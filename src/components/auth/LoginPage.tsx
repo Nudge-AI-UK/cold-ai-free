@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Zap, ArrowRight, Sparkles } from 'lucide-react'
 
 export function LoginPage() {
   const { signIn, signUp } = useAuth()
@@ -38,21 +38,32 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="w-full max-w-md px-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      {/* Background glow effect */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+      </div>
+      
+      <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl mb-4">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-2xl mb-4 relative">
+            <Zap className="w-10 h-10 text-primary" />
+            <div className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl animate-pulse" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Cold AI Free
+          <h1 className="text-4xl font-bold mb-2">
+            <span className="gradient-text">Cold AI</span> Free
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground">
             AI-powered outreach automation
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm text-primary">25 free messages per month</span>
+          </div>
         </div>
 
-        <Card>
+        <Card className="premium-card border-border/50">
           <CardHeader>
             <CardTitle>Welcome</CardTitle>
             <CardDescription>
@@ -61,7 +72,7 @@ export function LoginPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-2 bg-muted">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
@@ -78,6 +89,7 @@ export function LoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
+                      className="bg-input/50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -89,16 +101,24 @@ export function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
+                      className="bg-input/50"
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full btn-primary-glow" 
+                    disabled={loading}
+                  >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing in...
                       </>
                     ) : (
-                      'Sign In'
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
                     )}
                   </Button>
                 </form>
@@ -116,6 +136,7 @@ export function LoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
+                      className="bg-input/50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -128,16 +149,24 @@ export function LoginPage() {
                       required
                       disabled={loading}
                       minLength={6}
+                      className="bg-input/50"
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full btn-primary-glow" 
+                    disabled={loading}
+                  >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
                       </>
                     ) : (
-                      'Create Free Account'
+                      <>
+                        Create Free Account
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
                     )}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground">
@@ -148,6 +177,18 @@ export function LoginPage() {
             </Tabs>
           </CardContent>
         </Card>
+        
+        <div className="mt-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Need more features?
+          </p>
+          <a 
+            href={import.meta.env.VITE_UPGRADE_URL || 'https://app.coldai.uk'}
+            className="text-primary hover:text-primary/80 text-sm font-medium"
+          >
+            Upgrade to Pro →
+          </a>
+        </div>
       </div>
     </div>
   )
