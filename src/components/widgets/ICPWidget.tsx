@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import { ICPCreationModalV2 } from '@/components/states/ICPCreationModalV2'
-import { ICPUnifiedModal } from '@/components/icps/ICPUnifiedModal'
+//import { ICPUnifiedModal } from '@/components/icps/ICPUnifiedModal'
 
 interface ICPWidgetProps {
   className?: string
