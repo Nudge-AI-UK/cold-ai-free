@@ -43,7 +43,7 @@ export function MessageWidget({ isActive, onActivate }: MessageWidgetProps) {
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
     
     const { data } = await supabase
-      .from('usage')
+      .from('usage_tracking')
       .select('*')
       .eq('user_id', user.id)
       .gte('period_start', startOfMonth.toISOString())
@@ -113,7 +113,7 @@ export function MessageWidget({ isActive, onActivate }: MessageWidgetProps) {
       // Update usage
       if (usage) {
         await supabase
-          .from('usage')
+          .from('usage_tracking')
           .update({
             messages_sent: usage.messages_sent + 1,
             messages_remaining: usage.messages_remaining - 1,
