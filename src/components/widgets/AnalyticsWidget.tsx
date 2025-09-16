@@ -36,7 +36,7 @@ export function AnalyticsWidget({ isActive, onActivate }: AnalyticsWidgetProps) 
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
     
     const { data } = await supabase
-      .from('usage')
+      .from('usage_tracking')
       .select('*')
       .eq('user_id', user.id)
       .gte('period_start', startOfMonth.toISOString())
@@ -46,7 +46,7 @@ export function AnalyticsWidget({ isActive, onActivate }: AnalyticsWidgetProps) 
     if (!data) {
       // Create usage record if it doesn't exist
       const { data: newUsage } = await supabase
-        .from('usage')
+        .from('usage_tracking')
         .insert({
           user_id: user.id,
           messages_sent: 0,
