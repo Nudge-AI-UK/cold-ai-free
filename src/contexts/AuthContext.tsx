@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Ensure usage record exists
     const { data: usage } = await supabase
-      .from('usage')
+      .from('usage_tracking')
       .select('*')
       .eq('user_id', userId)
       .gte('period_start', new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString())
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!usage) {
       // Create usage record for current period
-      await supabase.from('usage').insert({
+      await supabase.from('usage_tracking').insert({
         user_id: userId,
         messages_sent: 0,
         messages_remaining: 25,
