@@ -7,8 +7,8 @@ import { Target, MoreVertical, Plus, Edit2, Eye, Loader2, CheckCircle2, Clock, A
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { ICPCreationModalV2 } from '@/components/ICPCreationModalV2'
-import { ICPUnifiedModal } from '@/components/icps/ICPUnifiedModal'
+import { ICPCreationModalV2 } from '@/components/states/ICPCreationModalV2'
+import { ICPUnifiedModal } from '@/components/states/ICPUnifiedModal'
 
 interface ICPWidgetProps {
   className?: string
