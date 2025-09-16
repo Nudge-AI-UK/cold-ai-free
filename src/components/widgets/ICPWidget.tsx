@@ -7,8 +7,8 @@ import { Target, MoreVertical, Plus, Edit2, Eye, Loader2, CheckCircle2, Clock, A
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { ICPCreationModalV2 } from '@/components/states/ICPCreationModalV2'
-import { ICPUnifiedModal } from '@/components/states/ICPUnifiedModal'
+import { ICPCreationModalV2 } from '@/components/ICPCreationModalV2'
+import { ICPUnifiedModal } from '@/components/icps/ICPUnifiedModal'
 
 interface ICPWidgetProps {
   className?: string
@@ -152,16 +152,73 @@ export function ICPWidget({ className }: ICPWidgetProps) {
           {/* State-based content */}
           {icpState === 'empty' && (
             <>
-              <p className="text-sm text-gray-400">Define your ideal customer</p>
-              <p className="text-xs text-gray-500">Free: 1 profile allowed</p>
+              {/* Central Icon and Message */}
+              <div className="text-center py-6">
+                <div className="relative inline-block mb-4">
+                  <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-[#FBAE1C]/20 to-[#FC9109]/20 flex items-center justify-center border border-[#FBAE1C]/30 animate-pulse">
+                    <span className="text-4xl">🎯</span>
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                    1
+                  </div>
+                </div>
+                
+                <h3 className="text-lg font-bold mb-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] bg-clip-text text-transparent">
+                  Define Your Ideal Customer
+                </h3>
+                
+                <p className="text-gray-400 text-xs mb-4 leading-relaxed">
+                  Unlock AI-powered messages that get responses
+                </p>
+              </div>
+
+              {/* Benefits Grid */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-white/5 rounded-lg p-2 text-center border border-white/10">
+                  <div className="text-lg mb-1">⚡</div>
+                  <p className="text-xs text-gray-400">10x Response</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 text-center border border-white/10">
+                  <div className="text-lg mb-1">🤖</div>
+                  <p className="text-xs text-gray-400">AI-Powered</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 text-center border border-white/10">
+                  <div className="text-lg mb-1">🚀</div>
+                  <p className="text-xs text-gray-400">5min Setup</p>
+                </div>
+              </div>
+
+              {/* What You'll Define */}
+              <div className="bg-black/20 rounded-xl p-3 mb-4 border border-white/5">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">What You'll Define</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1 h-1 rounded-full bg-[#FBAE1C]"></div>
+                    <span className="text-xs text-gray-400">Target job titles & decision makers</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1 h-1 rounded-full bg-[#FC9109]"></div>
+                    <span className="text-xs text-gray-400">Company size & industry focus</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1 h-1 rounded-full bg-[#DD6800]"></div>
+                    <span className="text-xs text-gray-400">Pain points & value drivers</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA Button */}
               <Button 
                 onClick={handleCreateClick}
-                size="sm"
-                className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:opacity-90"
+                className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:opacity-90 font-semibold"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Create ICP
+                Create Your First ICP
               </Button>
+              
+              <p className="text-center text-xs text-gray-500 mt-3">
+                Takes ~5 minutes • AI assists with suggestions
+              </p>
             </>
           )}
 
