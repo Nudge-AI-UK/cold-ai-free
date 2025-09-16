@@ -115,7 +115,7 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['messages']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['messages']['Insert']>
       }
-      usage: {
+      usage_tracking: {
         Row: {
           id: string
           user_id: string
@@ -126,8 +126,8 @@ export type Database = {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['usage']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['usage']['Insert']>
+        Insert: Omit<Database['public']['Tables']['usage_tracking']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['usage_tracking']['Insert']>
       }
       subscriptions: {
         Row: {
