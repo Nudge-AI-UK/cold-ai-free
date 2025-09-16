@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Target, Save, Lock, Plus, X } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { Target, MoreVertical, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
-import { toast } from 'sonner'
-import { COMPANY_SIZES } from '@/lib/constants'
+import { formatDistanceToNow } from 'date-fns'
 import type { ICP } from '@/types'
 
 interface ICPWidgetProps {
@@ -30,12 +26,6 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
   })
   const [loading, setLoading] = useState(false)
   const [hasICP, setHasICP] = useState(false)
-  
-  // Input states for array fields
-  const [jobTitleInput, setJobTitleInput] = useState('')
-  const [industryInput, setIndustryInput] = useState('')
-  const [painPointInput, setPainPointInput] = useState('')
-  const [goalInput, setGoalInput] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -59,92 +49,45 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
     }
   }
 
-  const handleSave = async () => {
-    if (!user || !icp.name) {
-      toast.error('ICP name is required')
-      return
-    }
+  // Calculate quality scores based on completeness
+  const calculateQualityScores = () => {
+    const hasName = icp.name ? 20 : 0
+    const hasJobTitles = (icp.job_titles?.length || 0) > 0 ? 20 : 0
+    const hasIndustries = (icp.industries?.length || 0) > 0 ? 20 : 0
+    const hasCompanySize = icp.company_size ? 20 : 0
+    const hasPainPoints = (icp.pain_points?.length || 0) > 0 ? 20 : 0
     
-    setLoading(true)
+    const completeness = hasName + hasJobTitles + hasIndustries + hasCompanySize + hasPainPoints
+    const specificity = hasJobTitles + hasIndustries + hasCompanySize
+    const relevance = hasName + hasPainPoints
     
-    if (hasICP && icp.id) {
-      // Update existing ICP
-      const { error } = await supabase
-        .from('icps')
-        .update({
-          name: icp.name,
-          job_titles: icp.job_titles || [],
-          industries: icp.industries || [],
-          company_size: icp.company_size || '',
-          pain_points: icp.pain_points || [],
-          goals: icp.goals || [],
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', icp.id)
-
-      if (error) {
-        toast.error('Failed to update ICP')
-      } else {
-        toast.success('ICP updated successfully')
-      }
-    } else {
-      // Create new ICP
-      const { data, error } = await supabase
-        .from('icps')
-        .insert({
-          user_id: user.id,
-          name: icp.name,
-          job_titles: icp.job_titles || [],
-          industries: icp.industries || [],
-          company_size: icp.company_size || '',
-          pain_points: icp.pain_points || [],
-          goals: icp.goals || [],
-        })
-        .select()
-        .single()
-
-      if (error) {
-        toast.error('Failed to create ICP')
-      } else if (data) {
-        setIcp(data)
-        setHasICP(true)
-        toast.success('ICP created successfully')
-      }
-    }
-    
-    setLoading(false)
-  }
-
-  const addToArray = (field: 'job_titles' | 'industries' | 'pain_points' | 'goals', value: string) => {
-    if (value.trim()) {
-      setIcp({
-        ...icp,
-        [field]: [...(icp[field] || []), value.trim()],
-      })
+    return {
+      completeness: Math.min(completeness, 92), // Cap at 92 for demo
+      specificity: Math.min(specificity * 1.5, 88), // Cap at 88 for demo
+      relevance: Math.min(relevance * 2, 85) // Cap at 85 for demo
     }
   }
 
-  const removeFromArray = (field: 'job_titles' | 'industries' | 'pain_points' | 'goals', index: number) => {
-    setIcp({
-      ...icp,
-      [field]: (icp[field] || []).filter((_, i) => i !== index),
-    })
-  }
+  const qualityScores = calculateQualityScores()
 
+  // Collapsed state (small card)
   if (!isActive) {
     return (
       <Card 
-        className="cursor-pointer hover:shadow-lg transition-shadow widget-fade-in"
+        className="cursor-pointer hover:shadow-lg transition-shadow widget-fade-in hover:border-orange-500/50"
         onClick={onActivate}
       >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Target className="h-5 w-5 text-primary" />
+              <Target className="h-5 w-5 text-orange-400" />
               <CardTitle className="text-lg">ICP</CardTitle>
             </div>
             {hasICP ? (
-              <Badge variant="secondary">1/1</Badge>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1 animate-pulse"></span>
+                Active
+              </Badge>
             ) : (
               <Badge variant="outline">0/1</Badge>
             )}
@@ -162,177 +105,196 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
     )
   }
 
+  // Expanded state (glassmorphic widget)
   return (
-    <Card className="lg:col-span-3 widget-fade-in">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Ideal Customer Profile</CardTitle>
-            <CardDescription>Define who you're targeting</CardDescription>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline">
-              <Lock className="h-3 w-3 mr-1" />
-              Free: 1 ICP
-            </Badge>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              <Save className="h-4 w-4 mr-1" />
-              Save
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="icp_name">Profile Name *</Label>
-            <Input
-              id="icp_name"
-              value={icp.name || ''}
-              onChange={(e) => setIcp({ ...icp, name: e.target.value })}
-              placeholder="e.g. Enterprise Sales Leaders"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="company_size">Company Size</Label>
-            <Select
-              value={icp.company_size || ''}
-              onValueChange={(value) => setIcp({ ...icp, company_size: value })}
-            >
-              <SelectTrigger id="company_size">
-                <SelectValue placeholder="Select size" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMPANY_SIZES.map((size) => (
-                  <SelectItem key={size.value} value={size.value}>
-                    {size.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="lg:col-span-3 widget-fade-in">
+      <div className="relative bg-gradient-to-br from-orange-900/40 via-amber-900/30 to-yellow-900/40 backdrop-blur-lg shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white">
         
-        <div className="space-y-2">
-          <Label>Job Titles</Label>
-          <div className="flex gap-2">
-            <Input
-              value={jobTitleInput}
-              onChange={(e) => setJobTitleInput(e.target.value)}
-              placeholder="e.g. Sales Director"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addToArray('job_titles', jobTitleInput)
-                  setJobTitleInput('')
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                addToArray('job_titles', jobTitleInput)
-                setJobTitleInput('')
-              }}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {icp.job_titles?.map((title, i) => (
-              <Badge key={i} variant="secondary">
-                {title}
-                <button
-                  onClick={() => removeFromArray('job_titles', i)}
-                  className="ml-1 hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <Label>Industries</Label>
-          <div className="flex gap-2">
-            <Input
-              value={industryInput}
-              onChange={(e) => setIndustryInput(e.target.value)}
-              placeholder="e.g. Technology"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addToArray('industries', industryInput)
-                  setIndustryInput('')
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                addToArray('industries', industryInput)
-                setIndustryInput('')
-              }}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {icp.industries?.map((industry, i) => (
-              <Badge key={i} variant="secondary">
-                {industry}
-                <button
-                  onClick={() => removeFromArray('industries', i)}
-                  className="ml-1 hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <Label>Pain Points</Label>
-          <Textarea
-            value={painPointInput}
-            onChange={(e) => setPainPointInput(e.target.value)}
-            placeholder="What challenges do they face?"
-            rows={2}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              addToArray('pain_points', painPointInput)
-              setPainPointInput('')
-            }}
-          >
-            Add Pain Point
-          </Button>
-          <div className="space-y-1">
-            {icp.pain_points?.map((point, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm">
-                <span className="text-muted-foreground">•</span>
-                <span className="flex-1">{point}</span>
-                <button
-                  onClick={() => removeFromArray('pain_points', i)}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+        {/* Header Section */}
+        <div className="relative z-20">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] flex items-center justify-center shadow-lg">
+                <span className="text-2xl">🎯</span>
               </div>
-            ))}
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold leading-tight">
+                  {hasICP ? icp.name : 'Create Your ICP'}
+                </h3>
+                {hasICP && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1 animate-pulse"></span>
+                    Active
+                  </span>
+                )}
+              </div>
+            </div>
+            <button className="text-white/50 hover:text-white/80 transition-colors">
+              <MoreVertical className="w-5 h-5" />
+            </button>
           </div>
+          
+          {/* Last Used and Product */}
+          {hasICP && (
+            <>
+              <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
+                Last used: {icp.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+              </div>
+              <div className="text-sm opacity-90 mb-4 tracking-wide">
+                Product: Cold AI Free
+              </div>
+            </>
+          )}
+
+          {hasICP ? (
+            <>
+              {/* Description */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
+                <div className="text-2xl mr-2 text-[#FBAE1C] drop-shadow-lg">📝</div>
+                <div className="text-sm opacity-90">
+                  {icp.pain_points && icp.pain_points.length > 0 
+                    ? icp.pain_points[0] 
+                    : `Targeting ${icp.industries?.join(', ') || 'various industries'}`}
+                </div>
+              </div>
+
+              {/* Quality Assessment */}
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-4 border border-white/5">
+                <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">Quality Assessment</h4>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Completeness</span>
+                      <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness}%</span>
+                    </div>
+                    <Progress 
+                      value={qualityScores.completeness} 
+                      className="h-1.5 bg-white/10"
+                      indicatorClassName="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Specificity</span>
+                      <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity}%</span>
+                    </div>
+                    <Progress 
+                      value={qualityScores.specificity} 
+                      className="h-1.5 bg-white/10"
+                      indicatorClassName="bg-gradient-to-r from-[#FC9109] to-[#DD6800]"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Relevance</span>
+                      <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.relevance}%</span>
+                    </div>
+                    <Progress 
+                      value={qualityScores.relevance} 
+                      className="h-1.5 bg-white/10"
+                      indicatorClassName="bg-gradient-to-r from-[#DD6800] to-[#FBAE1C]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Metrics */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                  <div className="text-2xl mb-1">🏢</div>
+                  <div className="text-xs text-white/50">Company Size</div>
+                  <div className="text-sm font-semibold">{icp.company_size || '1-50'}</div>
+                </div>
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                  <div className="text-2xl mb-1">💰</div>
+                  <div className="text-xs text-white/50">Budget Range</div>
+                  <div className="text-sm font-semibold">£2K-10K/mo</div>
+                </div>
+              </div>
+
+              {/* Industries */}
+              {icp.industries && icp.industries.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {icp.industries.slice(0, 2).map((industry, i) => (
+                      <span 
+                        key={i}
+                        className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium"
+                      >
+                        {industry}
+                      </span>
+                    ))}
+                    {icp.industries.length > 2 && (
+                      <span className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
+                        +{icp.industries.length - 2} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Summary */}
+              <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20">
+                <div className="flex items-start space-x-2">
+                  <span className="text-lg">✨</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      {qualityScores.completeness}% ready. 
+                      {icp.job_titles && icp.job_titles.length > 0 
+                        ? ` Targeting ${icp.job_titles.length} job titles.` 
+                        : ' Add job titles to improve targeting.'}
+                      {icp.pain_points && icp.pain_points.length > 0
+                        ? ` ${icp.pain_points.length} pain points identified.`
+                        : ' Define pain points for better messaging.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <Button 
+                  className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium hover:opacity-90 transition-all duration-200"
+                  onClick={() => window.location.href = '/icps'}
+                >
+                  View Details
+                </Button>
+                <Button 
+                  variant="secondary"
+                  size="icon"
+                  className="bg-white/5 backdrop-blur-sm border-white/10 hover:bg-white/10"
+                  onClick={() => window.location.href = '/message-generation'}
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </div>
+            </>
+          ) : (
+            /* Empty State */
+            <div className="text-center py-8">
+              <div className="mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] mb-4">
+                  <Target className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No ICP Created Yet</h3>
+                <p className="text-sm text-white/70 mb-6">
+                  Define your ideal customer profile to start generating targeted messages
+                </p>
+                <Button 
+                  className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium hover:opacity-90"
+                  onClick={() => window.location.href = '/icps'}
+                >
+                  Create Your First ICP
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+        
+        {/* Hover State Indicator */}
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
+      </div>
+    </div>
   )
 }
