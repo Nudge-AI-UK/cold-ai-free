@@ -16,14 +16,7 @@ interface ICPWidgetProps {
 
 export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
   const { user } = useAuth()
-  const [icp, setIcp] = useState<Partial<ICP>>({
-    name: '',
-    job_titles: [],
-    industries: [],
-    company_size: '',
-    pain_points: [],
-    goals: [],
-  })
+  const [icp, setIcp] = useState<any>({})
   const [loading, setLoading] = useState(false)
   const [hasICP, setHasICP] = useState(false)
 
@@ -39,7 +32,8 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
     const { data } = await supabase
       .from('icps')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('created_by', user.id)
+      .eq('is_active', true)
       .limit(1)
       .single()
 
@@ -49,26 +43,18 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
     }
   }
 
-  // Calculate quality scores based on completeness
-  const calculateQualityScores = () => {
-    const hasName = icp.name ? 20 : 0
-    const hasJobTitles = (icp.job_titles?.length || 0) > 0 ? 20 : 0
-    const hasIndustries = (icp.industries?.length || 0) > 0 ? 20 : 0
-    const hasCompanySize = icp.company_size ? 20 : 0
-    const hasPainPoints = (icp.pain_points?.length || 0) > 0 ? 20 : 0
-    
-    const completeness = hasName + hasJobTitles + hasIndustries + hasCompanySize + hasPainPoints
-    const specificity = hasJobTitles + hasIndustries + hasCompanySize
-    const relevance = hasName + hasPainPoints
-    
-    return {
-      completeness: Math.min(completeness, 92), // Cap at 92 for demo
-      specificity: Math.min(specificity * 1.5, 88), // Cap at 88 for demo
-      relevance: Math.min(relevance * 2, 85) // Cap at 85 for demo
-    }
+  // Get quality scores from metadata or use defaults
+  const qualityScores = icp.metadata?.ai_feedback?.quality_assessment?.scores || {
+    completeness: 0,
+    specificity: 0,
+    overall: 0
   }
 
-  const qualityScores = calculateQualityScores()
+  // Get personas count from metadata
+  const personasCount = icp.metadata?.personas?.length || 0
+
+  // Get AI summary from metadata
+  const aiSummary = icp.metadata?.ai_feedback?.summary || null
 
   // Collapsed state (small card)
   if (!isActive) {
@@ -95,7 +81,7 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {hasICP ? icp.name : 'Define your ideal customer'}
+            {hasICP ? icp.icp_name : 'Define your ideal customer'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Free: 1 profile allowed
@@ -119,7 +105,7 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold leading-tight">
-                  {hasICP ? icp.name : 'Create Your ICP'}
+                  {hasICP ? icp.icp_name : 'Create Your ICP'}
                 </h3>
                 {hasICP && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30 mt-1">
@@ -152,9 +138,7 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
                 <div className="text-2xl mr-2 text-[#FBAE1C] drop-shadow-lg">📝</div>
                 <div className="text-sm opacity-90">
-                  {icp.pain_points && icp.pain_points.length > 0 
-                    ? icp.pain_points[0] 
-                    : `Targeting ${icp.industries?.join(', ') || 'various industries'}`}
+                  {icp.description || `Targeting ${icp.industry_focus?.join(', ') || 'various industries'}`}
                 </div>
               </div>
 
@@ -165,10 +149,10 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-white/70">Completeness</span>
-                      <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness}%</span>
+                      <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness || 0}%</span>
                     </div>
                     <Progress 
-                      value={qualityScores.completeness} 
+                      value={qualityScores.completeness || 0} 
                       className="h-1.5 bg-white/10"
                       indicatorClassName="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]"
                     />
@@ -176,21 +160,21 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-white/70">Specificity</span>
-                      <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity}%</span>
+                      <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity || 0}%</span>
                     </div>
                     <Progress 
-                      value={qualityScores.specificity} 
+                      value={qualityScores.specificity || 0} 
                       className="h-1.5 bg-white/10"
                       indicatorClassName="bg-gradient-to-r from-[#FC9109] to-[#DD6800]"
                     />
                   </div>
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-white/70">Relevance</span>
-                      <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.relevance}%</span>
+                      <span className="text-xs text-white/70">Overall</span>
+                      <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.overall || 0}%</span>
                     </div>
                     <Progress 
-                      value={qualityScores.relevance} 
+                      value={qualityScores.overall || 0} 
                       className="h-1.5 bg-white/10"
                       indicatorClassName="bg-gradient-to-r from-[#DD6800] to-[#FBAE1C]"
                     />
@@ -203,20 +187,20 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
                 <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                   <div className="text-2xl mb-1">🏢</div>
                   <div className="text-xs text-white/50">Company Size</div>
-                  <div className="text-sm font-semibold">{icp.company_size || '1-50'}</div>
+                  <div className="text-sm font-semibold">{icp.company_size_range || '1-50'}</div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                   <div className="text-2xl mb-1">💰</div>
                   <div className="text-xs text-white/50">Budget Range</div>
-                  <div className="text-sm font-semibold">£2K-10K/mo</div>
+                  <div className="text-sm font-semibold">{icp.budget_range || '£2K-10K/mo'}</div>
                 </div>
               </div>
 
               {/* Industries */}
-              {icp.industries && icp.industries.length > 0 && (
+              {icp.industry_focus && icp.industry_focus.length > 0 && (
                 <div className="mb-4">
                   <div className="flex flex-wrap gap-2">
-                    {icp.industries.slice(0, 2).map((industry, i) => (
+                    {icp.industry_focus.slice(0, 2).map((industry: string, i: number) => (
                       <span 
                         key={i}
                         className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium"
@@ -224,9 +208,9 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
                         {industry}
                       </span>
                     ))}
-                    {icp.industries.length > 2 && (
+                    {icp.industry_focus.length > 2 && (
                       <span className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
-                        +{icp.industries.length - 2} more
+                        +{icp.industry_focus.length - 2} more
                       </span>
                     )}
                   </div>
@@ -240,13 +224,7 @@ export function ICPWidget({ isActive, onActivate }: ICPWidgetProps) {
                   <div className="flex-1">
                     <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
                     <p className="text-xs text-white/70 leading-relaxed">
-                      {qualityScores.completeness}% ready. 
-                      {icp.job_titles && icp.job_titles.length > 0 
-                        ? ` Targeting ${icp.job_titles.length} job titles.` 
-                        : ' Add job titles to improve targeting.'}
-                      {icp.pain_points && icp.pain_points.length > 0
-                        ? ` ${icp.pain_points.length} pain points identified.`
-                        : ' Define pain points for better messaging.'}
+                      {aiSummary || `${qualityScores.overall || 0}% ready. ${personasCount > 0 ? `${personasCount} buyer personas identified.` : 'Add personas for better targeting.'}`}
                     </p>
                   </div>
                 </div>
