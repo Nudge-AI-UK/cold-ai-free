@@ -41,7 +41,7 @@ export function WidgetDashboard() {
     <div className="min-h-screen">
       <Header />
       
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
+      <main className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -79,7 +79,7 @@ export function WidgetDashboard() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 auto-rows-min"
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-min"
         >
           {/* <motion.div variants={itemVariants}>
             <ProfileWidget 
