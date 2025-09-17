@@ -202,207 +202,208 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
     )
   }
 
-// Active State - Beautiful Version
-const qualityScores = icp?.metadata?.quality_scores || 
-                      icp?.metadata?.ai_feedback?.quality_assessment?.scores || 
-                      null
+  // Active State - Beautiful Version (and default for any other state)
+  const qualityScores = icp?.metadata?.quality_scores || 
+                        icp?.metadata?.ai_feedback?.quality_assessment?.scores || 
+                        null
 
-return (
-  <>
-    {/* Main Widget Container - No Card wrapper, pure div with glass effect */}
-    <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
-         style={{
-           background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
-           backdropFilter: 'blur(10px)',
-           WebkitBackdropFilter: 'blur(10px)'
-         }}>
-      
-      {/* Status Badge */}
-      <div className="absolute top-4 right-4 z-30">
-        <div className="bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1 rounded-full text-xs flex items-center">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse"></span>
-          Live
-        </div>
-      </div>
-
-      <div className="relative z-20">
-        {/* Last Used */}
-        <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
-          Last used: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
-        </div>
-
-        {/* ICP Name with icon */}
-        <div className="flex items-center mb-2">
-          <div className="text-5xl mr-3">🎯</div>
-          <div className="text-4xl font-semibold">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]">
-              {icp?.icp_name || 'B2B Sales Teams'}
-            </span>
+  return (
+    <>
+      {/* Main Widget Container - No Card wrapper, pure div with glass effect */}
+      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+           style={{
+             background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+             backdropFilter: 'blur(10px)',
+             WebkitBackdropFilter: 'blur(10px)'
+           }}>
+        
+        {/* Status Badge */}
+        <div className="absolute top-4 right-4 z-30">
+          <div className="bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1 rounded-full text-xs flex items-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse"></span>
+            Live
           </div>
         </div>
 
-        {/* Product Name */}
-        <div className="text-lg opacity-90 mb-4 tracking-wide">
-          Product: Cold AI Free
-        </div>
+        <div className="relative z-20">
+          {/* Last Used */}
+          <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
+            Last used: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+          </div>
 
-        {/* Description */}
-        {icp?.description && (
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
-            <div className="text-2xl mr-2">📝</div>
-            <div className="text-sm opacity-90">
-              {icp.description}
+          {/* ICP Name with icon */}
+          <div className="flex items-center mb-2">
+            <div className="text-5xl mr-3">🎯</div>
+            <div className="text-4xl font-semibold">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]">
+                {icp?.icp_name || 'B2B Sales Teams'}
+              </span>
             </div>
           </div>
-        )}
 
-        {/* Quality Assessment */}
-        {qualityScores && (qualityScores.completeness || qualityScores.specificity || qualityScores.overall) && (
-          <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-4 border border-white/5">
-            <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">Quality Assessment</h4>
-            <div className="space-y-3">
-              {qualityScores.completeness !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-white/70">Completeness</span>
-                    <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness}%</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full" 
-                         style={{ 
-                           width: `${qualityScores.completeness}%`,
-                           background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
-                         }}></div>
-                  </div>
-                </div>
-              )}
-              {qualityScores.specificity !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-white/70">Specificity</span>
-                    <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity}%</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full" 
-                         style={{ 
-                           width: `${qualityScores.specificity}%`,
-                           background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
-                         }}></div>
-                  </div>
-                </div>
-              )}
-              {qualityScores.overall !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-white/70">Overall</span>
-                    <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.overall}%</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full" 
-                         style={{ 
-                           width: `${qualityScores.overall}%`,
-                           background: 'linear-gradient(90deg, #DD6800 0%, #FBAE1C 100%)'
-                         }}></div>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Product Name */}
+          <div className="text-lg opacity-90 mb-4 tracking-wide">
+            Product: Cold AI Free
           </div>
-        )}
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          {icp?.company_size_range && (
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-              <div className="text-2xl mb-1">🏢</div>
-              <div className="text-xs text-white/50">Company Size</div>
-              <div className="text-sm font-semibold">{icp.company_size_range}</div>
+          {/* Description */}
+          {icp?.description && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
+              <div className="text-2xl mr-2">📝</div>
+              <div className="text-sm opacity-90">
+                {icp.description}
+              </div>
             </div>
           )}
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-            <div className="text-2xl mb-1">💰</div>
-            <div className="text-xs text-white/50">Budget Range</div>
-            <div className="text-sm font-semibold">£2K-10K/mo</div>
-          </div>
-        </div>
 
-        {/* Industries */}
-        {icp?.industry_focus && icp.industry_focus.length > 0 && (
-          <div className="mb-4">
-            <div className="flex flex-wrap gap-2">
-              {icp.industry_focus.slice(0, 2).map((industry: string, idx: number) => (
-                <span key={idx} className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
-                  {industry}
-                </span>
-              ))}
-              {icp.industry_focus.length > 2 && (
-                <span className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
-                  +{icp.industry_focus.length - 2} more
-                </span>
-              )}
+          {/* Quality Assessment */}
+          {qualityScores && (qualityScores.completeness || qualityScores.specificity || qualityScores.overall) && (
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-4 border border-white/5">
+              <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">Quality Assessment</h4>
+              <div className="space-y-3">
+                {qualityScores.completeness !== undefined && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Completeness</span>
+                      <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness}%</span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.completeness}%`,
+                             background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
+                           }}></div>
+                    </div>
+                  </div>
+                )}
+                {qualityScores.specificity !== undefined && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Specificity</span>
+                      <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity}%</span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.specificity}%`,
+                             background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
+                           }}></div>
+                    </div>
+                  </div>
+                )}
+                {qualityScores.overall !== undefined && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-white/70">Overall</span>
+                      <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.overall}%</span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.overall}%`,
+                             background: 'linear-gradient(90deg, #DD6800 0%, #FBAE1C 100%)'
+                           }}></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {icp?.company_size_range && (
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                <div className="text-2xl mb-1">🏢</div>
+                <div className="text-xs text-white/50">Company Size</div>
+                <div className="text-sm font-semibold">{icp.company_size_range}</div>
+              </div>
+            )}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+              <div className="text-2xl mb-1">💰</div>
+              <div className="text-xs text-white/50">Budget Range</div>
+              <div className="text-sm font-semibold">£2K-10K/mo</div>
             </div>
           </div>
-        )}
 
-        {/* AI Summary */}
-        <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20">
-          <div className="flex items-start space-x-2">
-            <span className="text-lg">✨</span>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
-              <p className="text-xs text-white/70 leading-relaxed">
-                {qualityScores?.overall ? `${qualityScores.overall}% ready.` : ''} Strong foundation with clear personas.
-              </p>
+          {/* Industries */}
+          {icp?.industry_focus && icp.industry_focus.length > 0 && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {icp.industry_focus.slice(0, 2).map((industry: string, idx: number) => (
+                  <span key={idx} className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
+                    {industry}
+                  </span>
+                ))}
+                {icp.industry_focus.length > 2 && (
+                  <span className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
+                    +{icp.industry_focus.length - 2} more
+                  </span>
+                )}
+              </div>
             </div>
+          )}
+
+          {/* AI Summary */}
+          <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20">
+            <div className="flex items-start space-x-2">
+              <span className="text-lg">✨</span>
+              <div className="flex-1">
+                <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  {qualityScores?.overall ? `${qualityScores.overall}% ready.` : ''} Strong foundation with clear personas.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            <button 
+              onClick={() => setIsUnifiedModalOpen(true)}
+              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
+            >
+              View Details
+            </button>
+            <button 
+              onClick={() => setIsUnifiedModalOpen(true)}
+              className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
+            >
+              <Edit2 className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex space-x-3">
-          <button 
-            onClick={() => setIsUnifiedModalOpen(true)}
-            className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
-          >
-            View Details
-          </button>
-          <button 
-            onClick={() => setIsUnifiedModalOpen(true)}
-            className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
-          >
-            <Edit2 className="w-5 h-5" />
-          </button>
-        </div>
+        {/* Hover State Indicator */}
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
       </div>
 
-      {/* Hover State Indicator */}
-      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
-    </div>
-
-    {/* Modals */}
-    <ICPCreationModalV2
-      isOpen={isCreationModalOpen}
-      onClose={() => {
-        setIsCreationModalOpen(false)
-        fetchICP()
-      }}
-      onSuccess={() => {
-        fetchICP()
-      }}
-      onGenerate={handleGenerate}
-    />
-
-    {icp && (
-      <ICPUnifiedModal
-        isOpen={isUnifiedModalOpen}
+      {/* Modals */}
+      <ICPCreationModalV2
+        isOpen={isCreationModalOpen}
         onClose={() => {
-          setIsUnifiedModalOpen(false)
+          setIsCreationModalOpen(false)
           fetchICP()
         }}
-        icp={icp}
-        onUpdate={() => {
+        onSuccess={() => {
           fetchICP()
         }}
+        onGenerate={handleGenerate}
       />
-    )}
-  </>
-)
+
+      {icp && (
+        <ICPUnifiedModal
+          isOpen={isUnifiedModalOpen}
+          onClose={() => {
+            setIsUnifiedModalOpen(false)
+            fetchICP()
+          }}
+          icp={icp}
+          onUpdate={() => {
+            fetchICP()
+          }}
+        />
+      )}
+    </>
+  )
+}
