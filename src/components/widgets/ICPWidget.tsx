@@ -68,6 +68,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
     try {
       const { data, error } = await supabase
         .from('icps')
+        .select('*, knowledge_base!product_link_id(product_name)')
         .select('*')
         .eq('created_by', user.id)
         .eq('is_active', true)
@@ -243,14 +244,14 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
 
           {/* Product Name */}
           <div className="text-lg opacity-90 mb-4 tracking-wide">
-            Product: Cold AI Free
+            Product: {icp?.knowledge_base?.product_name || 'Cold AI Free'}
           </div>
 
           {/* Description */}
           {icp?.description && (
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
               <div className="text-2xl mr-2">📝</div>
-              <div className="text-sm opacity-90">
+              <div className="text-sm opacity-90 line-clamp-2">
                 {icp.description}
               </div>
             </div>
@@ -309,7 +310,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
               </div>
             </div>
           )}
-
+          
           {/* Key Metrics */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             {icp?.company_size_range && (
@@ -319,11 +320,13 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
                 <div className="text-sm font-semibold">{icp.company_size_range}</div>
               </div>
             )}
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-              <div className="text-2xl mb-1">💰</div>
-              <div className="text-xs text-white/50">Budget Range</div>
-              <div className="text-sm font-semibold">£2K-10K/mo</div>
-            </div>
+            {icp?.budget_range && (
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                <div className="text-2xl mb-1">💰</div>
+                <div className="text-xs text-white/50">Budget Range</div>
+                <div className="text-sm font-semibold">{icp.budget_range}</div>
+              </div>
+            )}
           </div>
 
           {/* Industries */}
@@ -343,20 +346,22 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
               </div>
             </div>
           )}
-
+          
           {/* AI Summary */}
-          <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20">
-            <div className="flex items-start space-x-2">
-              <span className="text-lg">✨</span>
-              <div className="flex-1">
-                <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
-                <p className="text-xs text-white/70 leading-relaxed">
-                  {qualityScores?.overall ? `${qualityScores.overall}% ready.` : ''} Strong foundation with clear personas.
-                </p>
+          {(icp?.metadata?.ai_feedback?.summary || qualityScores) && (
+            <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20">
+              <div className="flex items-start space-x-2">
+                <span className="text-lg">✨</span>
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
+                  <p className="text-xs text-white/70 leading-relaxed line-clamp-2">
+                    {icp?.metadata?.ai_feedback?.summary || 
+                     (qualityScores?.overall ? `${qualityScores.overall}% ready. Strong foundation with clear personas.` : 'Ready for messaging')}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-
+          )}
           {/* Action Buttons */}
           <div className="flex space-x-3">
             <button 
