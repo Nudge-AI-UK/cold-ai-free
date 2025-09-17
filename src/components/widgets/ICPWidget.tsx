@@ -132,54 +132,130 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
   // Empty State
   if (icpState === 'empty') {
     return (
-      <Card className={`relative overflow-hidden backdrop-blur-md bg-gradient-to-br from-gray-900/90 via-gray-800/90 to-gray-900/90 border-white/10 hover:border-[#FBAE1C]/30 transition-all duration-300 ${className}`}>
-        <div className="p-6">
-          <div className="text-center py-6">
-            <div className="relative inline-block mb-4">
-              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-[#FBAE1C]/20 to-[#FC9109]/20 flex items-center justify-center border border-[#FBAE1C]/30 animate-pulse">
-                <span className="text-4xl">🎯</span>
-              </div>
-              <Badge className="absolute -top-1 -right-1 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] text-white">
-                1
-              </Badge>
-            </div>
-            
-            <h3 className="text-lg font-bold mb-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] bg-clip-text text-transparent">
-              Define Your Ideal Customer
-            </h3>
-            
-            <p className="text-gray-400 text-xs mb-4">
-              Unlock AI-powered messages that get responses
-            </p>
-
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                <div className="text-lg mb-1">⚡</div>
-                <p className="text-xs text-gray-400">10x Response</p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                <div className="text-lg mb-1">🤖</div>
-                <p className="text-xs text-gray-400">AI-Powered</p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                <div className="text-lg mb-1">🚀</div>
-                <p className="text-xs text-gray-400">5min Setup</p>
-              </div>
-            </div>
-
-            <Button 
-              onClick={() => setIsCreationModalOpen(true)}
-              className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:shadow-lg hover:shadow-[#FBAE1C]/25 transition-all duration-200 font-semibold"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First ICP
-            </Button>
+      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+           style={{
+             background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+             backdropFilter: 'blur(10px)',
+             WebkitBackdropFilter: 'blur(10px)'
+           }}>
+        
+        {/* Status Badge */}
+        <div className="absolute top-4 right-4 z-30">
+          <div className="bg-gray-700/50 text-gray-400 border border-gray-600/50 px-3 py-1 rounded-full text-xs">
+            Not Created
           </div>
         </div>
-      </Card>
+  
+        <div className="relative z-20">
+          {/* Account Type */}
+          <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
+            Free Account: 1 ICP Limit
+          </div>
+  
+          {/* Empty Title Area */}
+          <div className="flex items-center mb-2">
+            <div className="text-5xl mr-3">🎯</div>
+            <div className="text-4xl font-semibold">
+              {/* Empty - no title to show */}
+            </div>
+          </div>
+  
+          {/* Central Icon and Message */}
+          <div className="text-center py-8">
+            <div className="relative inline-block mb-6" style={{ animation: 'float 3s ease-in-out infinite' }}>
+              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-[#FBAE1C]/20 to-[#FC9109]/20 flex items-center justify-center border border-[#FBAE1C]/30">
+                <span className="text-5xl">🎯</span>
+              </div>
+              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                1
+              </div>
+            </div>
+            
+            <h2 className="text-2xl font-bold mb-2" 
+                style={{
+                  background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 25%, #DD6800 50%, #FC9109 75%, #FBAE1C 100%)',
+                  backgroundSize: '200% auto',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  animation: 'shimmer 3s linear infinite'
+                }}>
+              Define Your Ideal Customer
+            </h2>
+            
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed max-w-sm mx-auto">
+              Create your first Ideal Customer Profile to unlock AI-powered message personalisation that gets responses
+            </p>
+          </div>
+  
+          {/* Benefits Grid */}
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            <div className="rounded-xl p-3 text-center border border-white/5 hover:transform hover:-translate-y-0.5 transition-all duration-300"
+                 style={{
+                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <div className="text-2xl mb-2">⚡</div>
+              <p className="text-xs text-gray-300">10x Response Rate</p>
+            </div>
+            <div className="rounded-xl p-3 text-center border border-white/5 hover:transform hover:-translate-y-0.5 transition-all duration-300"
+                 style={{
+                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <div className="text-2xl mb-2">🤖</div>
+              <p className="text-xs text-gray-300">AI-Powered</p>
+            </div>
+            <div className="rounded-xl p-3 text-center border border-white/5 hover:transform hover:-translate-y-0.5 transition-all duration-300"
+                 style={{
+                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                   backdropFilter: 'blur(10px)'
+                 }}>
+              <div className="text-2xl mb-2">🚀</div>
+              <p className="text-xs text-gray-300">5min Setup</p>
+            </div>
+          </div>
+  
+          {/* What You'll Define Section */}
+          <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-6 border border-white/5">
+            <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">What You'll Define</h4>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#FBAE1C]"></div>
+                <span className="text-xs text-gray-300">Target job titles & decision makers</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#FC9109]"></div>
+                <span className="text-xs text-gray-300">Company size & industry focus</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#DD6800]"></div>
+                <span className="text-xs text-gray-300">Pain points & value drivers</span>
+              </div>
+            </div>
+          </div>
+  
+          {/* CTA Button */}
+          <button 
+            onClick={() => setIsCreationModalOpen(true)}
+            className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-4 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
+          >
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+            <span>Create Your First ICP</span>
+          </button>
+  
+          {/* Helper Text */}
+          <p className="text-center text-xs text-gray-500 mt-4">
+            Takes ~5 minutes • AI assists with suggestions
+          </p>
+        </div>
+  
+        {/* Decorative Elements */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>
+      </div>
     )
   }
-
   // Generating State
   if (icpState === 'generating') {
     return (
