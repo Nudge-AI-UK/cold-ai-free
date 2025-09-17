@@ -203,62 +203,77 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
   }
 
   // Active State - Beautiful Version
-  const qualityScores = icp?.metadata?.quality_scores || 
-                        icp?.metadata?.ai_feedback?.quality_assessment?.scores || 
-                        null
+const qualityScores = icp?.metadata?.quality_scores || 
+                      icp?.metadata?.ai_feedback?.quality_assessment?.scores || 
+                      null
 
+if (icpState === 'active') {
   return (
     <>
-      <Card className={`relative overflow-hidden backdrop-blur-md bg-gradient-to-br from-[#FBAE1C]/10 via-[#DD6800]/5 to-transparent border-white/10 hover:border-[#FBAE1C]/30 transition-all duration-300 ${className}`}>
+      {/* Main Widget Container - No Card wrapper, pure div with glass effect */}
+      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+           style={{
+             background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+             backdropFilter: 'blur(10px)',
+             WebkitBackdropFilter: 'blur(10px)'
+           }}>
+        
         {/* Status Badge */}
         <div className="absolute top-4 right-4 z-30">
-          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse inline-block" />
-            Active
-          </Badge>
+          <div className="bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1 rounded-full text-xs flex items-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse"></span>
+            Live
+          </div>
         </div>
 
-        <div className="relative z-20 p-6">
-          {/* Header Section */}
-          <div className="mb-4">
-            <div className="text-xs text-gray-400 mb-2">
-              Last used: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+        <div className="relative z-20">
+          {/* Last Used */}
+          <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
+            Last used: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+          </div>
+
+          {/* ICP Name with icon */}
+          <div className="flex items-center mb-2">
+            <div className="text-5xl mr-3">🎯</div>
+            <div className="text-4xl font-semibold">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]">
+                {icp?.icp_name || 'B2B Sales Teams'}
+              </span>
             </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="text-4xl">🎯</div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] bg-clip-text text-transparent">
-                  {icp?.icp_name || 'Ideal Customer Profile'}
-                </h3>
-                <p className="text-sm text-gray-400 mt-1">Product: Cold AI Free</p>
-              </div>
-            </div>
+          </div>
+
+          {/* Product Name */}
+          <div className="text-lg opacity-90 mb-4 tracking-wide">
+            Product: Cold AI Free
           </div>
 
           {/* Description */}
           {icp?.description && (
-            <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/10">
-              <p className="text-sm text-gray-300 line-clamp-2">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-start mb-4 border border-white/5 shadow-sm">
+              <div className="text-2xl mr-2">📝</div>
+              <div className="text-sm opacity-90">
                 {icp.description}
-              </p>
+              </div>
             </div>
           )}
 
-          {/* Quality Assessment - Only show if we have actual data */}
+          {/* Quality Assessment */}
           {qualityScores && (qualityScores.completeness || qualityScores.specificity || qualityScores.overall) && (
-            <div className="bg-black/20 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/5">
-              <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-2">Quality Assessment</h4>
-              <div className="space-y-2">
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-4 border border-white/5">
+              <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">Quality Assessment</h4>
+              <div className="space-y-3">
                 {qualityScores.completeness !== undefined && (
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-white/70">Completeness</span>
-                      <span className="text-xs font-semibold text-[#FBAE1C]">{qualityScores.completeness}%</span>
+                      <span className="text-xs font-semibold text-gradient">{qualityScores.completeness}%</span>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1">
-                      <div className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] h-1 rounded-full transition-all duration-300" 
-                           style={{ width: `${qualityScores.completeness}%` }} />
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.completeness}%`,
+                             background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
+                           }}></div>
                     </div>
                   </div>
                 )}
@@ -266,11 +281,14 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-white/70">Specificity</span>
-                      <span className="text-xs font-semibold text-[#FC9109]">{qualityScores.specificity}%</span>
+                      <span className="text-xs font-semibold text-gradient">{qualityScores.specificity}%</span>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1">
-                      <div className="bg-gradient-to-r from-[#FC9109] to-[#DD6800] h-1 rounded-full transition-all duration-300" 
-                           style={{ width: `${qualityScores.specificity}%` }} />
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.specificity}%`,
+                             background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
+                           }}></div>
                     </div>
                   </div>
                 )}
@@ -278,11 +296,14 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-white/70">Overall</span>
-                      <span className="text-xs font-semibold text-[#DD6800]">{qualityScores.overall}%</span>
+                      <span className="text-xs font-semibold text-gradient">{qualityScores.overall}%</span>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1">
-                      <div className="bg-gradient-to-r from-[#DD6800] to-[#FBAE1C] h-1 rounded-full transition-all duration-300" 
-                           style={{ width: `${qualityScores.overall}%` }} />
+                    <div className="w-full bg-white/10 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" 
+                           style={{ 
+                             width: `${qualityScores.overall}%`,
+                             background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
+                           }}></div>
                     </div>
                   </div>
                 )}
@@ -291,63 +312,104 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           )}
 
           {/* Key Metrics */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             {icp?.company_size_range && (
-              <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2 border border-white/10">
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                <div className="text-2xl mb-1">🏢</div>
                 <div className="text-xs text-white/50">Company Size</div>
-                <div className="text-sm font-semibold text-white">{icp.company_size_range}</div>
+                <div className="text-sm font-semibold">{icp.company_size_range}</div>
               </div>
             )}
-            {icp?.industry_focus?.length > 0 && (
-              <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2 border border-white/10">
-                <div className="text-xs text-white/50">Industries</div>
-                <div className="text-sm font-semibold text-white">{icp.industry_focus.length}</div>
-              </div>
-            )}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+              <div className="text-2xl mb-1">💰</div>
+              <div className="text-xs text-white/50">Budget Range</div>
+              <div className="text-sm font-semibold">£2K-10K/mo</div>
+            </div>
           </div>
 
-          {/* AI Insights */}
-          {(qualityScores || icp?.metadata?.ai_insights) && (
-            <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-lg p-2 mb-4 border border-[#FBAE1C]/20">
-              <div className="flex items-start gap-2">
-                <Sparkles className="w-3 h-3 text-[#FBAE1C] mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-xs font-medium text-[#FBAE1C]">AI Insights</div>
-                  <p className="text-xs text-white/70">
-                    {icp?.metadata?.ai_insights || 
-                     (qualityScores?.overall ? `${qualityScores.overall}% optimized for outreach` : 'Ready for messaging')}
-                  </p>
-                </div>
+          {/* Industries */}
+          {icp?.industry_focus && icp.industry_focus.length > 0 && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {icp.industry_focus.slice(0, 2).map((industry: string, idx: number) => (
+                  <span key={idx} className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
+                    {industry}
+                  </span>
+                ))}
+                {icp.industry_focus.length > 2 && (
+                  <span className="px-3 py-1 bg-gradient-to-r from-[#FBAE1C]/20 to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-full text-xs font-medium">
+                    +{icp.industry_focus.length - 2} more
+                  </span>
+                )}
               </div>
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-2">
-            <Button 
+          {/* AI Summary with shimmer */}
+          <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 rounded-xl p-3 mb-4 border border-[#FBAE1C]/20 shimmer">
+            <div className="flex items-start space-x-2">
+              <span className="text-lg">✨</span>
+              <div className="flex-1">
+                <div className="text-xs font-medium text-[#FBAE1C] mb-1">AI Insights</div>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  {qualityScores?.overall ? `${qualityScores.overall}% ready.` : ''} Strong foundation with clear personas. 3 buyer profiles identified.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            <button 
               onClick={() => setIsUnifiedModalOpen(true)}
-              size="sm"
-              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:shadow-lg hover:shadow-[#FBAE1C]/25 transition-all duration-200"
+              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
             >
-              <Eye className="w-3 h-3 mr-1" />
               View Details
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="bg-white/5 hover:bg-white/10 border border-white/10"
+            </button>
+            <button 
               onClick={() => setIsUnifiedModalOpen(true)}
+              className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
             >
-              <Edit2 className="w-3 h-3" />
-            </Button>
+              <Edit2 className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        {/* Decorative Glow */}
-        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl" />
-      </Card>
+        {/* Hover State Indicator */}
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
+      </div>
 
-      {/* Modals */}
+      {/* Add CSS for text-gradient and shimmer */}
+      <style jsx>{`
+        .text-gradient {
+          background: linear-gradient(135deg, #FBAE1C 0%, #FC9109 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        
+        .shimmer {
+          background: linear-gradient(
+            90deg,
+            rgba(251, 174, 28, 0.3) 0%,
+            rgba(252, 145, 9, 0.5) 50%,
+            rgba(251, 174, 28, 0.3) 100%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+      `}</style>
+
+      {/* Keep your existing modals */}
       <ICPCreationModalV2
         isOpen={isCreationModalOpen}
         onClose={() => {
