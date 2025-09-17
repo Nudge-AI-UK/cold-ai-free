@@ -102,12 +102,12 @@ export function WidgetDashboard() {
             />
           </motion.div> */}
           
-          {/ <motion.div variants={itemVariants}>
+          { <motion.div variants={itemVariants}>
             <KnowledgeWidget 
               isActive={activeWidget === 'knowledge'}
               onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
             />
-          </motion.div> /}
+          </motion.div> }
           
           <motion.div variants={itemVariants}>
             <ICPWidget 
