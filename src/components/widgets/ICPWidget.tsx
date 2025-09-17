@@ -80,11 +80,6 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         .limit(1)
         .single()
 
-      console.log('ICP data with join:', data)
-      console.log('Knowledge base data:', data?.knowledge_base)
-      console.log('Product link ID:', data?.product_link_id)
-      console.log('Supabase error:', error)
-
 
       if (data) {
         setIcp(data)
@@ -254,7 +249,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
 
           {/* Product Name */}
           <div className="text-lg opacity-90 mb-4 tracking-wide">
-            Product: {icp?.knowledge_base?.title || 'Cold AI Free'}
+            Product: {icp?.knowledge_base?.title?.replace(/^"|"$/g, '') || 'Error Displaying Title'}
           </div>
 
           {/* Description */}
