@@ -85,6 +85,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
       console.log('ICP data with join:', data)
       console.log('Knowledge base data:', data?.knowledge_base)
       console.log('Product link ID:', data?.product_link_id)
+      console.log('Supabase error:', error)
 
 
       if (data) {
