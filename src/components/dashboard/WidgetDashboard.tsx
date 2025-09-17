@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
-import { ProfileWidget } from '@/components/widgets/ProfileWidget'
-import { CompanyWidget } from '@/components/widgets/CompanyWidget'
-import { CommunicationWidget } from '@/components/widgets/CommunicationWidget'
-import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
+//import { ProfileWidget } from '@/components/widgets/ProfileWidget'
+//import { CompanyWidget } from '@/components/widgets/CompanyWidget'
+//import { CommunicationWidget } from '@/components/widgets/CommunicationWidget'
+//import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { ICPWidget } from '@/components/widgets/ICPWidget'
-import { ProspectWidget } from '@/components/widgets/ProspectWidget'
-import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
-import { MessageWidget } from '@/components/widgets/MessageWidget'
-import { UpgradeWidget } from '@/components/widgets/UpgradeWidget'
+//import { ProspectWidget } from '@/components/widgets/ProspectWidget'
+//import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
+//import { MessageWidget } from '@/components/widgets/MessageWidget'
+//import { UpgradeWidget } from '@/components/widgets/UpgradeWidget'
 import { motion } from 'framer-motion'
 import { Zap } from 'lucide-react'
 
@@ -81,33 +81,33 @@ export function WidgetDashboard() {
           animate="visible"
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 auto-rows-min"
         >
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <ProfileWidget 
               isActive={activeWidget === 'profile'}
               onActivate={() => setActiveWidget(activeWidget === 'profile' ? null : 'profile')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <CompanyWidget 
               isActive={activeWidget === 'company'}
               onActivate={() => setActiveWidget(activeWidget === 'company' ? null : 'company')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <CommunicationWidget 
               isActive={activeWidget === 'communication'}
               onActivate={() => setActiveWidget(activeWidget === 'communication' ? null : 'communication')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <KnowledgeWidget 
               isActive={activeWidget === 'knowledge'}
               onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
             />
-          </motion.div>
+          </motion.div> */}
           
           <motion.div variants={itemVariants}>
             <ICPWidget 
@@ -116,33 +116,33 @@ export function WidgetDashboard() {
             />
           </motion.div>
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <ProspectWidget 
               isActive={activeWidget === 'prospects'}
               onActivate={() => setActiveWidget(activeWidget === 'prospects' ? null : 'prospects')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <AnalyticsWidget 
               isActive={activeWidget === 'analytics'}
               onActivate={() => setActiveWidget(activeWidget === 'analytics' ? null : 'analytics')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <MessageWidget 
               isActive={activeWidget === 'messages'}
               onActivate={() => setActiveWidget(activeWidget === 'messages' ? null : 'messages')}
             />
-          </motion.div>
+          </motion.div> */}
           
-          <motion.div variants={itemVariants}>
+          {/* <motion.div variants={itemVariants}>
             <UpgradeWidget 
               isActive={activeWidget === 'upgrade'}
               onActivate={() => setActiveWidget(activeWidget === 'upgrade' ? null : 'upgrade')}
             />
-          </motion.div>
+          </motion.div> */}
         </motion.div>
       </main>
 

@@ -34,7 +34,7 @@ export function CompanyWidget({ isActive, onActivate }: CompanyWidgetProps) {
     if (!user) return
     
     const { data, error } = await supabase
-      .from('company_profiles')
+      .from('business_profiles')
       .select('*')
       .eq('user_id', user.id)
       .single()
@@ -44,7 +44,7 @@ export function CompanyWidget({ isActive, onActivate }: CompanyWidgetProps) {
     } else if (error?.code === 'PGRST116') {
       // Company profile doesn't exist, create one
       const { data: newCompany } = await supabase
-        .from('company_profiles')
+        .from('business_profiles')
         .insert({ 
           user_id: user.id,
           company_name: ''

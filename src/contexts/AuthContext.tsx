@@ -18,70 +18,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const ensureFreeSubscription = async (userId: string) => {
+    // Skipping subscription setup - will be handled by microservices
+    return;
+  }
+
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    console.log('AuthContext: Starting session check...')
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('AuthContext: Session response:', { session, error })
       setUser(session?.user ?? null)
       if (session?.user) {
-        ensureFreeSubscription(session.user.id)
+        console.log('AuthContext: User found')
+        // Skip subscription setup - will be handled by microservices
       }
+      console.log('AuthContext: Setting loading to false')
+      setLoading(false)
+    }).catch(err => {
+      console.error('AuthContext: Error getting session:', err)
       setLoading(false)
     })
 
-    // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthContext: Auth state changed:', event)
       setUser(session?.user ?? null)
-      if (session?.user && _event === 'SIGNED_IN') {
-        await ensureFreeSubscription(session.user.id)
+      if (session?.user && event === 'SIGNED_IN') {
+        // Skip subscription setup - will be handled by microservices
       }
       setLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const ensureFreeSubscription = async (userId: string) => {
-    // Check if user has a subscription
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-
-    const currentDate = new Date()
-    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
-
-    if (!subscription) {
-      // Create free tier subscription for new users
-      await supabase.from('subscriptions').insert({
-        user_id: userId,
-        plan_type: 'free',
-        status: 'active',
-        current_period_start: currentDate.toISOString(),
-        current_period_end: endDate.toISOString(),
-      })
-    }
-
-    // Ensure usage record exists
-    const { data: usage } = await supabase
-      .from('usage_tracking')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('period_start', new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString())
-      .lte('period_end', endDate.toISOString())
-      .single()
-
-    if (!usage) {
-      // Create usage record for current period
-      await supabase.from('usage_tracking').insert({
-        user_id: userId,
-        messages_sent: 0,
-        messages_remaining: 25,
-        period_start: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString(),
-        period_end: endDate.toISOString(),
-      })
-    }
-  }
 
   const signIn = async (email: string, password: string) => {
     const { error, data } = await supabase.auth.signInWithPassword({
@@ -94,11 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error
     }
 
-    // Ensure free tier setup for existing users
-    if (data?.user) {
-      await ensureFreeSubscription(data.user.id)
-    }
-
+    // Skip subscription setup - will be handled by microservices
     toast.success('Welcome back!')
   }
 
@@ -114,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data?.user) {
-      await ensureFreeSubscription(data.user.id)
+      // Skip subscription setup - will be handled by microservices
       toast.success('Account created! Please check your email to verify your account.')
     }
   }

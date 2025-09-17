@@ -39,7 +39,7 @@ export function KnowledgeWidget({ isActive, onActivate }: KnowledgeWidgetProps) 
     const { data } = await supabase
       .from('knowledge_base')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('created_by', user.id)
       .limit(1)
       .single()
 

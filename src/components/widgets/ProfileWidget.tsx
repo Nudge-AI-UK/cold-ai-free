@@ -58,7 +58,7 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
     
     setLoading(true)
     const { error } = await supabase
-      .from('profiles')
+      .from('user_profiles')
       .upsert({
         ...profile,
         user_id: user.id,

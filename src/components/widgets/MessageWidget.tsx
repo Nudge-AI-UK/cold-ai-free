@@ -102,7 +102,7 @@ export function MessageWidget({ isActive, onActivate }: MessageWidgetProps) {
       setGeneratedMessage(mockMessage)
       
       // Save message to database
-      await supabase.from('messages').insert({
+      await supabase.from('message_generation_logs').insert({
         user_id: user.id,
         type: messageType,
         content: mockMessage,
