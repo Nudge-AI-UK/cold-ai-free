@@ -3,7 +3,7 @@ import { Header } from '@/components/layout/Header'
 //import { ProfileWidget } from '@/components/widgets/ProfileWidget'
 //import { CompanyWidget } from '@/components/widgets/CompanyWidget'
 //import { CommunicationWidget } from '@/components/widgets/CommunicationWidget'
-//import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
+import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { ICPWidget } from '@/components/widgets/ICPWidget'
 //import { ProspectWidget } from '@/components/widgets/ProspectWidget'
 //import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
@@ -102,12 +102,12 @@ export function WidgetDashboard() {
             />
           </motion.div> */}
           
-          {/* <motion.div variants={itemVariants}>
+          {/ <motion.div variants={itemVariants}>
             <KnowledgeWidget 
               isActive={activeWidget === 'knowledge'}
               onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
             />
-          </motion.div> */}
+          </motion.div> /}
           
           <motion.div variants={itemVariants}>
             <ICPWidget 
