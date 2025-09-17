@@ -68,7 +68,13 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
     try {
       const { data, error } = await supabase
         .from('icps')
-        .select('*, knowledge_base!product_link_id(title)')
+        .select(`
+          *,
+          knowledge_base (
+            id,
+            title
+          )
+        `)
         .select('*')
         .eq('created_by', user.id)
         .eq('is_active', true)
