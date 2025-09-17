@@ -68,15 +68,13 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
     try {
       const { data, error } = await supabase
         .from('icps')
-        .select('*, knowledge_base!product_link_id(product_name)')
+        .select('*, knowledge_base!product_link_id(title)')
         .select('*')
         .eq('created_by', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
-
-      console.log('ICP data with join:', data) 
 
       if (data) {
         setIcp(data)
@@ -246,7 +244,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
 
           {/* Product Name */}
           <div className="text-lg opacity-90 mb-4 tracking-wide">
-            Product: {icp?.knowledge_base?.product_name || 'Cold AI Free'}
+            Product: {icp?.knowledge_base?.title || 'Cold AI Free'}
           </div>
 
           {/* Description */}
