@@ -76,6 +76,8 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         .limit(1)
         .single()
 
+      console.log('ICP data with join:', data) 
+
       if (data) {
         setIcp(data)
         // Determine state based on actual workflow_status
