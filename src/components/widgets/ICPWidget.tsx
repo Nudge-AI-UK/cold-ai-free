@@ -74,7 +74,6 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
             title
           )
         `)
-        .select('*')
         .eq('created_by', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
