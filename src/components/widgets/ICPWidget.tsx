@@ -420,9 +420,9 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           </div>
   
           <div className="relative z-20">
-            {/* Last Used */}
+            {/* Header Text */}
             <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
-              Last updated: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+              Edit & Approve Your ICP
             </div>
   
             {/* ICP Name with icon */}
@@ -781,7 +781,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         <div className="relative z-20">
           {/* Last Used */}
           <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
-            Last used: {icp?.updated_at ? formatDistanceToNow(new Date(icp.updated_at), { addSuffix: true }) : 'Never'}
+            Last used: {icp?.last_used ? formatDistanceToNow(new Date(icp.last_used), { addSuffix: true }) : 'Never used'}
           </div>
 
           {/* ICP Name with icon */}
