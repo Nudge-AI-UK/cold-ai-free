@@ -32,7 +32,7 @@ const FIELD_LIMITS: Record<string, { type: 'text' | 'textarea' | 'array'; limit:
   company_size_range: { type: 'text', limit: 80 },
   budget_range: { type: 'text', limit: 80 },
   sales_cycle_length: { type: 'text', limit: 80 },
-  geographic_focus: { type: 'text', limit: 100 },
+  geographic_focus: { type: 'array', limit: 8 },,
   // Textarea fields
   description: { type: 'textarea', limit: 500 },
   company_characteristics: { type: 'textarea', limit: 800 },
