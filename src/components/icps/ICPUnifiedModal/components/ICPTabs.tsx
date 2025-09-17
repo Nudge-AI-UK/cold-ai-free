@@ -316,7 +316,7 @@ export const ICPTabs: React.FC<ICPTabsProps> = ({
             <CardContent className="space-y-4">
               {renderField('ICP Name', 'icp_name', 'text', 'Enter a descriptive name', <Target className="w-4 h-4" />)}
               {renderField('Description', 'description', 'textarea', 'Describe this ICP', <MessageSquare className="w-4 h-4" />)}
-              {renderField('Geographic Focus', 'geographic_focus', 'text', 'e.g., North America, Europe', <Globe className="w-4 h-4" />)}
+              {renderField('Geographic Focus', 'geographic_focus', 'array', 'e.g., North America, Europe', <Globe className="w-4 h-4" />)}
               {renderField('Sales Cycle Length', 'sales_cycle_length', 'text', 'e.g., 3-6 months', <ChartBar className="w-4 h-4" />)}
             </CardContent>
           </Card>
