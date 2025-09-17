@@ -129,7 +129,7 @@ export const AIFeedbackPanel: React.FC<AIFeedbackPanelProps> = ({
               <div className="space-y-2">
                 {suggestions.critical.map((suggestion: string, index: number) => (
                   <Alert key={index} className="bg-red-500/10 border-red-500/20">
-                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    <AlertCircle className="w-4 h-4 text-red-300" />
                     <AlertDescription className="text-sm text-gray-300">
                       {suggestion}
                     </AlertDescription>
@@ -149,7 +149,7 @@ export const AIFeedbackPanel: React.FC<AIFeedbackPanelProps> = ({
               <div className="space-y-2">
                 {suggestions.important.map((suggestion: string, index: number) => (
                   <Alert key={index} className="bg-yellow-500/10 border-yellow-500/20">
-                    <TrendingUp className="w-4 h-4 text-yellow-500" />
+                    <TrendingUp className="w-4 h-4 text-yellow-300" />
                     <AlertDescription className="text-sm text-gray-300">
                       {suggestion}
                     </AlertDescription>
