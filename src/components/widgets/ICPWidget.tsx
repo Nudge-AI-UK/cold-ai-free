@@ -235,7 +235,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           {/* ICP Name with icon */}
           <div className="flex items-center mb-2">
             <div className="text-5xl mr-3">🎯</div>
-            <div className="text-4xl font-semibold">
+            <div className="text-2xl font-semibold">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]">
                 {icp?.icp_name || 'B2B Sales Teams'}
               </span>
