@@ -70,8 +70,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         .from('icps')
         .select(`
           *,
-          knowledge_base (
-            id,
+          knowledge_base:product_link_id (
             title
           )
         `)
