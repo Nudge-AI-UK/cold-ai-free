@@ -37,16 +37,6 @@ export function WidgetDashboard() {
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0A0E1B 0%, #1a1f36 100%)' }}>
       <Header />
-      
-      <main className="px-6 py-6 max-w-[1400px] mx-auto">
-        {/* Minimal Title */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6"
-        >
-          <p className="text-sm text-gray-400">Free Account: 25 Messages/Month</p>
-        </motion.div>
 
         {/* Widget Grid - Using CSS Grid with specific areas */}
         <motion.div 
