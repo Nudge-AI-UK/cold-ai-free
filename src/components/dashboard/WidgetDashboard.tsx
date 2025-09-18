@@ -6,7 +6,7 @@ import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
 import { MessageWidget } from '@/components/widgets/MessageWidget'
 import { LinkedInWidget } from '@/components/widgets/LinkedInWidget'
 import { ProspectWidget } from '@/components/widgets/ProspectWidget'
-import { SettingsWidget } from '@/components/widgets/SettingsWidget' 
+import { SettingsWidget } from '@/components/widgets/SettingsWidget' // ADD THIS IMPORT
 import { motion } from 'framer-motion'
 
 export function WidgetDashboard() {
@@ -95,22 +95,9 @@ export function WidgetDashboard() {
           
           {/* Row 3 - Settings, Prospects */}
           <motion.div variants={itemVariants}>
-            {/* Placeholder for Settings Widget */}
-            <div className="relative shadow-2xl rounded-2xl p-4 overflow-hidden border border-white/10 text-white"
-                 style={{
-                   background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
-                   backdropFilter: 'blur(10px)',
-                   WebkitBackdropFilter: 'blur(10px)'
-                 }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">⚙️</span>
-                <h3 className="text-sm font-semibold">Settings</h3>
-              </div>
-              <p className="text-xs text-gray-400">Configure your profile</p>
-              <button className="w-full mt-3 bg-white/10 hover:bg-white/15 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 text-xs">
-                Configure Settings
-              </button>
-            </div>
+            <SettingsWidget 
+              forceEmpty={forceEmptyState}
+            />
           </motion.div>
           
           <motion.div variants={itemVariants}>
