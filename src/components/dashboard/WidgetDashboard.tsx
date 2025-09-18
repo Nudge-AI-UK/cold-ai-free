@@ -102,7 +102,7 @@ export function WidgetDashboard() {
             />
           </motion.div> */}
           
-          { <motion.div variants={itemVariants}>
+          { <motion.div variants={itemVariants} className="lg:col-span-2">
             <KnowledgeWidget 
               isActive={activeWidget === 'knowledge'}
               onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
