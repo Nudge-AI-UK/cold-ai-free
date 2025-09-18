@@ -14,6 +14,7 @@ import { Zap } from 'lucide-react'
 
 export function WidgetDashboard() {
   const [activeWidget, setActiveWidget] = useState<string | null>(null)
+  const forceEmptyState = true  // TEST FLAG REMOVE WHEN NEEDED
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -106,6 +107,7 @@ export function WidgetDashboard() {
             <KnowledgeWidget 
               isActive={activeWidget === 'knowledge'}
               onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
+              forceEmpty={forceEmptyState}
             />
           </motion.div> }
           
@@ -113,29 +115,33 @@ export function WidgetDashboard() {
             <ICPWidget 
               isActive={activeWidget === 'icp'}
               onActivate={() => setActiveWidget(activeWidget === 'icp' ? null : 'icp')}
+              forceEmpty={forceEmptyState}
             />
           </motion.div>
           
-          {/* <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants}>
             <ProspectWidget 
               isActive={activeWidget === 'prospects'}
               onActivate={() => setActiveWidget(activeWidget === 'prospects' ? null : 'prospects')}
+              forceEmpty={forceEmptyState}
             />
-          </motion.div> */}
+          </motion.div>
           
-          {/* <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants}>
             <AnalyticsWidget 
               isActive={activeWidget === 'analytics'}
               onActivate={() => setActiveWidget(activeWidget === 'analytics' ? null : 'analytics')}
+              forceEmpty={forceEmptyState}
             />
-          </motion.div> */}
+          </motion.div>
           
-          {/* <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants}>
             <MessageWidget 
               isActive={activeWidget === 'messages'}
               onActivate={() => setActiveWidget(activeWidget === 'messages' ? null : 'messages')}
+              forceEmpty={forceEmptyState}
             />
-          </motion.div> */}
+          </motion.div>
           
           {/* <motion.div variants={itemVariants}>
             <UpgradeWidget 
