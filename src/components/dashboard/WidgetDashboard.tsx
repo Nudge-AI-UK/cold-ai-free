@@ -6,7 +6,7 @@ import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
 import { MessageWidget } from '@/components/widgets/MessageWidget'
 import { LinkedInWidget } from '@/components/widgets/LinkedInWidget'
 import { ProspectWidget } from '@/components/widgets/ProspectWidget'
-import { SettingsWidget } from '@/components/widgets/SettingsWidget' // ADD THIS IMPORT
+import { SettingsWidget } from '@/components/widgets/SettingsWidget'
 import { motion } from 'framer-motion'
 
 export function WidgetDashboard() {
@@ -17,7 +17,7 @@ export function WidgetDashboard() {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
+        staggerChildren: 0.05
       }
     }
   }
@@ -35,75 +35,119 @@ export function WidgetDashboard() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
-        {/* Minimal Hero Section */}
+      <main className="container mx-auto px-4 py-6">
+        {/* Minimal Title */}
         <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6"
         >
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-xl mb-3">
-            {/* Placeholder for logo */}
-            <span className="text-2xl">🚀</span>
-          </div>
-          <h1 className="text-2xl font-bold">
-            <span className="gradient-text">Cold AI</span> Dashboard
-          </h1>
+          <p className="text-sm text-muted-foreground">Free Account: 25 Messages/Month</p>
         </motion.div>
 
-        {/* Widget Grid - Based on your sketch */}
+        {/* Widget Grid - 4 column grid with custom row heights */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid gap-4 lg:grid-cols-4 auto-rows-min"
+          className="grid grid-cols-4 gap-4"
+          style={{
+            gridTemplateRows: 'repeat(6, 100px)', // 6 rows of 100px each
+            gridAutoFlow: 'dense'
+          }}
         >
-          {/* Row 1 - Knowledge, ICP, Usage */}
-          <motion.div variants={itemVariants} className="lg:col-span-2">
-            <KnowledgeWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Left Column - ICP (1x2 tall - spans 4 row units) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-1 row-span-4"
+          >
+            <div className="h-full">
+              <ICPWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          <motion.div variants={itemVariants}>
-            <ICPWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Center - Message Gen (2x1.5 - spans 2 cols, 3 row units) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-2 row-span-3"
+          >
+            <div className="h-full">
+              <MessageWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          <motion.div variants={itemVariants}>
-            <AnalyticsWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Right Column - Prospects (1x2 tall - spans 4 row units) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-1 row-span-4"
+          >
+            <div className="h-full">
+              <ProspectWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          {/* Row 2 - Message Gen, LinkedIn Status */}
-          <motion.div variants={itemVariants} className="lg:col-span-3">
-            <MessageWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Under Message Gen Left - Analytics (1x0.5 - 1 row unit) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-1 row-span-1"
+          >
+            <div className="h-full">
+              <AnalyticsWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          <motion.div variants={itemVariants}>
-            <LinkedInWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Under Message Gen Right - LinkedIn (1x0.5 - 1 row unit) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-1 row-span-1"
+          >
+            <div className="h-full">
+              <LinkedInWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          {/* Row 3 - Settings, Prospects */}
-          <motion.div variants={itemVariants} className="lg:col-span-2">
-            <SettingsWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Bottom Left - Knowledge (2x1 - spans 2 cols, 2 row units) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-2 row-span-2"
+          >
+            <div className="h-full">
+              <KnowledgeWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
           
-          <motion.div variants={itemVariants}>
-            <ProspectWidget 
-              forceEmpty={forceEmptyState}
-            />
+          {/* Bottom Right - Settings (2x1 - spans 2 cols, 2 row units) */}
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-2 row-span-2"
+          >
+            <div className="h-full">
+              <SettingsWidget 
+                forceEmpty={forceEmptyState}
+                className="h-full"
+              />
+            </div>
           </motion.div>
         </motion.div>
       </main>
