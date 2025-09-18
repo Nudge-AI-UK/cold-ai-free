@@ -1,19 +1,15 @@
 import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
-//import { ProfileWidget } from '@/components/widgets/ProfileWidget'
-//import { CompanyWidget } from '@/components/widgets/CompanyWidget'
-//import { CommunicationWidget } from '@/components/widgets/CommunicationWidget'
 import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { ICPWidget } from '@/components/widgets/ICPWidget'
-//import { ProspectWidget } from '@/components/widgets/ProspectWidget'
-//import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
-//import { MessageWidget } from '@/components/widgets/MessageWidget'
-//import { UpgradeWidget } from '@/components/widgets/UpgradeWidget'
+import { AnalyticsWidget } from '@/components/widgets/AnalyticsWidget'
+import { MessageWidget } from '@/components/widgets/MessageWidget'
+import { LinkedInWidget } from '@/components/widgets/LinkedInWidget'
+import { ProspectWidget } from '@/components/widgets/ProspectWidget'
+import { SettingsWidget } from '@/components/widgets/SettingsWidget' 
 import { motion } from 'framer-motion'
-import { Zap } from 'lucide-react'
 
 export function WidgetDashboard() {
-  const [activeWidget, setActiveWidget] = useState<string | null>(null)
   const forceEmptyState = true  // TEST FLAG REMOVE WHEN NEEDED
 
   const containerVariants = {
@@ -43,112 +39,85 @@ export function WidgetDashboard() {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
+        {/* Minimal Hero Section */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-4 relative">
-            <Zap className="w-8 h-8 text-primary" />
-            <div className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl animate-pulse" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-xl mb-3">
+            {/* Placeholder for logo */}
+            <span className="text-2xl">🚀</span>
           </div>
-          <h1 className="text-4xl font-bold mb-3">
-            Welcome to <span className="gradient-text">Cold AI Free</span>
+          <h1 className="text-2xl font-bold">
+            <span className="gradient-text">Cold AI</span> Dashboard
           </h1>
-          <p className="text-muted-foreground text-lg">
-            Your AI-powered outreach assistant
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-6">
-            <div className="stat-card px-6 py-3">
-              <p className="stat-value text-2xl">25</p>
-              <p className="stat-label">Messages/Month</p>
-            </div>
-            <div className="stat-card px-6 py-3">
-              <p className="stat-value text-2xl">1</p>
-              <p className="stat-label">ICP Profile</p>
-            </div>
-            <div className="stat-card px-6 py-3">
-              <p className="stat-value text-2xl">∞</p>
-              <p className="stat-label">Possibilities</p>
-            </div>
-          </div>
         </motion.div>
 
-        {/* Widget Grid */}
+        {/* Widget Grid - Based on your sketch */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-min"
+          className="grid gap-4 lg:grid-cols-4 auto-rows-min"
         >
-          {/* <motion.div variants={itemVariants}>
-            <ProfileWidget 
-              isActive={activeWidget === 'profile'}
-              onActivate={() => setActiveWidget(activeWidget === 'profile' ? null : 'profile')}
-            />
-          </motion.div> */}
-          
-          {/* <motion.div variants={itemVariants}>
-            <CompanyWidget 
-              isActive={activeWidget === 'company'}
-              onActivate={() => setActiveWidget(activeWidget === 'company' ? null : 'company')}
-            />
-          </motion.div> */}
-          
-          {/* <motion.div variants={itemVariants}>
-            <CommunicationWidget 
-              isActive={activeWidget === 'communication'}
-              onActivate={() => setActiveWidget(activeWidget === 'communication' ? null : 'communication')}
-            />
-          </motion.div> */}
-          
-          { <motion.div variants={itemVariants} className="lg:col-span-2">
+          {/* Row 1 - Knowledge, ICP, Usage */}
+          <motion.div variants={itemVariants} className="lg:col-span-2">
             <KnowledgeWidget 
-              isActive={activeWidget === 'knowledge'}
-              onActivate={() => setActiveWidget(activeWidget === 'knowledge' ? null : 'knowledge')}
-              forceEmpty={forceEmptyState}
-            />
-          </motion.div> }
-          
-          <motion.div variants={itemVariants}>
-            <ICPWidget 
-              isActive={activeWidget === 'icp'}
-              onActivate={() => setActiveWidget(activeWidget === 'icp' ? null : 'icp')}
               forceEmpty={forceEmptyState}
             />
           </motion.div>
           
           <motion.div variants={itemVariants}>
-            <ProspectWidget 
-              isActive={activeWidget === 'prospects'}
-              onActivate={() => setActiveWidget(activeWidget === 'prospects' ? null : 'prospects')}
+            <ICPWidget 
               forceEmpty={forceEmptyState}
             />
           </motion.div>
           
           <motion.div variants={itemVariants}>
             <AnalyticsWidget 
-              isActive={activeWidget === 'analytics'}
-              onActivate={() => setActiveWidget(activeWidget === 'analytics' ? null : 'analytics')}
+              forceEmpty={forceEmptyState}
+            />
+          </motion.div>
+          
+          {/* Row 2 - Message Gen, LinkedIn Status */}
+          <motion.div variants={itemVariants} className="lg:col-span-3">
+            <MessageWidget 
               forceEmpty={forceEmptyState}
             />
           </motion.div>
           
           <motion.div variants={itemVariants}>
-            <MessageWidget 
-              isActive={activeWidget === 'messages'}
-              onActivate={() => setActiveWidget(activeWidget === 'messages' ? null : 'messages')}
+            <LinkedInWidget 
               forceEmpty={forceEmptyState}
             />
           </motion.div>
           
-          {/* <motion.div variants={itemVariants}>
-            <UpgradeWidget 
-              isActive={activeWidget === 'upgrade'}
-              onActivate={() => setActiveWidget(activeWidget === 'upgrade' ? null : 'upgrade')}
+          {/* Row 3 - Settings, Prospects */}
+          <motion.div variants={itemVariants}>
+            {/* Placeholder for Settings Widget */}
+            <div className="relative shadow-2xl rounded-2xl p-4 overflow-hidden border border-white/10 text-white"
+                 style={{
+                   background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+                   backdropFilter: 'blur(10px)',
+                   WebkitBackdropFilter: 'blur(10px)'
+                 }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">⚙️</span>
+                <h3 className="text-sm font-semibold">Settings</h3>
+              </div>
+              <p className="text-xs text-gray-400">Configure your profile</p>
+              <button className="w-full mt-3 bg-white/10 hover:bg-white/15 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 text-xs">
+                Configure Settings
+              </button>
+            </div>
+          </motion.div>
+          
+          <motion.div variants={itemVariants}>
+            <ProspectWidget 
+              forceEmpty={forceEmptyState}
             />
-          </motion.div> */}
+          </motion.div>
         </motion.div>
       </main>
 
