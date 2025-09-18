@@ -48,19 +48,29 @@ export function WidgetDashboard() {
           <p className="text-sm text-gray-400">Free Account: 25 Messages/Month</p>
         </motion.div>
 
-        {/* Widget Grid - 4 column grid */}
+        {/* Widget Grid - Using CSS Grid with specific areas */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-4 gap-4 auto-rows-[minmax(150px,auto)]"
+          className="grid gap-4"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gridTemplateRows: 'auto auto auto auto',
+            gridTemplateAreas: `
+              "icp message message prospects"
+              "icp message message prospects"
+              "icp analytics linkedin prospects"
+              "knowledge knowledge settings settings"
+            `,
+            gap: '16px'
+          }}
         >
-          {/* Row 1 & 2: ICP (tall) | Message Gen (tall center) | Prospects (tall) */}
-          
-          {/* Left Column - ICP (1x2 tall) */}
+          {/* ICP Widget - Left tall */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-span-1 row-span-2"
+            variants={itemVariants}
+            style={{ gridArea: 'icp' }}
           >
             <div className="h-full min-h-[400px]">
               <ICPWidget 
@@ -70,11 +80,10 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Center Top - Message Gen (2x1.5 - taller) */}
+          {/* Message Generation - Center top */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-span-2 row-start-1 row-end-3"
-            style={{ gridRowEnd: 'span 1.5' }}
+            variants={itemVariants}
+            style={{ gridArea: 'message' }}
           >
             <div className="h-full min-h-[300px]">
               <MessageWidget 
@@ -84,10 +93,10 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Right Column - Prospects (1x2 tall) */}
+          {/* Prospects Widget - Right tall */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-span-1 row-span-2"
+            variants={itemVariants}
+            style={{ gridArea: 'prospects' }}
           >
             <div className="h-full min-h-[400px]">
               <ProspectWidget 
@@ -97,15 +106,12 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Row 2 partial: Analytics & LinkedIn under Message Gen */}
-          
-          {/* Analytics (small square) */}
+          {/* Analytics - Small under message left */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-start-2 col-span-1"
-            style={{ marginTop: '-50px' }}
+            variants={itemVariants}
+            style={{ gridArea: 'analytics' }}
           >
-            <div className="h-full min-h-[100px]">
+            <div className="h-full min-h-[120px]">
               <AnalyticsWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -113,13 +119,12 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* LinkedIn (small square) */}
+          {/* LinkedIn - Small under message right */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-start-3 col-span-1"
-            style={{ marginTop: '-50px' }}
+            variants={itemVariants}
+            style={{ gridArea: 'linkedin' }}
           >
-            <div className="h-full min-h-[100px]">
+            <div className="h-full min-h-[120px]">
               <LinkedInWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -127,12 +132,10 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Row 3: Knowledge & Settings (landscape) */}
-          
-          {/* Knowledge (2x1 landscape) */}
+          {/* Knowledge Widget - Bottom left */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-span-2"
+            variants={itemVariants}
+            style={{ gridArea: 'knowledge' }}
           >
             <div className="h-full min-h-[200px]">
               <KnowledgeWidget 
@@ -142,10 +145,10 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Settings (2x1 landscape) */}
+          {/* Settings Widget - Bottom right */}
           <motion.div 
-            variants={itemVariants} 
-            className="col-span-2"
+            variants={itemVariants}
+            style={{ gridArea: 'settings' }}
           >
             <div className="h-full min-h-[200px]">
               <SettingsWidget 
