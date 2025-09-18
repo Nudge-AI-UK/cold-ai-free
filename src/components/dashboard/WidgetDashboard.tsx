@@ -94,7 +94,7 @@ export function WidgetDashboard() {
           </motion.div>
           
           {/* Row 3 - Settings, Prospects */}
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants} className="lg:col-span-2">
             <SettingsWidget 
               forceEmpty={forceEmptyState}
             />
