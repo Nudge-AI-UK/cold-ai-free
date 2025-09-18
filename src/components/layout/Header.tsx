@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { LogOut, Zap, User } from 'lucide-react'
+import { LogOut, User } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,18 +15,57 @@ export function Header() {
   const { user, signOut } = useAuth()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header 
+      className="sticky top-0 z-50 w-full backdrop-blur"
+      style={{ 
+        backgroundColor: '#0C1725',
+        borderBottom: '2px solid #FC9109'
+      }}
+    >
       <div className="container flex h-16 items-center">
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center justify-center w-9 h-9 bg-primary/10 rounded-xl relative">
-              <Zap className="w-5 h-5 text-primary" />
+          <div className="flex items-center space-x-3">
+            {/* Logo */}
+            <img 
+              src="/Cold_AI_Logo_Rectangle.png" 
+              alt="Cold AI" 
+              className="h-10 w-auto"
+            />
+            
+            {/* Animated FREE text */}
+            <div 
+              className="text-xl font-bold relative"
+              style={{
+                background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 20%, #FFD700 40%, #FC9109 60%, #FBAE1C 80%, #FC9109 100%)',
+                backgroundSize: '200% auto',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                animation: 'shimmer 3s linear infinite',
+                letterSpacing: '0.1em'
+              }}
+            >
+              FREE
+              {/* Sparkle effect */}
+              <span 
+                className="absolute -top-1 -right-2 text-yellow-400"
+                style={{
+                  animation: 'sparkle 2s ease-in-out infinite',
+                  fontSize: '12px'
+                }}
+              >
+                ✨
+              </span>
             </div>
-            <span className="font-semibold text-lg">Cold AI Free</span>
           </div>
-          <div className="h-6 w-px bg-border" />
-          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-            Free Tier • 25 messages/month
+          
+          <div className="h-6 w-px bg-gray-600" />
+          
+          <Badge 
+            variant="secondary" 
+            className="bg-orange-500/10 text-orange-400 border-orange-500/20"
+          >
+            25 messages/month
           </Badge>
         </div>
         
@@ -34,7 +73,7 @@ export function Header() {
           <Button
             variant="outline"
             size="sm"
-            className="border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+            className="border-orange-500/30 hover:border-orange-500/50 hover:bg-orange-500/10 text-gray-200"
             onClick={() => window.open(import.meta.env.VITE_UPGRADE_URL || 'https://app.coldai.uk', '_blank')}
           >
             Upgrade to Pro
@@ -42,19 +81,23 @@ export function Header() {
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover:bg-primary/10">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="hover:bg-orange-500/10 text-gray-200"
+              >
                 <User className="h-5 w-5" />
                 <span className="sr-only">User menu</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card border-border">
-              <DropdownMenuLabel className="text-muted-foreground">
+            <DropdownMenuContent align="end" className="w-56 bg-[#0C1725] border-orange-500/30">
+              <DropdownMenuLabel className="text-gray-400">
                 {user?.email}
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-orange-500/20" />
               <DropdownMenuItem 
                 onClick={() => signOut()}
-                className="hover:bg-primary/10 cursor-pointer"
+                className="hover:bg-orange-500/10 cursor-pointer text-gray-200"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
@@ -63,6 +106,25 @@ export function Header() {
           </DropdownMenu>
         </div>
       </div>
+      
+      {/* Add CSS animations */}
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        
+        @keyframes sparkle {
+          0%, 100% { 
+            opacity: 0;
+            transform: scale(0) rotate(0deg);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1) rotate(180deg);
+          }
+        }
+      `}</style>
     </header>
   )
 }
