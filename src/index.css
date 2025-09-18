@@ -331,3 +331,14 @@
     box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); 
   }
 }
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(251, 174, 28, 0.6);
+  }
+  50% { 
+    opacity: 0.85;
+    box-shadow: 0 0 20px rgba(251, 174, 28, 0.4);
+  }
+}
