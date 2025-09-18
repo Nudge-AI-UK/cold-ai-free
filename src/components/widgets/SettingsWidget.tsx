@@ -3,7 +3,6 @@ import { User, Building2, MessageCircle, ChevronRight, Edit2, Check } from 'luci
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
 
 interface SettingsWidgetProps {
   forceEmpty?: boolean
@@ -18,7 +17,6 @@ interface SettingsStatus {
 
 export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>({
     profile: false,
     company: false,
@@ -67,15 +65,20 @@ export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
 
   const handleButtonClick = (type: 'profile' | 'company' | 'communication') => {
     if (allConfigured) {
-      navigate('/profile')
+      // Use window.location for navigation
+      window.location.href = '/profile'
     } else {
       toast.info(`Configure your ${type} settings`)
-      navigate('/profile')
+      window.location.href = '/profile'
     }
   }
 
   const handleQuickSetup = () => {
-    navigate('/profile')
+    window.location.href = '/profile'
+  }
+
+  const handleEditSettings = () => {
+    window.location.href = '/profile'
   }
 
   // Empty State
@@ -357,7 +360,7 @@ export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
             </div>
           </div>
           <button 
-            onClick={() => navigate('/profile')}
+            onClick={handleEditSettings}
             className="ml-4 bg-white/10 hover:bg-white/15 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-xs flex items-center space-x-2 group">
             <span>Edit Settings</span>
             <Edit2 className="w-4 h-4" />
