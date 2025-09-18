@@ -48,24 +48,21 @@ export function WidgetDashboard() {
           <p className="text-sm text-gray-400">Free Account: 25 Messages/Month</p>
         </motion.div>
 
-        {/* Widget Grid - 4 column grid with custom row heights */}
+        {/* Widget Grid - 4 column grid */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-4 gap-4"
-          style={{
-            gridTemplateRows: 'repeat(5, minmax(120px, 1fr))', // 5 rows with min height
-            minHeight: '600px'
-          }}
+          className="grid grid-cols-4 gap-4 auto-rows-[minmax(150px,auto)]"
         >
-          {/* Left Column - ICP (1x2 tall - spans 4 row units) */}
+          {/* Row 1 & 2: ICP (tall) | Message Gen (tall center) | Prospects (tall) */}
+          
+          {/* Left Column - ICP (1x2 tall) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-1 row-span-4"
-            style={{ minHeight: '500px' }}
+            className="col-span-1 row-span-2"
           >
-            <div className="h-full">
+            <div className="h-full min-h-[400px]">
               <ICPWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -73,13 +70,13 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Center - Message Gen (2x1.5 - spans 2 cols, 3 row units) */}
+          {/* Center Top - Message Gen (2x1.5 - taller) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-2 row-span-3"
-            style={{ minHeight: '380px' }}
+            className="col-span-2 row-start-1 row-end-3"
+            style={{ gridRowEnd: 'span 1.5' }}
           >
-            <div className="h-full">
+            <div className="h-full min-h-[300px]">
               <MessageWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -87,13 +84,12 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Right Column - Prospects (1x2 tall - spans 4 row units) */}
+          {/* Right Column - Prospects (1x2 tall) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-1 row-span-4"
-            style={{ minHeight: '500px' }}
+            className="col-span-1 row-span-2"
           >
-            <div className="h-full">
+            <div className="h-full min-h-[400px]">
               <ProspectWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -101,13 +97,15 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Under Message Gen Left - Analytics (1x0.5 - 1 row unit) */}
+          {/* Row 2 partial: Analytics & LinkedIn under Message Gen */}
+          
+          {/* Analytics (small square) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-1 row-span-1"
-            style={{ minHeight: '120px' }}
+            className="col-start-2 col-span-1"
+            style={{ marginTop: '-50px' }}
           >
-            <div className="h-full">
+            <div className="h-full min-h-[100px]">
               <AnalyticsWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -115,13 +113,13 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Under Message Gen Right - LinkedIn (1x0.5 - 1 row unit) */}
+          {/* LinkedIn (small square) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-1 row-span-1"
-            style={{ minHeight: '120px' }}
+            className="col-start-3 col-span-1"
+            style={{ marginTop: '-50px' }}
           >
-            <div className="h-full">
+            <div className="h-full min-h-[100px]">
               <LinkedInWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -129,13 +127,14 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Bottom Left - Knowledge (2x1 - spans 2 cols, 1 row unit) */}
+          {/* Row 3: Knowledge & Settings (landscape) */}
+          
+          {/* Knowledge (2x1 landscape) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-2 row-span-1"
-            style={{ minHeight: '240px' }}
+            className="col-span-2"
           >
-            <div className="h-full">
+            <div className="h-full min-h-[200px]">
               <KnowledgeWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
@@ -143,13 +142,12 @@ export function WidgetDashboard() {
             </div>
           </motion.div>
           
-          {/* Bottom Right - Settings (2x1 - spans 2 cols, 1 row unit) */}
+          {/* Settings (2x1 landscape) */}
           <motion.div 
             variants={itemVariants} 
-            className="col-span-2 row-span-1"
-            style={{ minHeight: '240px' }}
+            className="col-span-2"
           >
-            <div className="h-full">
+            <div className="h-full min-h-[200px]">
               <SettingsWidget 
                 forceEmpty={forceEmptyState}
                 className="h-full"
