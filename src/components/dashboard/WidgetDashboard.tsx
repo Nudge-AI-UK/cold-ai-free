@@ -35,7 +35,7 @@ export function WidgetDashboard() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0A0E1B 0%, #1a1f36 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0C1725 0%, #1a1f36 100%)' }}>  // -previously had 0% set as #0A0E1B
       <Header />
 
       <main className="px-6 py-6 max-w-[1400px] mx-auto">
