@@ -1,0 +1,205 @@
+/* src/components/modals/AnimatedModalBackground.css */
+
+.animated-modal-background {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+
+/* Animated Background - Bright Colours with Purple */
+.bg-animation {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 1;
+}
+
+.bg-animation::before,
+.bg-animation::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 30% 50%, rgba(251, 174, 28, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(255, 145, 9, 0.7) 0%, transparent 50%),
+    radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.7) 0%, transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(99, 102, 241, 0.7) 0%, transparent 45%),
+    radial-gradient(circle at 50% 60%, rgba(236, 72, 153, 0.6) 0%, transparent 50%),
+    radial-gradient(circle at 10% 80%, rgba(34, 211, 238, 0.6) 0%, transparent 45%),
+    radial-gradient(circle at 90% 70%, rgba(217, 70, 239, 0.7) 0%, transparent 40%),
+    radial-gradient(circle at 40% 30%, rgba(147, 51, 234, 0.8) 0%, transparent 35%);
+  animation: swirl 20s ease-in-out infinite;
+  filter: blur(80px);
+}
+
+.bg-animation::after {
+  animation: swirl 20s ease-in-out infinite reverse;
+  animation-delay: -5s;
+  filter: blur(100px);
+  opacity: 0.9;
+}
+
+@keyframes swirl {
+  0%, 100% {
+    transform: rotate(0deg) scale(1) translateX(0);
+  }
+  33% {
+    transform: rotate(60deg) scale(1.1) translateX(50px);
+  }
+  66% {
+    transform: rotate(-40deg) scale(0.9) translateX(-50px);
+  }
+}
+
+/* Floating orbs */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  animation: float 15s infinite;
+  z-index: 2;
+}
+
+.orb1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(251, 174, 28, 0.9), transparent);
+  top: -200px;
+  left: -200px;
+  animation-delay: 0s;
+}
+
+.orb2 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.9), transparent);
+  bottom: -150px;
+  right: -150px;
+  animation-delay: -5s;
+  animation-duration: 20s;
+}
+
+.orb3 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.8), transparent);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation-delay: -10s;
+  animation-duration: 25s;
+}
+
+.orb4 {
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(217, 70, 239, 0.8), transparent);
+  top: 30%;
+  right: 10%;
+  animation-delay: -3s;
+  animation-duration: 18s;
+}
+
+.orb5 {
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.9), transparent);
+  bottom: 20%;
+  left: 15%;
+  animation-delay: -7s;
+  animation-duration: 22s;
+}
+
+.orb6 {
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.85), transparent);
+  top: 10%;
+  left: 40%;
+  animation-delay: -12s;
+  animation-duration: 28s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(100px, -50px) scale(1.2);
+  }
+  50% {
+    transform: translate(-50px, 100px) scale(0.8);
+  }
+  75% {
+    transform: translate(-100px, -100px) scale(1.1);
+  }
+}
+
+/* Modal overlay backdrop for better contrast */
+.modal-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 14, 27, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 3;
+}
+
+/* Ensure modals appear above the background */
+.modal-container {
+  position: relative;
+  z-index: 50;
+}
+
+/* Dark mode optimization */
+@media (prefers-color-scheme: dark) {
+  .modal-overlay-backdrop {
+    background: rgba(10, 14, 27, 0.5);
+  }
+}
+
+/* Performance optimization for mobile */
+@media (max-width: 768px) {
+  .bg-animation::before,
+  .bg-animation::after {
+    filter: blur(60px);
+  }
+  
+  .orb {
+    filter: blur(40px);
+  }
+  
+  /* Reduce number of orbs on mobile for performance */
+  .orb5,
+  .orb6 {
+    display: none;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .bg-animation::before,
+  .bg-animation::after,
+  .orb {
+    animation: none;
+  }
+  
+  .animated-modal-background {
+    animation: none;
+    opacity: 1;
+  }
+}
