@@ -1,20 +1,15 @@
 // src/components/knowledge/ProductAddModalEnhanced.tsx
 
-import { Package, Building, FileText, Sparkles, X, Info, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Package, Building, Sparkles, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { useModalFlow } from '@/components/modals/ModalFlowManager';
 
 interface ProductAddModalEnhancedProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onNavigate?: (direction: 'prev' | 'next') => void;
-  canNavigate?: { prev: boolean; next: boolean };
   newEntry: any;
   setNewEntry: (entry: any) => void;
   knowledgeTypes: any[];
@@ -41,10 +36,6 @@ const CHAR_LIMITS = {
 };
 
 export const ProductAddModalEnhanced = ({
-  isOpen,
-  onClose,
-  onNavigate,
-  canNavigate,
   newEntry,
   setNewEntry,
   knowledgeTypes,
@@ -59,6 +50,18 @@ export const ProductAddModalEnhanced = ({
   handleAddEntry,
   isProcessing = false
 }: ProductAddModalEnhancedProps) => {
+
+  // Get navigation functions from modal flow context
+  const { 
+    closeModal, 
+    navigateNext, 
+    navigatePrevious, 
+    canNavigate,
+    isAnyModalOpen 
+  } = useModalFlow();
+  
+  // Check if this modal is actually open
+  const isModalOpen = isAnyModalOpen();
 
   const hasProductLink = newEntry.productLink && newEntry.productLink.trim() !== '';
   
@@ -133,52 +136,51 @@ export const ProductAddModalEnhanced = ({
     );
   };
 
+  // If modal is not open via ModalFlowManager, don't render
+  if (!isModalOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={!isProcessing ? onClose : undefined}>
-      <DialogContent className="max-w-[72rem] max-h-[90vh] p-0 bg-transparent border-0 overflow-hidden">
-        {/* Navigation Arrows */}
-        {onNavigate && canNavigate && (
-          <>
-            <button
-              onClick={() => onNavigate('prev')}
-              disabled={!canNavigate.prev}
-              className={cn(
-                "absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
-                "rounded-full flex items-center justify-center transition-all duration-300",
-                canNavigate.prev 
-                  ? "hover:scale-110 cursor-pointer" 
-                  : "opacity-30 cursor-not-allowed"
-              )}
-            >
-              <ChevronLeft className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
-            </button>
-            
-            <button
-              onClick={() => onNavigate('next')}
-              disabled={!canNavigate.next}
-              className={cn(
-                "absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
-                "rounded-full flex items-center justify-center transition-all duration-300",
-                canNavigate.next 
-                  ? "hover:scale-110 cursor-pointer" 
-                  : "opacity-30 cursor-not-allowed"
-              )}
-            >
-              <ChevronRight className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
-            </button>
-          </>
-        )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="relative max-w-[72rem] w-full max-h-[90vh] overflow-hidden">
+        {/* Navigation Arrows - Using context functions */}
+        <button
+          onClick={navigatePrevious}
+          disabled={!canNavigate.prev}
+          className={cn(
+            "absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
+            "rounded-full flex items-center justify-center transition-all duration-300",
+            canNavigate.prev 
+              ? "hover:scale-110 cursor-pointer" 
+              : "opacity-30 cursor-not-allowed"
+          )}
+        >
+          <ChevronLeft className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
+        </button>
+        
+        <button
+          onClick={navigateNext}
+          disabled={!canNavigate.next}
+          className={cn(
+            "absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
+            "rounded-full flex items-center justify-center transition-all duration-300",
+            canNavigate.next 
+              ? "hover:scale-110 cursor-pointer" 
+              : "opacity-30 cursor-not-allowed"
+          )}
+        >
+          <ChevronRight className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
+        </button>
   
         {/* Glass Effect Container */}
         <div className="relative w-full h-full flex flex-col">
           <div className="bg-gradient-to-br from-[#0A0E1B]/95 to-[#1A1F36]/95 backdrop-blur-xl rounded-3xl 
-                          border border-white/10 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 flex flex-col">
+                          border border-white/10 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 flex flex-col h-full">
             
             {/* Header */}
             <div className="flex-shrink-0 px-6 py-4 border-b border-white/10 
                             bg-gradient-to-b from-black/20 to-transparent">
               <button
-                onClick={onClose}
+                onClick={closeModal}
                 disabled={isProcessing}
                 className="absolute top-4 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 
                            flex items-center justify-center transition-all duration-300 disabled:opacity-50"
@@ -356,7 +358,7 @@ export const ProductAddModalEnhanced = ({
               <div className="flex justify-end gap-3">
                 <Button 
                   variant="outline"
-                  onClick={onClose}
+                  onClick={closeModal}
                   disabled={isProcessing}
                   className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 
                              hover:border-orange-500 transition-all duration-300 rounded-lg"
@@ -383,7 +385,7 @@ export const ProductAddModalEnhanced = ({
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
