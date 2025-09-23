@@ -1,8 +1,10 @@
+// src/components/KnowledgeWidget.tsx
 import { useState, useEffect } from 'react'
 import { Plus, Edit2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { ProductAddModalEnhanced } from './knowledge/ProductAddModalEnhanced'
 import type { KnowledgeEntry } from '@/types'
 
 interface KnowledgeWidgetProps {
@@ -16,6 +18,18 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const [loading, setLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newEntry, setNewEntry] = useState({
+    knowledge_type: 'product',
+    productLink: '',
+    title: '',
+    targetMarket: '',
+    content: '',
+    additionalLinks: []
+  })
+  const [aiFields, setAiFields] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -48,144 +62,226 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   }
 
   const handleCreateProduct = () => {
-    // Simulate generation process
-    setIsGenerating(true)
-    // In real implementation, this would trigger the actual creation process
-    setTimeout(() => {
-      setIsGenerating(false)
-      // Fetch the new entry
-      fetchKnowledge()
-    }, 5000)
+    // Open the modal instead of simulating
+    setIsModalOpen(true)
   }
+
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    // Reset form state
+    setNewEntry({
+      knowledge_type: 'product',
+      productLink: '',
+      title: '',
+      targetMarket: '',
+      content: '',
+      additionalLinks: []
+    })
+    setAiFields(new Set())
+  }
+
+  const toggleAIField = (field: string) => {
+    setAiFields(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(field)) {
+        newSet.delete(field)
+      } else {
+        newSet.add(field)
+      }
+      return newSet
+    })
+  }
+
+  const handleAddEntry = async () => {
+    setIsGenerating(true)
+    setIsModalOpen(false) // Close modal when processing starts
+    
+    try {
+      // Your actual API call to create the product
+      const { data, error } = await supabase
+        .from('knowledge_base')
+        .insert({
+          created_by: user?.user_id,
+          knowledge_type: newEntry.knowledge_type,
+          title: newEntry.title || 'AI Generated',
+          content: newEntry.content || 'AI Generated',
+          metadata: {
+            productLink: newEntry.productLink,
+            targetMarket: newEntry.targetMarket,
+            aiFields: Array.from(aiFields)
+          }
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      toast.success('Product created successfully!')
+      setEntry(data)
+      handleModalClose()
+    } catch (error) {
+      toast.error('Failed to create product')
+      console.error(error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // Knowledge types for the modal
+  const knowledgeTypes = [
+    { value: 'product', label: 'Product', icon: Plus },
+    { value: 'service', label: 'Service', icon: Plus }
+  ]
 
   // Empty State
   if (forceEmpty || (!entry && !isGenerating)) {
     return (
-      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
-           style={{
-             background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
-             backdropFilter: 'blur(10px)',
-             WebkitBackdropFilter: 'blur(10px)'
-           }}>
-        
-        {/* Status Badge */}
-        <div className="absolute top-4 right-4 z-30">
-          <div className="bg-gray-700/50 text-gray-400 border border-gray-600/50 px-3 py-1 rounded-full text-xs">
-            Not Created
+      <>
+        <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+             style={{
+               background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+               backdropFilter: 'blur(10px)',
+               WebkitBackdropFilter: 'blur(10px)'
+             }}>
+          
+          {/* Status Badge */}
+          <div className="absolute top-4 right-4 z-30">
+            <div className="bg-gray-700/50 text-gray-400 border border-gray-600/50 px-3 py-1 rounded-full text-xs">
+              Not Created
+            </div>
           </div>
-        </div>
 
-        {/* Account Info */}
-        <div className="text-sm font-light opacity-80 mb-4 tracking-wide">
-          Free Account: 1 Product/Service Limit
-        </div>
+          {/* Account Info */}
+          <div className="text-sm font-light opacity-80 mb-4 tracking-wide">
+            Free Account: 1 Product/Service Limit
+          </div>
 
-        <div className="flex gap-8">
-          {/* Left Side - Icon and Main Content */}
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-6 mb-4">
-              {/* Floating Icon */}
-              <div className="relative inline-block" style={{ animation: 'float 3s ease-in-out infinite' }}>
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FBAE1C]/20 to-[#FC9109]/20 flex items-center justify-center border border-[#FBAE1C]/30">
-                  <span className="text-4xl">📦</span>
+          <div className="flex gap-8">
+            {/* Left Side - Icon and Main Content */}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="flex items-center gap-6 mb-4">
+                {/* Floating Icon */}
+                <div className="relative inline-block" style={{ animation: 'float 3s ease-in-out infinite' }}>
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FBAE1C]/20 to-[#FC9109]/20 flex items-center justify-center border border-[#FBAE1C]/30">
+                    <span className="text-4xl">📦</span>
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-7 h-7 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                    1
+                  </div>
                 </div>
-                <div className="absolute -top-2 -right-2 w-7 h-7 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-                  1
+                
+                {/* Title and Description */}
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold mb-2"
+                      style={{
+                        background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 25%, #DD6800 50%, #FC9109 75%, #FBAE1C 100%)',
+                        backgroundSize: '200% auto',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        animation: 'shimmer 3s linear infinite'
+                      }}>
+                    Add Your Product/Service
+                  </h2>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Create your first product entry to maximise AI-powered message personalisation
+                  </p>
                 </div>
               </div>
-              
-              {/* Title and Description */}
-              <div className="flex-1">
-                <h2 className="text-xl font-bold mb-2"
-                    style={{
-                      background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 25%, #DD6800 50%, #FC9109 75%, #FBAE1C 100%)',
-                      backgroundSize: '200% auto',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      animation: 'shimmer 3s linear infinite'
-                    }}>
-                  Add Your Product/Service
-                </h2>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  Create your first product entry to maximise AI-powered message personalisation
+
+              {/* Benefits Grid - Horizontal */}
+              <div className="flex gap-3 mb-4">
+                <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                       backdropFilter: 'blur(10px)'
+                     }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚡</span>
+                    <p className="text-xs text-gray-300">10x Response</p>
+                  </div>
+                </div>
+                <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                       backdropFilter: 'blur(10px)'
+                     }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🤖</span>
+                    <p className="text-xs text-gray-300">AI-Powered</p>
+                  </div>
+                </div>
+                <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                       backdropFilter: 'blur(10px)'
+                     }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚀</span>
+                    <p className="text-xs text-gray-300">2min Setup</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA Button */}
+              <button 
+                onClick={handleCreateProduct}
+                className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group">
+                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                <span>Create Your Product/Service Entry</span>
+              </button>
+            </div>
+
+            {/* Right Side - What You'll Define */}
+            <div className="w-80">
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 h-full border border-white/5">
+                <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">What You'll Define</h4>
+                <div className="space-y-3">
+                  <div className="flex items-start space-x-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FBAE1C] mt-1.5"></div>
+                    <span className="text-xs text-gray-300">The pain points your product/service addresses</span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FC9109] mt-1.5"></div>
+                    <span className="text-xs text-gray-300">The key selling benefits</span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#DD6800] mt-1.5"></div>
+                    <span className="text-xs text-gray-300">Who you might be selling to</span>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-gray-500 mt-4 pt-4 border-t border-white/5">
+                  Provide a product URL for AI-powered analysis
                 </p>
               </div>
             </div>
-
-            {/* Benefits Grid - Horizontal */}
-            <div className="flex gap-3 mb-4">
-              <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                     backdropFilter: 'blur(10px)'
-                   }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">⚡</span>
-                  <p className="text-xs text-gray-300">10x Response</p>
-                </div>
-              </div>
-              <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                     backdropFilter: 'blur(10px)'
-                   }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🤖</span>
-                  <p className="text-xs text-gray-300">AI-Powered</p>
-                </div>
-              </div>
-              <div className="rounded-lg px-4 py-2 text-center border border-white/5 flex-1"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                     backdropFilter: 'blur(10px)'
-                   }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🚀</span>
-                  <p className="text-xs text-gray-300">2min Setup</p>
-                </div>
-              </div>
-            </div>
-
-            {/* CTA Button */}
-            <button 
-              onClick={handleCreateProduct}
-              className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group">
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-              <span>Create Your Product/Service Entry</span>
-            </button>
           </div>
-
-          {/* Right Side - What You'll Define */}
-          <div className="w-80">
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 h-full border border-white/5">
-              <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">What You'll Define</h4>
-              <div className="space-y-3">
-                <div className="flex items-start space-x-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#FBAE1C] mt-1.5"></div>
-                  <span className="text-xs text-gray-300">The pain points your product/service addresses</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#FC9109] mt-1.5"></div>
-                  <span className="text-xs text-gray-300">The key selling benefits</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#DD6800] mt-1.5"></div>
-                  <span className="text-xs text-gray-300">Who you might be selling to</span>
-                </div>
-              </div>
-              
-              <p className="text-xs text-gray-500 mt-4 pt-4 border-t border-white/5">
-                Provide a product URL for AI-powered analysis
-              </p>
-            </div>
-          </div>
+          
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>
         </div>
-        
-        {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>
-      </div>
+
+        {/* Product Add Modal */}
+        <ProductAddModalEnhanced
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          newEntry={newEntry}
+          setNewEntry={setNewEntry}
+          knowledgeTypes={knowledgeTypes}
+          canAddAdditionalLinks={false} // Free tier
+          getMaxAdditionalLinks={() => 0}
+          subscription={{ plan_type: 'free' }}
+          addAdditionalLink={() => {}}
+          removeAdditionalLink={() => {}}
+          updateAdditionalLink={() => {}}
+          aiFields={aiFields}
+          toggleAIField={toggleAIField}
+          handleAddEntry={handleAddEntry}
+          isProcessing={isGenerating}
+        />
+      </>
     )
   }
 
@@ -338,7 +434,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
     )
   }
 
-  // Active State
+  // Active State (when product exists)
   return (
     <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
          style={{
