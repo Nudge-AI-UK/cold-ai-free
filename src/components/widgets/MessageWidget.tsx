@@ -1,12 +1,38 @@
 import { useState, useEffect } from 'react'
-import { Zap, Send, Copy, AlertCircle } from 'lucide-react'
+import { Zap, Send, Copy, AlertCircle, Save } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { unipileService } from '@/services/unipileService'
 
 interface MessageWidgetProps {
   forceEmpty?: boolean
   className?: string
+}
+
+const validateLinkedInUrl = (url: string): boolean => {
+  if (!url) return false
+  // Allow alphanumeric, hyphens, underscores, and URL-encoded characters (like emojis: %F0%9F%94%AD)
+  const linkedinRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[\w%-]+\/?$/
+  return linkedinRegex.test(url)
+}
+
+// Helper function to parse and clean message
+const parseMessage = (message: string): string => {
+  if (!message) return ''
+
+  // Try to parse if it's a JSON string
+  try {
+    const parsed = JSON.parse(message)
+    if (typeof parsed === 'string') {
+      message = parsed
+    }
+  } catch {
+    // Not JSON, use as-is
+  }
+
+  // Replace escaped newlines with actual newlines
+  return message.replace(/\\n/g, '\n')
 }
 
 export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
@@ -15,57 +41,312 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [generatedMessage, setGeneratedMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupComplete, setSetupComplete] = useState(false)
+  const [linkedinError, setLinkedinError] = useState('')
   const [setupStatus, setSetupStatus] = useState({
     settings: { personal: false, company: false, communication: false },
     product: false,
-    icp: false
+    icp: false,
+    linkedin: false
   })
+  const [icpData, setIcpData] = useState<any>(null)
+  const [productData, setProductData] = useState<any>(null)
+  const [messageType, setMessageType] = useState('first_message')
+  const [outreachGoal, setOutreachGoal] = useState('meeting')
+  const [progressStatus, setProgressStatus] = useState<string>('')
+  const [currentLogId, setCurrentLogId] = useState<number | null>(null)
+  const [editedMessage, setEditedMessage] = useState<string>('')
+  const [isSending, setIsSending] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [recipientUrl, setRecipientUrl] = useState<string>('')
+  const [isCheckingSetup, setIsCheckingSetup] = useState(false)
 
   useEffect(() => {
     if (user && !forceEmpty) {
       checkSetupStatus()
+      checkForInProgressGeneration()
     }
   }, [user, forceEmpty])
 
-  const checkSetupStatus = async () => {
+  // Check for any in-progress message generation on mount
+  const checkForInProgressGeneration = async () => {
     if (!user) return
 
+    const userId = user?.id || user?.user_id
+
+    // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
+    const { data: existingLog, error: logError } = await supabase
+      .from('message_generation_logs')
+      .select('id, message_status, generated_message, edited_message')
+      .eq('user_id', userId)
+      .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (logError) {
+      console.error('❌ Error checking for in-progress generation:', logError)
+      return
+    }
+
+    if (existingLog) {
+      console.log('📝 Found existing message log:', existingLog)
+      setCurrentLogId(existingLog.id)
+
+      // Check if it's in progress
+      if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(existingLog.message_status)) {
+        setProgressStatus(existingLog.message_status)
+        setIsGenerating(true)
+        toast.info('Resuming message generation...')
+      } else if (existingLog.message_status === 'generated' && existingLog.generated_message) {
+        // Load completed message
+        setGeneratedMessage(parseMessage(existingLog.generated_message))
+        if (existingLog.edited_message) {
+          setEditedMessage(parseMessage(existingLog.edited_message))
+        }
+        setProgressStatus('generated')
+        setIsGenerating(false)
+      }
+    }
+  }
+
+  // Auto-save edited message (debounced)
+  useEffect(() => {
+    if (!currentLogId) return
+
+    console.log('💾 Auto-saving edited message...', { currentLogId, editedLength: editedMessage?.length || 0, matchesOriginal: editedMessage === generatedMessage })
+    const timer = setTimeout(async () => {
+      // If edited message is empty or matches the original, save NULL to indicate no edits
+      const valueToSave = (!editedMessage || editedMessage === generatedMessage) ? null : editedMessage
+
+      const { data, error } = await supabase
+        .from('message_generation_logs')
+        .update({ edited_message: valueToSave })
+        .eq('id', currentLogId)
+        .select()
+
+      if (error) {
+        console.error('❌ Failed to save edited message:', error)
+      } else {
+        console.log('✅ Edited message saved:', data)
+      }
+    }, 1000) // Save 1s after user stops typing
+
+    return () => clearTimeout(timer)
+  }, [editedMessage, currentLogId, generatedMessage])
+
+  // Real-time subscriptions for automatic updates
+  useEffect(() => {
+    if (!user) return
+
+    const userId = user?.id || user?.user_id
+    let debounceTimer: NodeJS.Timeout | null = null
+
+    // Debounced checkSetupStatus to prevent rapid-fire updates
+    const debouncedCheckSetupStatus = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        checkSetupStatus()
+      }, 500) // Wait 500ms after last change
+    }
+
+    // Subscribe to changes in user-related tables
+    const channel = supabase
+      .channel('message_widget_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 User profile updated:', payload)
+          debouncedCheckSetupStatus()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'business_profiles',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 Business profile updated:', payload)
+          debouncedCheckSetupStatus()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'communication_preferences',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 Communication preferences updated:', payload)
+          debouncedCheckSetupStatus()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'knowledge_base',
+          filter: `created_by=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 Knowledge base updated:', payload)
+          debouncedCheckSetupStatus()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'icps',
+          filter: `created_by=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 ICP updated:', payload)
+          debouncedCheckSetupStatus()
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔌 Subscription status:', status)
+      })
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
+  // Removed aggressive refresh mechanisms to prevent infinite loops
+  // Real-time subscriptions below handle updates automatically
+
+  // Subscribe to message generation progress
+  useEffect(() => {
+    if (!currentLogId) return
+
+    console.log('📡 Subscribing to message generation progress for log_id:', currentLogId)
+
+    const channel = supabase
+      .channel(`message_progress_${currentLogId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_generation_logs',
+          filter: `id=eq.${currentLogId}`
+        },
+        (payload) => {
+          console.log('🔄 Message generation progress update:', payload)
+          const newData = payload.new as any
+          const oldData = payload.old as any
+
+          // Ignore updates that only change edited_message (from our own auto-save)
+          const isOnlyEditedMessageChange =
+            newData.edited_message !== oldData.edited_message &&
+            newData.generated_message === oldData.generated_message &&
+            newData.message_status === oldData.message_status
+
+          if (isOnlyEditedMessageChange) {
+            console.log('⏭️ Ignoring auto-save update (edited_message only)')
+            return
+          }
+
+          // Update progress status from message_status
+          if (newData.message_status) {
+            setProgressStatus(newData.message_status)
+            console.log('📊 Progress:', newData.message_status)
+          }
+
+          // Check if generation is complete (only reset on first completion)
+          if (newData.generated_message && newData.message_status === 'generated' && !generatedMessage) {
+            console.log('✅ Message generation complete!')
+            setGeneratedMessage(parseMessage(newData.generated_message))
+            setEditedMessage('') // Reset edited message for new generation
+            setProgressStatus('generated')
+            setIsGenerating(false)
+          }
+
+          // Check if generation failed
+          if (newData.message_status === 'failed') {
+            console.error('❌ Message generation failed:', newData.message_metadata?.error)
+            toast.error(newData.message_metadata?.error || 'Message generation failed')
+            setProgressStatus('')
+            setIsGenerating(false)
+            setCurrentLogId(null)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔌 Message progress subscription status:', status)
+      })
+
+    return () => {
+      console.log('🔌 Unsubscribing from message progress')
+      supabase.removeChannel(channel)
+    }
+  }, [currentLogId])
+
+  const checkSetupStatus = async () => {
+    if (!user || isCheckingSetup) return
+
+    setIsCheckingSetup(true)
+    const userId = user?.id || user?.user_id
     // Check user profiles
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.user_id)
+      .eq('user_id', userId)
       .single()
 
     // Check business profiles
     const { data: businessProfile } = await supabase
       .from('business_profiles')
       .select('*')
-      .eq('user_id', user.user_id)
+      .eq('user_id', userId)
       .single()
 
     // Check communication preferences
     const { data: commPrefs } = await supabase
       .from('communication_preferences')
       .select('*')
-      .eq('user_id', user.user_id)
+      .eq('user_id', userId)
       .single()
 
     // Check knowledge base
-    const { data: knowledgeBase } = await supabase
+    const { data: knowledgeBase, error: kbError } = await supabase
       .from('knowledge_base')
       .select('*')
-      .eq('created_by', user.user_id)
+      .eq('created_by', userId)
       .limit(1)
       .single()
 
+    console.log('📚 Knowledge Base Query:', { knowledgeBase, kbError, userId })
+
     // Check ICPs
-    const { data: icp } = await supabase
+    const { data: icp, error: icpError } = await supabase
       .from('icps')
       .select('*')
-      .eq('created_by', user.user_id)
+      .eq('created_by', userId)
       .limit(1)
       .single()
+
+    console.log('🎯 ICP Query:', { icp, icpError, userId })
+
+    // Check LinkedIn connection
+    const linkedinStatus = await unipileService.checkLinkedInStatus(userId)
+    console.log('🔗 LinkedIn Status:', linkedinStatus)
 
     const status = {
       settings: {
@@ -73,45 +354,240 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         company: !!businessProfile,
         communication: !!commPrefs
       },
-      product: !!knowledgeBase,
-      icp: !!icp
+      product: !!knowledgeBase && knowledgeBase.review_status === 'approved',
+      // ICP is ready when approved (even if still reviewing), or fully active
+      icp: !!icp && (
+        (icp.workflow_status === 'reviewing' && icp.review_status === 'approved') ||
+        icp.is_active === true
+      ),
+      linkedin: linkedinStatus.connected
+    }
+
+    console.log('📊 Setup Status:', status)
+
+    // Store actual data for display
+    setIcpData(icp)
+    setProductData(knowledgeBase)
+
+    // Set message type - always first_message for initial outreach
+    setMessageType('first_message')
+
+    // Set outreach goal from communication preferences
+    if (commPrefs && commPrefs.cta_preference) {
+      setOutreachGoal(commPrefs.cta_preference)
     }
 
     setSetupStatus(status)
     setSetupComplete(
-      status.settings.personal && 
-      status.settings.company && 
-      status.settings.communication && 
-      status.product && 
-      status.icp
+      status.settings.personal &&
+      status.settings.company &&
+      status.settings.communication &&
+      status.product &&
+      status.icp &&
+      status.linkedin
     )
+
+    setIsCheckingSetup(false)
   }
 
   const handleGenerate = async () => {
     if (!linkedinUrl) {
       toast.error('Please enter a LinkedIn URL')
+      setLinkedinError('LinkedIn URL is required')
+      return
+    }
+
+    if (!validateLinkedInUrl(linkedinUrl)) {
+      toast.error('Please enter a valid LinkedIn URL')
+      setLinkedinError('Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username')
+      return
+    }
+
+    if (!user) {
+      toast.error('Please log in to generate messages')
       return
     }
 
     setIsGenerating(true)
-    // Simulate generation
-    setTimeout(() => {
-      setGeneratedMessage(`Hi [Name],
+    setGeneratedMessage('') // Clear previous message
+    setEditedMessage('') // Clear any previous edits
+    setProgressStatus('') // Will be set by n8n workflow
 
-I noticed your experience in B2B sales and thought you'd be interested in how we're helping teams like yours book 3x more meetings with personalised AI-powered outreach.
+    try {
+      const userId = user?.id || user?.user_id
 
-Our platform has helped similar companies reduce prospecting time by 70% while improving response rates.
+      // Get current user session for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
 
-Would you be open to a quick chat next week to see if this could help your team?
+      if (!token) {
+        throw new Error('Authentication required')
+      }
 
-Best regards,
-[Your Name]`)
-      setIsGenerating(false)
-    }, 2000)
+      // Prepare request payload
+      const payload = {
+        user_id: userId,
+        prospect_data: {
+          linkedin_url: linkedinUrl
+        },
+        message_type: messageType,
+        outreach_goal: outreachGoal,
+        product_id: productData?.id || null,
+        icp_id: icpData?.id || null
+      }
+
+      // Call the edge function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/message-generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+
+      // Get the log_id from the response
+      const result = await response.json()
+      const logId = result.log_id
+
+      if (!logId) {
+        throw new Error('No log_id returned from server')
+      }
+
+      console.log('📝 Message generation started, log_id:', logId)
+
+      // Set the log ID to trigger subscription
+      setCurrentLogId(logId)
+      setRecipientUrl(linkedinUrl)
+
+      // The subscription will handle updates and final message
+      // Generation continues in the background via n8n workflow
+
+    } catch (error: any) {
+      console.error('❌ Failed to generate message:', error)
+
+      // Try to parse structured error response
+      try {
+        const errorData = typeof error === 'string' ? JSON.parse(error) : error
+
+        if (errorData.error_type === 'MONTHLY_LIMIT_EXCEEDED') {
+          toast.error(`Monthly limit reached (${errorData.details?.limits?.messages_used}/${errorData.details?.limits?.messages_limit}). ${errorData.details?.suggestion || 'Upgrade your plan'}`)
+        } else if (errorData.error_type === 'LINKEDIN_CONNECTION_REQUIRED') {
+          toast.error(`LinkedIn connection required. ${errorData.details?.suggestion || 'Connect your LinkedIn in Settings'}`)
+        } else {
+          toast.error(errorData.message || errorData.error || 'Failed to generate message')
+        }
+      } catch (parseError) {
+        // Fallback to generic error message
+        toast.error(error.message || 'Failed to generate message')
+      }
+
+      setGeneratedMessage('') // Clear on error
+      setEditedMessage('') // Clear edited message on error
+      setProgressStatus('') // Clear progress on error
+      setCurrentLogId(null) // Clear log ID on error
+      setIsGenerating(false) // Stop generating on error
+    }
   }
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedMessage)
+  const handleSendMessage = async () => {
+    if (!user || !currentLogId) return
+
+    setIsSending(true)
+    try {
+      const userId = user?.id || user?.user_id
+      const messageText = editedMessage || generatedMessage
+
+      if (!recipientUrl) {
+        toast.error('No recipient LinkedIn URL found')
+        return
+      }
+
+      // Call Supabase Edge Function to send message via Unipile
+      const { data, error } = await supabase.functions.invoke('linkedin-send-message', {
+        body: {
+          user_id: userId,
+          message_log_id: currentLogId,
+          recipient_linkedin_url: recipientUrl,
+          message_text: messageText
+        }
+      })
+
+      if (error) throw error
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to send message')
+      }
+
+      toast.success('Message sent successfully via LinkedIn!')
+
+      // Reset widget to Ready state
+      resetWidget()
+
+    } catch (error: any) {
+      console.error('❌ Error sending message:', error)
+      toast.error(error.message || 'Failed to send message. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleArchiveMessage = async () => {
+    if (!currentLogId) return
+
+    setIsArchiving(true)
+    try {
+      const { error } = await supabase
+        .from('message_generation_logs')
+        .update({
+          message_status: 'archived',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentLogId)
+
+      if (error) throw error
+
+      toast.success('Message archived successfully!')
+
+      // Reset widget to Ready state
+      resetWidget()
+
+    } catch (error: any) {
+      console.error('❌ Error archiving message:', error)
+      toast.error('Failed to archive message')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const resetWidget = () => {
+    setGeneratedMessage('')
+    setEditedMessage('')
+    setProgressStatus('')
+    setCurrentLogId(null)
+    setIsGenerating(false)
+    setLinkedinUrl('')
+    setRecipientUrl('')
+  }
+
+  const copyToClipboard = async () => {
+    const messageToCopy = editedMessage || generatedMessage
+    navigator.clipboard.writeText(messageToCopy)
+
+    // Save edited version if it's different from original
+    if (editedMessage && editedMessage !== generatedMessage && currentLogId) {
+      console.log('💾 Saving edited message on copy...')
+      await supabase
+        .from('message_generation_logs')
+        .update({ edited_message: editedMessage })
+        .eq('id', currentLogId)
+    }
+
     toast.success('Message copied to clipboard!')
   }
 
@@ -193,6 +669,16 @@ Best regards,
                   </div>
                   <span className={setupStatus.icp ? 'text-gray-300' : 'text-gray-400'}>
                     Create an ICP with Cold AI
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                    setupStatus.linkedin ? 'border-green-500 bg-green-500/20' : 'border-gray-500'
+                  }`}>
+                    <span className={setupStatus.linkedin ? 'text-green-400' : 'text-gray-500'}>✓</span>
+                  </div>
+                  <span className={setupStatus.linkedin ? 'text-gray-300' : 'text-gray-400'}>
+                    Connect LinkedIn Account
                   </span>
                 </div>
               </div>
@@ -343,30 +829,61 @@ Best regards,
                 LinkedIn Profile URL
               </label>
               <div className="relative">
-                <input 
+                <input
                   type="url"
                   value={linkedinUrl}
-                  onChange={(e) => setLinkedinUrl(e.target.value)}
-                  placeholder="https://linkedin.com/in/example" 
-                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-[#FBAE1C]/50 transition-all duration-200"
+                  onChange={(e) => {
+                    setLinkedinUrl(e.target.value)
+                    setLinkedinError('')
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value && !validateLinkedInUrl(e.target.value)) {
+                      setLinkedinError('Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username')
+                    }
+                  }}
+                  placeholder="https://linkedin.com/in/example"
+                  className={`w-full bg-black/30 border rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none transition-all duration-200 ${
+                    linkedinError
+                      ? 'border-red-500 focus:border-red-500'
+                      : 'border-white/10 focus:border-[#FBAE1C]/50'
+                  }`}
                 />
               </div>
+              {linkedinError && (
+                <p className="text-xs text-red-400 mt-1">{linkedinError}</p>
+              )}
             </div>
 
             {/* Configuration Options */}
             <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/5">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">ICP Profile</span>
-                  <span className="text-xs font-medium text-[#FBAE1C]">B2B Sales Teams</span>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left Column */}
+                <div className="space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-400 mb-1">ICP Profile</span>
+                    <span className="text-xs font-medium text-[#FBAE1C]">
+                      {icpData?.icp_name || 'Not set'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-400 mb-1">Outreach Goal</span>
+                    <span className="text-xs font-medium text-[#FBAE1C] capitalize">
+                      {outreachGoal === 'meeting' ? 'Book Meeting' :
+                       outreachGoal === 'call' ? 'Schedule Call' :
+                       outreachGoal === 'email' ? 'Reply via Email' :
+                       outreachGoal === 'soft' ? 'Soft Ask' : 'Book Meeting'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Message Type</span>
-                  <span className="text-xs font-medium text-[#FBAE1C]">Connection Request</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Product Context</span>
-                  <span className="text-xs font-medium text-[#FBAE1C]">Cold AI Pro</span>
+
+                {/* Right Column */}
+                <div className="space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-400 mb-1">Product Context</span>
+                    <span className="text-xs font-medium text-[#FBAE1C]">
+                      {productData?.title || 'Not set'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -398,11 +915,146 @@ Best regards,
               <label className="block text-xs font-medium text-white/70 uppercase tracking-wide mb-2">
                 Generated Message
               </label>
-              <div className="bg-black/30 rounded-xl border border-white/10 p-4 text-sm leading-relaxed min-h-[200px]">
+              <div className="bg-black/30 rounded-xl border border-white/10 min-h-[200px]">
                 {generatedMessage ? (
-                  <div className="text-gray-300 whitespace-pre-wrap">{generatedMessage}</div>
+                  <textarea
+                    value={editedMessage || generatedMessage}
+                    onChange={(e) => setEditedMessage(e.target.value)}
+                    className="w-full h-full min-h-[200px] bg-transparent p-4 text-sm leading-relaxed text-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-[#FBAE1C]/50 rounded-xl"
+                    placeholder="Your generated message will appear here..."
+                  />
+                ) : progressStatus ? (
+                  <div className="text-gray-400 p-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="relative flex items-center justify-center">
+                        <div className="w-3 h-3 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                        <div className="absolute w-3 h-3 bg-[#FBAE1C] rounded-full animate-ping opacity-75"></div>
+                      </div>
+                      <span className="text-sm font-medium text-[#FBAE1C] animate-pulse">
+                        {progressStatus === 'analysing_prospect' && 'Analysing prospect profile'}
+                        {progressStatus === 'researching_product' && 'Researching product context'}
+                        {progressStatus === 'analysing_icp' && 'Analysing ICP alignment'}
+                        {progressStatus === 'generating_message' && 'Crafting personalised message'}
+                        <span className="inline-block ml-1">
+                          <span className="animate-[bounce_1s_ease-in-out_infinite]">.</span>
+                          <span className="animate-[bounce_1s_ease-in-out_0.1s_infinite]">.</span>
+                          <span className="animate-[bounce_1s_ease-in-out_0.2s_infinite]">.</span>
+                        </span>
+                      </span>
+                    </div>
+                    <div className="space-y-3 pl-1">
+                      {/* Analysing prospect */}
+                      <div className={`flex items-start gap-3 transition-all duration-500 ${
+                        progressStatus === 'analysing_prospect' ? 'scale-105' : ''
+                      }`}>
+                        <div className="relative flex items-center justify-center mt-1">
+                          {progressStatus === 'analysing_prospect' ? (
+                            <>
+                              <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                              <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
+                            </>
+                          ) : (progressStatus === 'researching_product' || progressStatus === 'analysing_icp' || progressStatus === 'generating_message') ? (
+                            <div className="w-2 h-2 bg-green-500 rounded-full flex items-center justify-center">
+                              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm transition-colors duration-300 ${
+                          progressStatus === 'analysing_prospect' ? 'text-gray-200 font-medium' :
+                          (progressStatus === 'researching_product' || progressStatus === 'analysing_icp' || progressStatus === 'generating_message') ? 'text-green-400' :
+                          'text-gray-600'
+                        }`}>
+                          Analysing prospect profile
+                        </span>
+                      </div>
+
+                      {/* Researching product */}
+                      <div className={`flex items-start gap-3 transition-all duration-500 ${
+                        progressStatus === 'researching_product' ? 'scale-105' : ''
+                      }`}>
+                        <div className="relative flex items-center justify-center mt-1">
+                          {progressStatus === 'researching_product' ? (
+                            <>
+                              <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                              <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
+                            </>
+                          ) : (progressStatus === 'analysing_icp' || progressStatus === 'generating_message') ? (
+                            <div className="w-2 h-2 bg-green-500 rounded-full flex items-center justify-center">
+                              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm transition-colors duration-300 ${
+                          progressStatus === 'researching_product' ? 'text-gray-200 font-medium' :
+                          (progressStatus === 'analysing_icp' || progressStatus === 'generating_message') ? 'text-green-400' :
+                          'text-gray-600'
+                        }`}>
+                          Researching product context
+                        </span>
+                      </div>
+
+                      {/* Analysing ICP */}
+                      <div className={`flex items-start gap-3 transition-all duration-500 ${
+                        progressStatus === 'analysing_icp' ? 'scale-105' : ''
+                      }`}>
+                        <div className="relative flex items-center justify-center mt-1">
+                          {progressStatus === 'analysing_icp' ? (
+                            <>
+                              <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                              <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
+                            </>
+                          ) : progressStatus === 'generating_message' ? (
+                            <div className="w-2 h-2 bg-green-500 rounded-full flex items-center justify-center">
+                              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm transition-colors duration-300 ${
+                          progressStatus === 'analysing_icp' ? 'text-gray-200 font-medium' :
+                          progressStatus === 'generating_message' ? 'text-green-400' :
+                          'text-gray-600'
+                        }`}>
+                          Analysing ICP alignment
+                        </span>
+                      </div>
+
+                      {/* Generating message */}
+                      <div className={`flex items-start gap-3 transition-all duration-500 ${
+                        progressStatus === 'generating_message' ? 'scale-105' : ''
+                      }`}>
+                        <div className="relative flex items-center justify-center mt-1">
+                          {progressStatus === 'generating_message' ? (
+                            <>
+                              <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                              <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
+                            </>
+                          ) : (
+                            <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm transition-colors duration-300 ${
+                          progressStatus === 'generating_message' ? 'text-gray-200 font-medium' :
+                          'text-gray-600'
+                        }`}>
+                          Crafting personalised message
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full min-h-[200px] text-gray-400">
+                  <div className="flex items-center justify-center h-full min-h-[200px] text-gray-400 p-4">
                     <div className="text-center">
                       <div className="text-3xl mb-3 opacity-50">💬</div>
                       <p className="text-xs">Your personalised message will appear here</p>
@@ -414,32 +1066,66 @@ Best regards,
             </div>
 
             {/* Message Stats */}
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Character count: {generatedMessage.length}/300</span>
-              <span>Est. response rate: {generatedMessage ? '15-20%' : '--'}</span>
+            <div className="flex justify-between text-xs">
+              <span className={(editedMessage || generatedMessage).length > 300 ? 'text-red-400 font-medium' : 'text-gray-500'}>
+                Character count: {(editedMessage || generatedMessage).length}/300
+                {(editedMessage || generatedMessage).length > 300 && ` (${(editedMessage || generatedMessage).length - 300} over limit)`}
+              </span>
+              {editedMessage && editedMessage !== generatedMessage && (
+                <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+              )}
             </div>
+            {(editedMessage || generatedMessage).length > 300 && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400">
+                ⚠️ LinkedIn connection requests are limited to 300 characters. This message will be rejected or truncated if the recipient is not an existing connection.
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <button 
+              <button
+                onClick={handleSendMessage}
+                disabled={isSending || !(editedMessage || generatedMessage)}
                 className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 ${
-                  generatedMessage 
-                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg' 
+                  (editedMessage || generatedMessage)
+                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
                     : 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
-                }`}
-                disabled={!generatedMessage}>
-                <Send className="w-5 h-5" />
-                <span>Send Message</span>
+                }`}>
+                {isSending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Sending...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send Message</span>
+                  </>
+                )}
               </button>
-              <button 
+              <button
                 onClick={copyToClipboard}
                 className={`p-3 rounded-xl border transition-all duration-200 ${
-                  generatedMessage 
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300' 
+                  (editedMessage || generatedMessage)
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
                     : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
                 }`}
-                disabled={!generatedMessage}>
+                disabled={!(editedMessage || generatedMessage)}>
                 <Copy className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleArchiveMessage}
+                disabled={isArchiving || !(editedMessage || generatedMessage)}
+                className={`p-3 rounded-xl border transition-all duration-200 ${
+                  (editedMessage || generatedMessage)
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                    : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                }`}>
+                {isArchiving ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
               </button>
             </div>
           </div>

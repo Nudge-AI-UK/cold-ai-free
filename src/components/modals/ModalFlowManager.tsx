@@ -3,6 +3,20 @@ import { useState, useEffect, createContext, useContext, useCallback, useMemo } 
 import { Plus, Package, Briefcase, MessageSquare, User, Building2, Target, Settings, CreditCard, Users } from 'lucide-react'
 import { AnimatedModalBackground } from './AnimatedModalBackground'
 
+// Import Modal Components
+import { ProfilePersonalModal } from './ProfilePersonalModal'
+import { ProfileCompanyModal } from './ProfileCompanyModal'
+import { ProfileCommunicationModal } from './ProfileCommunicationModal'
+
+// Import existing modals and wrappers
+import { ICPCreationModalV2 } from '../states/ICPCreationModalV2'
+import { ProductAddModalEnhanced } from '../knowledge/ProductAddModalEnhanced'
+
+// Import modal wrappers
+import { ICPBasicModal, ICPDemographicsModal, ICPFirmographicsModal, ICPPainPointsModal, ICPGeneratingModal, KnowledgeGeneratingModal, ICPCreationModalWrapper, ICPUnifiedModalWrapper, ICPDetailsModal } from './ICPModalWrapper'
+import { KnowledgeModal } from './KnowledgeModal'
+import { SettingsAccountModal, SettingsPreferencesModal, SettingsIntegrationsModal, SettingsBillingModal } from './SettingsModals'
+
 // ==================== TYPE DEFINITIONS ====================
 
 interface ModalFlowState {
@@ -19,6 +33,10 @@ interface ModalFlowState {
     source?: string
     userId?: string
   }
+  // New state for unsaved changes tracking
+  originalData: Record<string, any>
+  hasUnsavedChanges: boolean
+  changeTracking: Record<string, boolean>
 }
 
 interface ModalFlowContextType {
@@ -35,6 +53,11 @@ interface ModalFlowContextType {
   getProgress: () => number
   isInFlow: () => boolean
   isAnyModalOpen: () => boolean
+  // New methods for change tracking
+  markDataAsOriginal: (data: Record<string, any>) => void
+  checkForUnsavedChanges: () => boolean
+  resetUnsavedChanges: () => void
+  hasUnsavedChanges: () => boolean
 }
 
 interface ModalOpenOptions {
@@ -58,54 +81,20 @@ interface ModalConfig {
 // ==================== MODAL FLOW DEFINITIONS ====================
 
 const MODAL_FLOWS = {
-  // Onboarding flow for new users
-  onboarding: {
-    name: 'Onboarding',
-    sequence: ['profile-personal', 'profile-company', 'profile-communication', 'knowledge-product'],
-    description: 'Complete your profile setup'
+  // Unified main workflow - the only flow all widgets use
+  main: {
+    name: 'Main Workflow',
+    sequence: ['profile-personal', 'profile-company', 'profile-communication', 'knowledge', 'icp-edit'],
+    description: 'Complete workflow from profile setup to ICP management'
   },
-  
-  // Profile completion flow
-  profileComplete: {
-    name: 'Profile Setup',
-    sequence: ['profile-personal', 'profile-company', 'profile-communication'],
-    description: 'Complete your profile information'
-  },
-  
-  // Knowledge base creation flow
-  knowledgeCreation: {
-    name: 'Knowledge Base',
-    sequence: ['knowledge-product', 'knowledge-company', 'knowledge-case-studies'],
-    description: 'Build your knowledge base'
-  },
-  
-  // ICP creation flow
-  icpCreation: {
-    name: 'Ideal Customer Profile',
-    sequence: ['icp-basic', 'icp-demographics', 'icp-firmographics', 'icp-pain-points'],
-    description: 'Define your ideal customer'
-  },
-  
-  // Settings configuration flow
+
+  // Settings configuration flow (separate flow only for settings pages)
   settings: {
     name: 'Settings',
     sequence: ['settings-account', 'settings-preferences', 'settings-integrations', 'settings-billing'],
     description: 'Configure your account settings'
   },
-  
-  // Team management flow
-  teamSetup: {
-    name: 'Team Setup',
-    sequence: ['team-invite', 'team-roles', 'team-permissions'],
-    description: 'Set up your team'
-  },
-  
-  // Message generation flow
-  messageGeneration: {
-    name: 'Message Generation',
-    sequence: ['message-select-icp', 'message-select-template', 'message-customize', 'message-preview'],
-    description: 'Generate personalised messages'
-  }
+
 } as const
 
 // ==================== MODAL REGISTRY ====================
@@ -114,165 +103,131 @@ const MODAL_REGISTRY: Record<string, ModalConfig> = {
   // Profile Modals
   'profile-personal': {
     id: 'profile-personal',
-    component: () => null,
+    component: ProfilePersonalModal,
     title: 'Personal Information',
     icon: User,
     description: 'Your personal details and contact information'
   },
   'profile-company': {
     id: 'profile-company',
-    component: () => null,
+    component: ProfileCompanyModal,
     title: 'Company Information',
     icon: Building2,
     description: 'Your company details and role'
   },
   'profile-communication': {
     id: 'profile-communication',
-    component: () => null,
+    component: ProfileCommunicationModal,
     title: 'Communication Style',
     icon: MessageSquare,
     description: 'Your preferred communication approach'
   },
   
-  // Knowledge Base Modals
-  'knowledge-product': {
-    id: 'knowledge-product',
-    component: () => null,
+  // Knowledge Base Modal
+  'knowledge': {
+    id: 'knowledge',
+    component: KnowledgeModal,
     title: 'Product/Service',
     icon: Package,
-    description: 'Add your product or service details'
+    description: 'Add or edit your product or service details'
   },
-  'knowledge-company': {
-    id: 'knowledge-company',
-    component: () => null,
-    title: 'Company Information',
-    icon: Briefcase,
-    description: 'Add company knowledge'
-  },
-  'knowledge-case-studies': {
-    id: 'knowledge-case-studies',
-    component: () => null,
-    title: 'Case Studies',
-    icon: Target,
-    description: 'Add success stories and case studies'
+  'knowledge-generating': {
+    id: 'knowledge-generating',
+    component: KnowledgeGeneratingModal,
+    title: 'Creating Product Profile',
+    icon: Package,
+    description: 'AI is analyzing your product'
   },
   
   // ICP Modals
   'icp-basic': {
     id: 'icp-basic',
-    component: () => null,
+    component: ICPBasicModal,
     title: 'Basic Information',
     icon: Target,
     description: 'Define basic ICP characteristics'
   },
   'icp-demographics': {
     id: 'icp-demographics',
-    component: () => null,
+    component: ICPDemographicsModal,
     title: 'Demographics',
     icon: Users,
     description: 'Demographic information'
   },
   'icp-firmographics': {
     id: 'icp-firmographics',
-    component: () => null,
+    component: ICPFirmographicsModal,
     title: 'Firmographics',
     icon: Building2,
     description: 'Company characteristics'
   },
   'icp-pain-points': {
     id: 'icp-pain-points',
-    component: () => null,
+    component: ICPPainPointsModal,
     title: 'Pain Points',
     icon: Target,
     description: 'Problems your ICP faces'
+  },
+  'icp-generating': {
+    id: 'icp-generating',
+    component: ICPGeneratingModal,
+    title: 'Creating ICP',
+    icon: Target,
+    description: 'AI is generating your ideal customer profile'
+  },
+  'icp-create': {
+    id: 'icp-create',
+    component: ICPCreationModalWrapper,
+    title: 'Create ICP',
+    icon: Target,
+    description: 'Create a new ideal customer profile'
+  },
+  'icp-edit': {
+    id: 'icp-edit',
+    component: ICPUnifiedModalWrapper,
+    title: 'Edit ICP',
+    icon: Target,
+    description: 'Edit and approve your ideal customer profile'
+  },
+  'icp-details': {
+    id: 'icp-details',
+    component: ICPDetailsModal,
+    title: 'ICP Details',
+    icon: Target,
+    description: 'View your ideal customer profile details'
   },
   
   // Settings Modals
   'settings-account': {
     id: 'settings-account',
-    component: () => null,
+    component: SettingsAccountModal,
     title: 'Account Settings',
     icon: Settings,
     description: 'Manage your account'
   },
   'settings-preferences': {
     id: 'settings-preferences',
-    component: () => null,
+    component: SettingsPreferencesModal,
     title: 'Preferences',
     icon: Settings,
     description: 'Customise your experience'
   },
   'settings-integrations': {
     id: 'settings-integrations',
-    component: () => null,
+    component: SettingsIntegrationsModal,
     title: 'Integrations',
     icon: Settings,
     description: 'Connect external services'
   },
   'settings-billing': {
     id: 'settings-billing',
-    component: () => null,
+    component: SettingsBillingModal,
     title: 'Billing',
     icon: CreditCard,
     description: 'Manage subscription and payments',
     requiresAuth: true
   },
   
-  // Team Modals
-  'team-invite': {
-    id: 'team-invite',
-    component: () => null,
-    title: 'Invite Team Members',
-    icon: Users,
-    description: 'Invite colleagues to your team',
-    allowedPlans: ['team', 'enterprise']
-  },
-  'team-roles': {
-    id: 'team-roles',
-    component: () => null,
-    title: 'Team Roles',
-    icon: Users,
-    description: 'Assign roles to team members',
-    allowedPlans: ['team', 'enterprise']
-  },
-  'team-permissions': {
-    id: 'team-permissions',
-    component: () => null,
-    title: 'Permissions',
-    icon: Settings,
-    description: 'Configure team permissions',
-    allowedPlans: ['team', 'enterprise']
-  },
-  
-  // Message Generation Modals
-  'message-select-icp': {
-    id: 'message-select-icp',
-    component: () => null,
-    title: 'Select ICP',
-    icon: Target,
-    description: 'Choose target customer profile'
-  },
-  'message-select-template': {
-    id: 'message-select-template',
-    component: () => null,
-    title: 'Choose Template',
-    icon: MessageSquare,
-    description: 'Select message template'
-  },
-  'message-customize': {
-    id: 'message-customize',
-    component: () => null,
-    title: 'Customise Message',
-    icon: MessageSquare,
-    description: 'Personalise your message'
-  },
-  'message-preview': {
-    id: 'message-preview',
-    component: () => null,
-    title: 'Preview & Send',
-    icon: MessageSquare,
-    description: 'Review and send your message'
-  }
 }
 
 // ==================== CONTEXT IMPLEMENTATION ====================
@@ -301,21 +256,13 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
     totalSteps: 0,
     metadata: {
       timestamp: Date.now()
-    }
+    },
+    // New state for unsaved changes tracking
+    originalData: {},
+    hasUnsavedChanges: false,
+    changeTracking: {}
   })
 
-  // Debug logging in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('ModalFlow State:', {
-        currentModal: state.currentModal,
-        flowName: state.flowName,
-        stepIndex: state.stepIndex,
-        totalSteps: state.totalSteps,
-        history: state.history
-      })
-    }
-  }, [state])
 
   // Open a modal with optional flow detection
   const openModal = useCallback((modalId: string, options: ModalOpenOptions = {}) => {
@@ -358,20 +305,36 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState(prev => {
-      const newHistory = replace 
+      const newHistory = replace
         ? prev.history.slice(0, -1).concat(modalId)
         : [...prev.history, modalId]
 
+      // Check if we're switching to a completely different context (different flow or modal type)
+      const isDifferentContext =
+        prev.flowName !== flowName ||
+        (prev.currentModal && prev.currentModal !== modalId && !prev.flowSequence.includes(modalId))
+
+      // Special case: switching from ICP modal to profile/settings modals
+      const isFromICPToSettings = prev.currentModal?.includes('icp') && modalId.startsWith('profile')
+
+      // For different contexts, completely clear all data to prevent contamination
+      const cleanData = isDifferentContext ? { ...data } : { ...prev.data, ...data }
+
+      // Always clear change tracking when opening a new modal, especially for different contexts
       return {
         ...prev,
         currentModal: modalId,
         mode,
-        data: { ...prev.data, ...data },
+        data: cleanData, // Use cleaned data - fresh for different contexts, merged for same context
         history: newHistory,
         flowSequence,
         flowName,
         stepIndex,
         totalSteps: flowSequence.length,
+        // Force clear all change tracking for any modal switch, especially from ICP
+        hasUnsavedChanges: false,
+        originalData: {},
+        changeTracking: {},
         metadata: {
           timestamp: Date.now(),
           source,
@@ -411,7 +374,12 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
           flowSequence,
           flowName,
           stepIndex,
-          totalSteps: flowSequence.length
+          totalSteps: flowSequence.length,
+          data: {}, // Clear data when going back to prevent cross-modal contamination
+          // Clear change tracking when going back
+          hasUnsavedChanges: false,
+          originalData: {},
+          changeTracking: {}
         }
       } else {
         // Close all modals
@@ -423,7 +391,11 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
           flowName: null,
           stepIndex: 0,
           totalSteps: 0,
-          data: {}
+          data: {},
+          // Clear change tracking when closing all
+          hasUnsavedChanges: false,
+          originalData: {},
+          changeTracking: {}
         }
       }
     })
@@ -442,7 +414,11 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
       totalSteps: 0,
       metadata: {
         timestamp: Date.now()
-      }
+      },
+      // Clear change tracking state completely
+      originalData: {},
+      hasUnsavedChanges: false,
+      changeTracking: {}
     })
   }, [])
 
@@ -456,11 +432,34 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
       const nextIndex = prev.stepIndex + 1
       const nextModal = prev.flowSequence[nextIndex]
 
+
+      // Clear change tracking when navigating to avoid cross-modal conflicts
+      // But preserve flow-specific data that needs to persist
+      const preservedData: any = {}
+
+      // For main, preserve ICP data throughout the flow
+      if (prev.flowName === 'main' && prev.data?.icp) {
+        preservedData.icp = prev.data.icp
+      }
+
+      // Set appropriate mode based on flow and target modal
+      let targetMode = 'add' // default - knowledge modal works in 'add' mode
+
+      // For ICP modals, use 'view' mode when there's existing ICP data
+      if (nextModal === 'icp-edit') {
+        targetMode = 'view' // ICP modals should show existing data in view mode by default
+      }
+
       return {
         ...prev,
         currentModal: nextModal,
         stepIndex: nextIndex,
-        history: [...prev.history, nextModal]
+        history: [...prev.history, nextModal],
+        data: preservedData, // Preserve flow-specific data
+        mode: targetMode, // Set appropriate mode for target modal
+        hasUnsavedChanges: false,
+        originalData: {},
+        changeTracking: {}
       }
     })
   }, [])
@@ -473,11 +472,29 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
         const prevIndex = prev.stepIndex - 1
         const prevModal = prev.flowSequence[prevIndex]
 
+
+        // Clear change tracking when navigating to avoid cross-modal conflicts
+        // But preserve flow-specific data that needs to persist
+        const preservedData: any = {}
+
+        // For main, preserve ICP data throughout the flow
+        if (prev.flowName === 'main' && prev.data?.icp) {
+          preservedData.icp = prev.data.icp
+        }
+
+        // Set appropriate mode based on flow and target modal
+        let targetMode = 'add' // default - knowledge modal works in 'add' mode
+
         return {
           ...prev,
           currentModal: prevModal,
           stepIndex: prevIndex,
-          history: prev.history.slice(0, -1)
+          history: prev.history.slice(0, -1),
+          data: preservedData, // Preserve flow-specific data
+          mode: targetMode, // Set appropriate mode for target modal
+          hasUnsavedChanges: false,
+          originalData: {},
+          changeTracking: {}
         }
       } else if (prev.history.length > 1) {
         // Navigate through history
@@ -485,10 +502,33 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
         newHistory.pop()
         const previousModal = newHistory[newHistory.length - 1]
 
+
+        // Clear change tracking when navigating to avoid cross-modal conflicts
+        // But preserve flow-specific data that needs to persist
+        const preservedData: any = {}
+
+        // For main, preserve ICP data throughout the flow
+        if (prev.flowName === 'main' && prev.data?.icp) {
+          preservedData.icp = prev.data.icp
+        }
+
+        // Set appropriate mode based on flow and target modal
+        let targetMode = 'add' // default - knowledge modal works in 'add' mode
+
+        // For ICP modals, use 'view' mode when there's existing ICP data
+        if (previousModal === 'icp-edit') {
+          targetMode = 'view' // ICP modals should show existing data in view mode by default
+        }
+
         return {
           ...prev,
           currentModal: previousModal,
-          history: newHistory
+          history: newHistory,
+          data: preservedData, // Preserve flow-specific data
+          mode: targetMode, // Set appropriate mode for target modal
+          hasUnsavedChanges: false,
+          originalData: {},
+          changeTracking: {}
         }
       }
 
@@ -522,7 +562,10 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         currentModal: targetModal,
         stepIndex,
-        history: newHistory
+        history: newHistory,
+        hasUnsavedChanges: false,
+        originalData: {},
+        changeTracking: {}
       }
     })
   }, [])
@@ -558,11 +601,97 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
 
   // Navigation availability
   const canNavigate = useMemo(() => ({
-    prev: state.flowSequence.length > 0 
-      ? state.stepIndex > 0 
+    prev: state.flowSequence.length > 0
+      ? state.stepIndex > 0
       : state.history.length > 1,
     next: state.flowSequence.length > 0 && state.stepIndex < state.flowSequence.length - 1
   }), [state.flowSequence, state.stepIndex, state.history])
+
+  // New methods for change tracking
+  const markDataAsOriginal = useCallback((data: Record<string, any>) => {
+
+    setState(prev => ({
+      ...prev,
+      originalData: { ...data },
+      hasUnsavedChanges: false,
+      changeTracking: {}
+    }))
+  }, [state.currentModal])
+
+  const checkForUnsavedChanges = useCallback(() => {
+    // If no original data has been set, treat as no changes
+    if (!state.originalData || Object.keys(state.originalData).length === 0) {
+      return false
+    }
+
+    const originalStr = JSON.stringify(state.originalData)
+    const currentStr = JSON.stringify(state.data)
+    const hasChanges = originalStr !== currentStr
+
+
+    return hasChanges
+  }, [state.originalData, state.data, state.currentModal])
+
+  const resetUnsavedChanges = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      hasUnsavedChanges: false,
+      changeTracking: {}
+    }))
+  }, [])
+
+  const hasUnsavedChanges = useCallback(() => {
+    // Only check for unsaved changes if we have original data to compare against
+    if (!state.originalData || Object.keys(state.originalData).length === 0) {
+      return false
+    }
+
+    // Enhanced safeguard: don't show unsaved changes when navigating between different modal contexts
+    if (state.history.length > 1) {
+      const previousModal = state.history[state.history.length - 2]
+      const currentModal = state.currentModal
+
+      // Detect context switches that should not show unsaved changes
+      const isContextSwitch = (
+        // From ICP to any profile/settings modal
+        (previousModal?.includes('icp') && currentModal?.startsWith('profile')) ||
+        // From any profile modal to ICP
+        (previousModal?.startsWith('profile') && currentModal?.includes('icp')) ||
+        // From any profile modal to another profile modal (different context)
+        (previousModal?.startsWith('profile') && currentModal?.startsWith('profile') && previousModal !== currentModal) ||
+        // When current modal data is empty (fresh start)
+        Object.keys(state.data).length === 0
+      )
+
+      if (isContextSwitch) {
+        return false
+      }
+    }
+
+    return state.hasUnsavedChanges || checkForUnsavedChanges()
+  }, [state.hasUnsavedChanges, checkForUnsavedChanges, state.originalData, state.currentModal, state.history, state.data])
+
+  // Enhanced updateModalData with change tracking
+  const updateModalDataWithTracking = useCallback((newData: Partial<ModalFlowState['data']>) => {
+    setState(prev => {
+      const updatedData = { ...prev.data, ...newData }
+
+      // Only check for changes if we have original data to compare against
+      const hasChanges = prev.originalData && Object.keys(prev.originalData).length > 0
+        ? JSON.stringify(prev.originalData) !== JSON.stringify(updatedData)
+        : false
+
+      return {
+        ...prev,
+        data: updatedData,
+        hasUnsavedChanges: hasChanges,
+        changeTracking: {
+          ...prev.changeTracking,
+          [prev.currentModal || 'current']: hasChanges
+        }
+      }
+    })
+  }, [])
 
   // Context value
   const contextValue = useMemo<ModalFlowContextType>(() => ({
@@ -574,11 +703,15 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
     navigatePrevious,
     navigateToStep,
     canNavigate,
-    updateModalData,
+    updateModalData: updateModalDataWithTracking,
     isModalOpen,
     getProgress,
     isInFlow,
-    isAnyModalOpen
+    isAnyModalOpen,
+    markDataAsOriginal,
+    checkForUnsavedChanges,
+    resetUnsavedChanges,
+    hasUnsavedChanges
   }), [
     state,
     openModal,
@@ -588,18 +721,38 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
     navigatePrevious,
     navigateToStep,
     canNavigate,
-    updateModalData,
+    updateModalDataWithTracking,
     isModalOpen,
     getProgress,
     isInFlow,
-    isAnyModalOpen
+    isAnyModalOpen,
+    markDataAsOriginal,
+    checkForUnsavedChanges,
+    resetUnsavedChanges,
+    hasUnsavedChanges
   ])
+
+  // Render the current modal
+  const renderCurrentModal = () => {
+    if (!state.currentModal) return null
+
+    const modalConfig = MODAL_REGISTRY[state.currentModal]
+    if (!modalConfig) {
+      console.error(`❌ Modal config not found for: ${state.currentModal}`)
+      return null
+    }
+
+
+    const ModalComponent = modalConfig.component
+    // Pass state data as props to the modal component
+    return <ModalComponent {...state.data} mode={state.mode} />
+  }
 
   return (
     <ModalFlowContext.Provider value={contextValue}>
       {children}
-      {/* Animated Background - Shows when any modal is open */}
-      {state.currentModal && <AnimatedModalBackground />}
+      {/* Render the current modal */}
+      {renderCurrentModal()}
     </ModalFlowContext.Provider>
   )
 }

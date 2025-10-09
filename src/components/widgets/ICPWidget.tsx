@@ -7,8 +7,7 @@ import { Plus, MoreVertical, Loader2, Sparkles, Edit2, Eye } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { ICPCreationModalV2 } from '@/components/states/ICPCreationModalV2'
-import { ICPUnifiedModal } from '@/components/icps/ICPUnifiedModal'
+import { useModalFlow } from '@/components/modals/ModalFlowManager'
 
 interface ICPWidgetProps {
   className?: string
@@ -20,12 +19,12 @@ type ICPState = 'empty' | 'generating' | 'draft' | 'reviewing' | 'active'
 
 export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
   const { user } = useAuth()
+  const { openModal } = useModalFlow()
   const [icp, setIcp] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [icpState, setIcpState] = useState<ICPState>('empty')
-  const [isCreationModalOpen, setIsCreationModalOpen] = useState(false)
-  const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false)
   const [generatingProgress, setGeneratingProgress] = useState(0)
+  const [currentStep, setCurrentStep] = useState(2)
 
   useEffect(() => {
     if (user) {
@@ -43,9 +42,9 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           const genIcp = parsed[0]
           const elapsed = Date.now() - genIcp.startTime
           const progress = Math.min(95, (elapsed / 60000) * 100)
-          
+
           setGeneratingProgress(progress)
-          
+
           if (elapsed > 60000) {
             setIcpState('active')
             localStorage.removeItem('generating_icps')
@@ -56,14 +55,35 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         }
       }
     }
-    
+
     const interval = setInterval(checkGenerating, 1000)
     return () => clearInterval(interval)
   }, [])
 
+  // Poll for ICP updates when in generating state
+  useEffect(() => {
+    if (icpState === 'generating' && user) {
+      const pollInterval = setInterval(() => {
+        fetchICP()
+      }, 5000) // Check every 5 seconds
+
+      return () => clearInterval(pollInterval)
+    }
+  }, [icpState, user])
+
+  // Animate progress steps for generating and reviewing states
+  useEffect(() => {
+    if (icpState === 'generating' || icpState === 'reviewing') {
+      const interval = setInterval(() => {
+        setCurrentStep(prev => prev >= 4 ? 2 : prev + 1)
+      }, 2000)
+      return () => clearInterval(interval)
+    }
+  }, [icpState])
+
   const fetchICP = async () => {
     if (!user) return
-    
+
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -74,8 +94,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
             title
           )
         `)
-        .eq('created_by', user.id)
-        .eq('is_active', true)
+        .eq('created_by', user?.id || user?.user_id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
@@ -83,15 +102,25 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
 
       if (data) {
         setIcp(data)
-        // Determine state based on actual workflow_status
-        if (data.workflow_status === 'generating' || data.workflow_status === 'form') {
+
+        // Determine state based on workflow_status first (most specific)
+        if (data.workflow_status === 'draft') {
+          setIcpState('draft')
+        } else if (data.workflow_status === 'generating' || data.workflow_status === 'form') {
           setIcpState('generating')
         } else if (data.workflow_status === 'processing' || data.workflow_status === 'reviewing') {
           setIcpState('reviewing')
-        } else if (data.workflow_status === 'approved') {
+        } else if (data.workflow_status === 'approved' || data.workflow_status === 'active') {
           setIcpState('active')
-        } else if (data.workflow_status === 'draft'){
-          setIcpState('draft')
+        }
+        // Fall back to is_active check if workflow_status doesn't tell us
+        else if (data.is_active === false) {
+          setIcpState('generating')
+        } else if (data.is_active === true) {
+          setIcpState('active')
+        } else {
+          // No workflow_status and no is_active, default to empty
+          setIcpState('empty')
         }
       } else if (!error) {
         setIcpState('empty')
@@ -236,8 +265,8 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           </div>
   
           {/* CTA Button */}
-          <button 
-            onClick={() => setIsCreationModalOpen(true)}
+          <button
+            onClick={() => openModal('icp-edit', { flowName: 'main', mode: 'add' })}
             className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-4 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
@@ -259,15 +288,6 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
   
   // Generating State
   if (icpState === 'generating') {
-    const [currentStep, setCurrentStep] = useState(2)
-    
-    useEffect(() => {
-      const interval = setInterval(() => {
-        setCurrentStep(prev => prev >= 4 ? 2 : prev + 1)
-      }, 2000)
-      return () => clearInterval(interval)
-    }, [])
-  
     return (
       <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
            style={{
@@ -558,14 +578,14 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
             
             {/* Action Buttons - Different for Draft */}
             <div className="flex space-x-3">
-              <button 
-                onClick={() => setIsUnifiedModalOpen(true)}
-                className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
+              <button
+                onClick={() => openModal('icp-edit', { mode: 'edit', data: { icp }, flowName: 'main' })}
+                className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
               >
                 Edit & Approve
               </button>
-              <button 
-                onClick={() => setIsUnifiedModalOpen(true)}
+              <button
+                onClick={() => openModal('icp-edit', { mode: 'view', data: { icp }, flowName: 'main' })}
                 className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
               >
                 <Eye className="w-5 h-5" />
@@ -576,48 +596,13 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           {/* Hover State Indicator */}
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
         </div>
-  
-        {/* Modals */}
-        <ICPCreationModalV2
-          isOpen={isCreationModalOpen}
-          onClose={() => {
-            setIsCreationModalOpen(false)
-            fetchICP()
-          }}
-          onSuccess={() => {
-            fetchICP()
-          }}
-          onGenerate={handleGenerate}
-        />
-  
-        {icp && (
-          <ICPUnifiedModal
-            isOpen={isUnifiedModalOpen}
-            onClose={() => {
-              setIsUnifiedModalOpen(false)
-              fetchICP()
-            }}
-            icp={icp}
-            onUpdate={() => {
-              fetchICP()
-            }}
-          />
-        )}
+
       </>
     )
   }
 
   // Reviewing State
   if (icpState === 'reviewing') {
-    const [currentStep, setCurrentStep] = useState(2)
-    
-    useEffect(() => {
-      const interval = setInterval(() => {
-        setCurrentStep(prev => prev >= 4 ? 2 : prev + 1)
-      }, 2000)
-      return () => clearInterval(interval)
-    }, [])
-  
     return (
       <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
            style={{
@@ -643,7 +628,7 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           {/* ICP Name with icon */}
           <div className="flex items-center mb-2">
             <div className="text-5xl mr-3">🎯</div>
-            <div className="text-4xl font-semibold">
+            <div className="text-2xl font-semibold">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]">
                 {icp?.icp_name || 'B2B Sales Teams'}
               </span>
@@ -734,8 +719,8 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           </div>
   
           {/* View Details Button */}
-          <button 
-            onClick={() => setIsUnifiedModalOpen(true)}
+          <button
+            onClick={() => openModal('icp-edit', { mode: 'view', data: { icp }, flowName: 'main' })}
             className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm mb-4"
           >
             View Details
@@ -916,14 +901,14 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
           )}
           {/* Action Buttons */}
           <div className="flex space-x-3">
-            <button 
-              onClick={() => setIsUnifiedModalOpen(true)}
+            <button
+              onClick={() => openModal('icp-edit', { mode: 'view', data: { icp }, flowName: 'main' })}
               className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
             >
               View Details
             </button>
-            <button 
-              onClick={() => setIsUnifiedModalOpen(true)}
+            <button
+              onClick={() => openModal('icp-edit', { mode: 'edit', data: { icp }, flowName: 'main' })}
               className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
             >
               <Edit2 className="w-5 h-5" />
@@ -935,32 +920,6 @@ export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FBAE1C]/20 to-transparent rounded-bl-full blur-xl"></div>
       </div>
 
-      {/* Modals */}
-      <ICPCreationModalV2
-        isOpen={isCreationModalOpen}
-        onClose={() => {
-          setIsCreationModalOpen(false)
-          fetchICP()
-        }}
-        onSuccess={() => {
-          fetchICP()
-        }}
-        onGenerate={handleGenerate}
-      />
-
-      {icp && (
-        <ICPUnifiedModal
-          isOpen={isUnifiedModalOpen}
-          onClose={() => {
-            setIsUnifiedModalOpen(false)
-            fetchICP()
-          }}
-          icp={icp}
-          onUpdate={() => {
-            fetchICP()
-          }}
-        />
-      )}
     </>
   )
 }

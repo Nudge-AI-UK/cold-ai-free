@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Link2, Settings } from 'lucide-react'
+import { Link2, Settings, ExternalLink } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { unipileService } from '@/services/unipileService'
 
 interface LinkedInWidgetProps {
   forceEmpty?: boolean
@@ -10,10 +11,21 @@ interface LinkedInWidgetProps {
 }
 
 interface LinkedInProfile {
-  name: string
-  email: string
+  id: string
+  username: string
   connected: boolean
   profileUrl?: string
+  status: string
+  metadata?: {
+    profile_url?: string
+    profile_picture_url?: string
+    occupation?: string
+    location?: string
+    organization?: string
+    first_name?: string
+    last_name?: string
+    public_identifier?: string
+  }
 }
 
 export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
@@ -31,36 +43,134 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   const checkLinkedInStatus = async () => {
     if (!user) return
 
-    // Check user profile for LinkedIn connection status
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('linkedin_url, linkedin_connected')
-      .eq('user_id', user.user_id)
-      .single()
+    const userId = user?.id || user?.user_id
 
-    if (userProfile?.linkedin_connected) {
-      setIsConnected(true)
-      // Mock profile data - in production this would come from Unipile/LinkedIn API
-      setProfile({
-        name: 'John Doe',
-        email: 'john.doe@company.com',
-        connected: true,
-        profileUrl: userProfile.linkedin_url || undefined
-      })
+    try {
+      const { connected, account } = await unipileService.checkLinkedInStatus(userId)
+
+      setIsConnected(connected)
+
+      if (connected && account) {
+        console.log('📊 Setting profile data in widget:', account);
+        setProfile({
+          id: account.id,
+          username: account.username,
+          connected: true,
+          profileUrl: account.metadata?.profile_url,
+          status: account.status,
+          metadata: account.metadata
+        })
+      } else {
+        setProfile(null)
+      }
+    } catch (error) {
+      console.error('Failed to check LinkedIn status:', error)
+      setIsConnected(false)
+      setProfile(null)
     }
   }
 
   const handleConnect = async () => {
+    if (!user) return
+
     setIsConnecting(true)
-    // Simulate connection process
-    setTimeout(() => {
-      toast.success('LinkedIn integration coming soon!')
+    const userId = user?.id || user?.user_id
+
+    try {
+      const result = await unipileService.generateAuthLink(userId, 'create')
+
+      if (result.success && result.data) {
+        // Open Unipile hosted auth in new window
+        const authWindow = window.open(
+          result.data.url,
+          'unipile-auth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        )
+
+        // Listen for auth completion via postMessage
+        const handleMessage = (event: MessageEvent) => {
+          // Security check - only accept messages from Unipile domain
+          if (!event.origin.includes('unipile.com')) return
+
+          if (event.data.type === 'UNIPILE_AUTH_SUCCESS') {
+            // Close the auth window
+            authWindow?.close()
+
+            // Clean up listeners
+            window.removeEventListener('message', handleMessage)
+            clearInterval(checkClosed)
+
+            setIsConnecting(false)
+            toast.success('LinkedIn connected successfully!')
+
+            // Refresh connection status
+            setTimeout(() => {
+              checkLinkedInStatus()
+            }, 1000)
+          }
+        }
+
+        // Add message listener
+        window.addEventListener('message', handleMessage)
+
+        // Fallback: Listen for manual window closure
+        const checkClosed = setInterval(() => {
+          if (authWindow?.closed) {
+            clearInterval(checkClosed)
+            window.removeEventListener('message', handleMessage)
+            setIsConnecting(false)
+
+            // Refresh connection status after auth window closes
+            setTimeout(() => {
+              checkLinkedInStatus()
+            }, 1000)
+          }
+        }, 1000)
+
+        toast.info('Complete LinkedIn connection in the popup window')
+      } else {
+        throw new Error(result.error || 'Failed to generate auth link')
+      }
+    } catch (error: any) {
+      console.error('LinkedIn connection error:', error)
+      toast.error(`Failed to connect: ${error.message}`)
+    } finally {
       setIsConnecting(false)
-    }, 1500)
+    }
   }
 
-  const handleManage = () => {
-    toast.info('LinkedIn settings will open here')
+  const handleManage = async () => {
+    if (!user || !profile) return
+
+    const userId = user?.id || user?.user_id
+
+    // Show management options
+    const action = window.confirm(
+      'LinkedIn Account Management\n\n' +
+      `Connected as: ${profile.username}\n` +
+      `Status: ${profile.status}\n\n` +
+      'Click OK to disconnect, Cancel to view profile'
+    )
+
+    if (action) {
+      // Disconnect LinkedIn
+      try {
+        const success = await unipileService.disconnectLinkedIn(userId)
+        if (success) {
+          toast.success('LinkedIn disconnected successfully')
+          setIsConnected(false)
+          setProfile(null)
+        } else {
+          toast.error('Failed to disconnect LinkedIn')
+        }
+      } catch (error) {
+        console.error('Disconnect error:', error)
+        toast.error('Failed to disconnect LinkedIn')
+      }
+    } else if (profile.profileUrl) {
+      // Open LinkedIn profile
+      window.open(profile.profileUrl, '_blank')
+    }
   }
 
   const getInitials = (name: string) => {
@@ -140,18 +250,55 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
 
       {/* Connected Account */}
       {profile && (
-        <div className="flex items-center gap-3 mb-3">
-          <img 
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=0077B5&color=fff&size=32&rounded=true`}
-            alt="Profile"
-            className="w-8 h-8 rounded-full"
+        <div className="flex items-start gap-3 mb-3">
+          <img
+            src={
+              profile.metadata?.profile_picture_url ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=0077B5&color=fff&size=32&rounded=true`
+            }
+            alt="LinkedIn Profile"
+            className="w-8 h-8 rounded-full object-cover"
+            onError={(e) => {
+              // Fallback to generated avatar if profile picture fails to load
+              const target = e.target as HTMLImageElement;
+              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}&background=0077B5&color=fff&size=32&rounded=true`;
+            }}
           />
-          <div className="flex-1">
-            <p className="text-xs font-medium text-white/90">{profile.name}</p>
-            <p className="text-xs text-gray-500">{profile.email}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white/90 mb-1">{profile.username}</p>
+            {profile.metadata?.occupation && (
+              <p className="text-xs text-gray-400 leading-tight mb-1 break-words">
+                {profile.metadata.occupation}
+              </p>
+            )}
+            {profile.metadata?.organization && (
+              <p className="text-xs text-gray-500">
+                at {profile.metadata.organization}
+              </p>
+            )}
           </div>
+          {(profile.metadata?.profile_url || profile.profileUrl) && (
+            <button
+              onClick={() => {
+                const url = profile.metadata?.profile_url || profile.profileUrl;
+                console.log('🔗 Opening LinkedIn URL:', url);
+                window.open(url, '_blank');
+              }}
+              className="flex-shrink-0 p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-all duration-200"
+              title="View LinkedIn Profile"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
         </div>
       )}
+
+      {/* Refresh Note */}
+      <div className="mb-3 px-2 py-1 bg-black/20 backdrop-blur-sm rounded-lg border border-white/5">
+        <p className="text-xs text-gray-400">
+          <span className="text-[#FBAE1C]">ℹ</span> Profile data refreshed monthly
+        </p>
+      </div>
 
       {/* Action Button */}
       <button 

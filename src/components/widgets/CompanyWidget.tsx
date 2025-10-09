@@ -32,11 +32,12 @@ export function CompanyWidget({ isActive, onActivate }: CompanyWidgetProps) {
 
   const fetchCompany = async () => {
     if (!user) return
-    
+
+    const userId = user?.id || user?.user_id
     const { data, error } = await supabase
       .from('business_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (data) {
@@ -45,8 +46,8 @@ export function CompanyWidget({ isActive, onActivate }: CompanyWidgetProps) {
       // Company profile doesn't exist, create one
       const { data: newCompany } = await supabase
         .from('business_profiles')
-        .insert({ 
-          user_id: user.id,
+        .insert({
+          user_id: userId,
           company_name: ''
         })
         .select()
@@ -63,14 +64,17 @@ export function CompanyWidget({ isActive, onActivate }: CompanyWidgetProps) {
       toast.error('Company name is required')
       return
     }
-    
+
     setLoading(true)
+    const userId = user?.id || user?.user_id
     const { error } = await supabase
-      .from('company_profiles')
+      .from('business_profiles')
       .upsert({
         ...company,
-        user_id: user.id,
+        user_id: userId,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
       })
 
     if (error) {

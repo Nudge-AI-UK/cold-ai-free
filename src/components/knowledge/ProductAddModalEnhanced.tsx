@@ -140,66 +140,18 @@ export const ProductAddModalEnhanced = ({
   if (!isModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="relative max-w-[72rem] w-full max-h-[90vh] overflow-hidden">
-        {/* Navigation Arrows - Using context functions */}
-        <button
-          onClick={navigatePrevious}
-          disabled={!canNavigate.prev}
-          className={cn(
-            "absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
-            "rounded-full flex items-center justify-center transition-all duration-300",
-            canNavigate.prev 
-              ? "hover:scale-110 cursor-pointer" 
-              : "opacity-30 cursor-not-allowed"
-          )}
-        >
-          <ChevronLeft className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
-        </button>
-        
-        <button
-          onClick={navigateNext}
-          disabled={!canNavigate.next}
-          className={cn(
-            "absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12",
-            "rounded-full flex items-center justify-center transition-all duration-300",
-            canNavigate.next 
-              ? "hover:scale-110 cursor-pointer" 
-              : "opacity-30 cursor-not-allowed"
-          )}
-        >
-          <ChevronRight className="w-8 h-8 text-white/90 drop-shadow-lg hover:text-orange-400" />
-        </button>
-  
-        {/* Glass Effect Container */}
-        <div className="relative w-full h-full flex flex-col">
-          <div className="bg-gradient-to-br from-[#0A0E1B]/95 to-[#1A1F36]/95 backdrop-blur-xl rounded-3xl 
-                          border border-white/10 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 flex flex-col h-full">
-            
-            {/* Header */}
-            <div className="flex-shrink-0 px-6 py-4 border-b border-white/10 
-                            bg-gradient-to-b from-black/20 to-transparent">
-              <button
-                onClick={closeModal}
-                disabled={isProcessing}
-                className="absolute top-4 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 
-                           flex items-center justify-center transition-all duration-300 disabled:opacity-50"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              
-              <h2 className="text-xl font-bold text-white">Add Knowledge Entry</h2>
-              <p className="text-sm text-gray-400 mt-1">
-                {isProcessing 
-                  ? "AI is processing your entry. This may take a few moments..."
-                  : "Provide a URL and Cold AI will analyse the page to create comprehensive content for outreach personalisation."
-                }
-              </p>
-            </div>
-  
-            {/* Body */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6
-                            scrollbar-thin scrollbar-track-transparent scrollbar-thumb-orange-500/30">
+    <div className="relative w-full h-full flex flex-col">
+      <div className="p-1">
+        {/* Processing indicator */}
+        {isProcessing && (
+          <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+            <span className="text-sm text-orange-300">AI is processing your entry. This may take a few moments...</span>
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="space-y-6">
               
               {/* Type Selection */}
               <div className="mb-6">
@@ -382,8 +334,6 @@ export const ProductAddModalEnhanced = ({
                   )}
                 </Button>
               </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

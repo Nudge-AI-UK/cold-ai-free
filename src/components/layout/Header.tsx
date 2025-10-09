@@ -112,24 +112,7 @@ export function Header() {
         </div>
       </div>
       
-      {/* Add CSS animations */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        
-        @keyframes sparkle {
-          0%, 100% { 
-            opacity: 0;
-            transform: scale(0) rotate(0deg);
-          }
-          50% { 
-            opacity: 1;
-            transform: scale(1) rotate(180deg);
-          }
-        }
-      `}</style>
+      {/* CSS animations defined in global CSS */}
     </header>
   )
 }

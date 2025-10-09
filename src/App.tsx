@@ -1,7 +1,7 @@
 // src/App.tsx
-import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { LoadingProvider } from '@/contexts/LoadingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
 import { LoginPage } from '@/components/auth/LoginPage'
 import { useAuth } from '@/hooks/useAuth'
@@ -33,19 +33,21 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ModalFlowProvider>
-        <AppContent />
-        <Toaster 
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: 'hsl(222 41% 11%)',
-              border: '1px solid hsl(217 33% 18%)',
-              color: 'hsl(210 20% 95%)',
-            },
-          }}
-        />
-      </ModalFlowProvider>
+      <LoadingProvider>
+        <ModalFlowProvider>
+          <AppContent />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: 'hsl(222 41% 11%)',
+                border: '1px solid hsl(217 33% 18%)',
+                color: 'hsl(210 20% 95%)',
+              },
+            }}
+          />
+        </ModalFlowProvider>
+      </LoadingProvider>
     </AuthProvider>
   )
 }

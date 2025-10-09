@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { User, Building2, MessageCircle, ChevronRight, Edit2, Check } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { User, Building2, MessageCircle, Edit2, Check } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useModalFlow } from '@/components/modals/ModalFlowManager'
 
 interface SettingsWidgetProps {
   forceEmpty?: boolean
@@ -17,65 +18,96 @@ interface SettingsStatus {
 
 export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
   const { user } = useAuth()
+  const { openModal } = useModalFlow()
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>({
     profile: false,
     company: false,
     communication: false
   })
-  
+  const [hasCheckedStatus, setHasCheckedStatus] = useState(false)
+  const hasAutoOpened = useRef(false)
+
   const configuredCount = Object.values(settingsStatus).filter(Boolean).length
   const allConfigured = configuredCount === 3
 
   useEffect(() => {
+    console.log('SettingsWidget useEffect:', { user: !!user, forceEmpty, shouldCheck: user && !forceEmpty })
     if (user && !forceEmpty) {
       checkSettingsStatus()
     }
   }, [user, forceEmpty])
 
+  // Auto-open profile modal for new users with no profile data
+  useEffect(() => {
+    if (!forceEmpty && user && hasCheckedStatus && !settingsStatus.profile && !hasAutoOpened.current) {
+      hasAutoOpened.current = true
+      openModal('profile-personal', {
+        flowName: 'main',
+        mode: 'add'
+      })
+    }
+  }, [settingsStatus.profile, user, forceEmpty, openModal, hasCheckedStatus])
+
   const checkSettingsStatus = async () => {
     if (!user) return
 
+    const userId = user?.id || user?.user_id
+    console.log('Checking settings for user ID:', userId)
+
     // Check user profile
-    const { data: userProfile } = await supabase
+    const { data: profileResults, error: profileError } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.user_id)
-      .single()
+      .eq('user_id', userId)
+      .limit(1)
+    const userProfile = profileResults?.[0]
 
-    // Check business profile
-    const { data: businessProfile } = await supabase
+    // Check business profile (for solo users)
+    const { data: companyResults, error: companyError } = await supabase
       .from('business_profiles')
       .select('*')
-      .eq('user_id', user.user_id)
-      .single()
+      .eq('user_id', userId)
+      .limit(1)
+    const companyProfile = companyResults?.[0]
 
     // Check communication preferences
-    const { data: commPrefs } = await supabase
+    const { data: commResults, error: commError } = await supabase
       .from('communication_preferences')
       .select('*')
-      .eq('user_id', user.user_id)
-      .single()
+      .eq('user_id', userId)
+      .limit(1)
+    const commPrefs = commResults?.[0]
 
-    setSettingsStatus({
-      profile: !!userProfile,
-      company: !!businessProfile,
-      communication: !!commPrefs
+    console.log('Database check results:', {
+      profile: { exists: !!userProfile, error: profileError?.message, data: userProfile },
+      company: { exists: !!companyProfile, error: companyError?.message, data: companyProfile },
+      communication: { exists: !!commPrefs, error: commError?.message, data: commPrefs }
     })
+
+    const newStatus = {
+      profile: !!userProfile,
+      company: !!companyProfile,
+      communication: !!commPrefs
+    }
+
+    console.log('Setting new status:', newStatus)
+    setSettingsStatus(newStatus)
+    setHasCheckedStatus(true)
   }
 
   const handleButtonClick = (type: 'profile' | 'company' | 'communication') => {
-    if (allConfigured) {
-      // Use window.location for navigation
-      window.location.href = '/profile'
-    } else {
-      toast.info(`Configure your ${type} settings`)
-      window.location.href = '/profile'
+    const modalMapping = {
+      profile: 'profile-personal',
+      company: 'profile-company',
+      communication: 'profile-communication'
     }
+
+    openModal(modalMapping[type], {
+      flowName: 'main',
+      mode: settingsStatus[type] ? 'edit' : 'add'
+    })
   }
 
-  const handleQuickSetup = () => {
-    window.location.href = '/profile'
-  }
 
   const handleEditSettings = () => {
     window.location.href = '/profile'
@@ -206,12 +238,6 @@ export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
               <p className="text-xs text-gray-400 mb-1">Why configure settings?</p>
               <p className="text-xs text-gray-300">AI uses your profile data to craft messages that sound like you and resonate with your ideal customers</p>
             </div>
-            <button 
-              onClick={handleQuickSetup}
-              className="ml-4 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-xs flex items-center space-x-2 group">
-              <span>Quick Setup</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
           </div>
         </div>
         

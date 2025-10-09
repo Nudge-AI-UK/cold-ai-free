@@ -23,7 +23,7 @@ import {
   Brain
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { icpService } from '@/services/icpService';
+import { n8nService } from '@/services/n8nService';
 import { useAuth } from '@/hooks/useAuth';
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,7 @@ interface ICPCreationModalV2Props {
   onClose: () => void;
   onSuccess: () => void;
   onGenerate?: (data: { title: string; productName: string; productId: string; icpId?: number }) => void;
+  isWrapped?: boolean;
 }
 
 interface Product {
@@ -68,7 +69,8 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
   isOpen,
   onClose,
   onSuccess,
-  onGenerate
+  onGenerate,
+  isWrapped = false
 }) => {
   const { user } = useAuth();
   const { planType, teamMembership } = useSimpleSubscription(user?.user_id);
@@ -86,17 +88,26 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
 
   // Load user's products on mount
   useEffect(() => {
+    const userId = user?.user_id || user?.id;
+    console.log('🔍 ICP Modal useEffect triggered:', { isOpen, userId, user });
+
     const loadProducts = async () => {
-      if (!user?.user_id) return;
+      if (!userId) {
+        console.log('⚠️ No user_id, skipping product load');
+        return;
+      }
+
+      console.log('📦 Loading products for user:', userId);
 
       try {
-        // Fetch ALL products from knowledge base with more inclusive query
-        // Check for products that are approved, active, or live
+        // Fetch only approved and active products from knowledge base
         const { data: knowledgeData, error } = await supabase
           .from('knowledge_base')
           .select('id, title, content, knowledge_type, review_status, workflow_status, created_at')
           .eq('knowledge_type', 'product')
-          .or('review_status.eq.approved,workflow_status.eq.active,workflow_status.eq.live,review_status.is.null');
+          .eq('review_status', 'approved')
+          .eq('workflow_status', 'active')
+          .eq('created_by', userId);
 
         console.log('Products query result:', { knowledgeData, error });
 
@@ -137,7 +148,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
     if (isOpen) {
       loadProducts();
     }
-  }, [isOpen, user?.user_id]);
+  }, [isOpen, user?.user_id, user?.id]);
 
   const handleClose = () => {
     setFormData(initialFormData);
@@ -187,7 +198,8 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
       return;
     }
 
-    if (!user?.user_id) {
+    const userId = user?.user_id || user?.id;
+    if (!userId) {
       toast.error('User not authenticated');
       return;
     }
@@ -201,59 +213,61 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
     setIsSubmitting(true);
 
     try {
-      // Prepare ICP data for the new service
+      // Prepare ICP data for n8n service
       const icpData = {
+        userId: userId,
+        teamId: undefined, // Add team support later if needed
         icp_name: aiFields.has('icp_title') ? 'AI Generated ICP' : formData.icp_title,
         description: `ICP for ${selectedProduct.name} targeting ${formData.target_company_maturity} companies`,
         product_link_id: formData.product_id,
-        
+
         // Convert form fields to arrays where needed
-        job_titles: aiFields.has('champion_profile') ? ['FILL_WITH_AI'] : 
+        job_titles: aiFields.has('champion_profile') ? ['FILL_WITH_AI'] :
                    formData.champion_profile ? [formData.champion_profile] : [],
-        
-        pain_points: aiFields.has('objection_patterns') ? ['FILL_WITH_AI'] : 
+
+        pain_points: aiFields.has('objection_patterns') ? ['FILL_WITH_AI'] :
                     formData.objection_patterns ? formData.objection_patterns.split(',').map(s => s.trim()) : [],
-        
-        value_drivers: aiFields.has('success_metrics') ? ['FILL_WITH_AI'] : 
+
+        value_drivers: aiFields.has('success_metrics') ? ['FILL_WITH_AI'] :
                       formData.success_metrics ? formData.success_metrics.split(',').map(s => s.trim()) : [],
-        
+
         industry_focus: [], // Will be filled by AI
-        
+
         company_characteristics: `Maturity: ${formData.target_company_maturity}`,
-        
-        // Optional fields
-        decision_making_process: aiFields.has('decision_criteria') ? 'FILL_WITH_AI' : formData.decision_criteria,
-        objections_and_concerns: aiFields.has('objection_patterns') ? ['FILL_WITH_AI'] : 
-                                formData.objection_patterns ? [formData.objection_patterns] : [],
-        success_metrics: aiFields.has('success_metrics') ? ['FILL_WITH_AI'] : 
-                        formData.success_metrics ? [formData.success_metrics] : [],
-        preferred_communication_channels: aiFields.has('engagement_preference') ? ['FILL_WITH_AI'] : 
-                                         formData.engagement_preference ? [formData.engagement_preference] : [],
-        competitive_alternatives: aiFields.has('competitive_alternatives') ? ['FILL_WITH_AI'] : 
-                                 formData.competitive_alternatives ? [formData.competitive_alternatives] : [],
-        budget_range: aiFields.has('budget_authority') ? 'FILL_WITH_AI' : formData.budget_authority,
-        
+
         // Strategic fields stored in metadata
         metadata: {
           buying_triggers: aiFields.has('buying_triggers') ? 'FILL_WITH_AI' : formData.buying_triggers,
           target_company_maturity: formData.target_company_maturity,
           ai_generation_requested: true,
+          ai_fields: Array.from(aiFields),
           product_context: {
             name: selectedProduct.name,
             description: selectedProduct.description
-          }
+          },
+          // Optional fields for n8n processing
+          decision_making_process: aiFields.has('decision_criteria') ? 'FILL_WITH_AI' : formData.decision_criteria,
+          objections_and_concerns: aiFields.has('objection_patterns') ? ['FILL_WITH_AI'] :
+                                  formData.objection_patterns ? [formData.objection_patterns] : [],
+          success_metrics: aiFields.has('success_metrics') ? ['FILL_WITH_AI'] :
+                          formData.success_metrics ? [formData.success_metrics] : [],
+          preferred_communication_channels: aiFields.has('engagement_preference') ? ['FILL_WITH_AI'] :
+                                           formData.engagement_preference ? [formData.engagement_preference] : [],
+          competitive_alternatives: aiFields.has('competitive_alternatives') ? ['FILL_WITH_AI'] :
+                                   formData.competitive_alternatives ? [formData.competitive_alternatives] : [],
+          budget_range: aiFields.has('budget_authority') ? 'FILL_WITH_AI' : formData.budget_authority
         }
       };
 
-      console.log('🚀 Creating ICP with new service:', icpData);
+      console.log('🚀 Creating ICP via n8n service:', icpData);
 
-      const result = await icpService.createICP(icpData as any);
-      
+      const result = await n8nService.createICPEntry(icpData);
+
+      console.log('✅ ICP creation result:', result);
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to create ICP');
       }
-
-      console.log('✅ ICP creation started:', result);
 
       // Notify parent component about the new generating ICP
       if (onGenerate) {
@@ -266,10 +280,11 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
       }
 
       toast.success('ICP creation started! AI is generating your profile...');
-      
-      // Reset form
-      handleClose();
-      onSuccess();
+
+      // Refresh the page to show the generating widget immediately
+      setTimeout(() => {
+        window.location.reload()
+      }, 500) // Short delay to ensure toast shows
       
     } catch (error: any) {
       console.error('❌ Error creating ICP:', error);
@@ -353,20 +368,9 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
     );
   };
 
-  return (
-    <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white">
-              Create New ICP
-            </DialogTitle>
-            <DialogDescription className="text-sm text-gray-400 mt-1">
-              Define your Ideal Customer Profile with AI assistance to target the right prospects
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
+  // Form content (without Dialog header when wrapped)
+  const formContent = (
+    <div className="space-y-6">
             {/* Create Tab Only (Upload removed for now until n8n workflow supports it) */}
             <div className="space-y-4">
               {/* Required Fields */}
@@ -564,7 +568,8 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
               <Button
                 variant="outline"
                 onClick={handleClose}
-                className="border-gray-600 hover:bg-gray-800"
+                className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10
+                           hover:border-orange-500 transition-all duration-300 rounded-lg"
               >
                 Cancel
               </Button>
@@ -586,10 +591,30 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
                 )}
               </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+  );
+
+  // Conditionally wrap content based on isWrapped prop
+  if (isWrapped) {
+    // When wrapped in BaseModal, render only form content (BaseModal provides header)
+    return formContent;
+  }
+
+  // Otherwise, render with Dialog wrapper and header (standalone mode)
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-white">
+            Create New ICP
+          </DialogTitle>
+          <DialogDescription className="text-sm text-gray-400 mt-1">
+            Define your Ideal Customer Profile with AI assistance to target the right prospects
+          </DialogDescription>
+        </DialogHeader>
+        {formContent}
+      </DialogContent>
+    </Dialog>
   );
 };
 

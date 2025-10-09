@@ -1,0 +1,155 @@
+{
+  "title": "Josh Braun's Golden Rules for LinkedIn DMs",
+  "description": "These guiding principles distil Josh Braun's philosophy for writing LinkedIn DMs that spark curiosity without pressure. They are based on his posts, articles and examples and aim to reflect his concise, customer-centric style. These principles serve as training guidance for Cold AI to write DMs that are respectful, relevant and effective.",
+  "rules": [
+    {
+      "ruleNumber": 1,
+      "title": "Start in the prospect's world",
+      "principles": [
+        {
+          "principle": "Lead with relevance",
+          "details": "Open with something specific about the person or their company rather than introducing yourself. Research a prospect's situation and use that as the opening line.",
+          "example": "How closely are you tracking unused or underutilised software seats at ACME?",
+          "rationale": "Shows that you know why you are reaching out and makes them feel uniquely qualified to respond."
+        },
+        {
+          "principle": "Avoid generic pleasantries or intros",
+          "details": "Phrases like 'Hello Josh! My name is...' or 'Hope you're doing well' are fluff and make you sound like every other seller.",
+          "recommendation": "Move your name to the end and cut these filler phrases."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 2,
+      "title": "Poke the bear with a neutral question",
+      "principles": [
+        {
+          "principle": "Use illumination questions instead of leading questions",
+          "details": "Leading questions ('If I could show you how to 10X your revenue, would you be interested?') make prospects smell 'commission breath'.",
+          "recommendation": "Ask a neutral question that exposes a problem or risk the prospect might not be aware of.",
+          "example": "How do you know good interviews won't turn into bad sales hires?"
+        },
+        {
+          "principle": "Lower the zone of resistance",
+          "details": "Precede your question with a softener like 'Not sure about your situation...' to avoid assuming they have a problem.",
+          "benefit": "This tone prevents defensiveness and keeps the conversation respectful."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 3,
+      "title": "Show specific proof and expertise",
+      "principles": [
+        {
+          "principle": "Give a concrete proof point",
+          "details": "After highlighting the problem, share a succinct example of how you helped someone similar achieve a desirable outcome.",
+          "example": "ModMed (~4k employees) saved $1.4M by reclaiming 2,800 licences",
+          "keyElements": ["names", "numbers", "time frames"],
+          "benefit": "Specificity makes the claim believable and leverages the bandwagon effect."
+        },
+        {
+          "principle": "Be meaningfully different",
+          "details": "Highlight how your approach differs from what they're currently doing.",
+          "recommendation": "Clearly show the contrast between before and after, or between current pain and future possibility."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 4,
+      "title": "Keep it crispy (concise and clear)",
+      "principles": [
+        {
+          "principle": "Five lines or less",
+          "details": "Prospects are inundated with emails, calls, chats and notifications. Every word has a 'calorie count' – cut any that don't add value.",
+          "format": "Braun's 'crispy' emails use five lines or fewer."
+        },
+        {
+          "principle": "DMs should be short, succinct and clear",
+          "details": "A great DM reads like a text message: one or two sentences that get to the point.",
+          "example": "Hi [Name], not sure if this is relevant, but we built AI that helps with outbound, ads and retargeting. If you're curious I can share a bit more. If not, no worries at all.",
+          "warning": "Messages that ramble or include multiple paragraphs are far more likely to be ignored."
+        },
+        {
+          "principle": "Make one chess move per message",
+          "details": "Don't cram multiple benefits or asks into a single DM.",
+          "recommendation": "Focus on one problem and one way you can help; follow up later with another 'chess move' rather than 'bumping' the same message."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 5,
+      "title": "Focus on the outcome the prospect wants",
+      "principles": [
+        {
+          "principle": "Speak to results, not features",
+          "details": "Frame the proof point around a result the prospect desires but doesn't yet have.",
+          "example": "Saving money on unused software licences is an outcome that CFOs care about."
+        },
+        {
+          "principle": "Use future pacing or 'what-if' questions",
+          "details": "Help prospects imagine a better tomorrow.",
+          "example": "What if you could calculate and run commissions for 100+ reps in one-third the time without any manual data entry or errors?",
+          "benefit": "Future pacing taps into the desire to improve their situation and contrasts current and potential outcomes."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 6,
+      "title": "End with a low-friction invitation",
+      "principles": [
+        {
+          "principle": "Gently gauge interest",
+          "details": "Replace pushy meeting requests with light asks.",
+          "goodExamples": ["Worth a look?", "Opposed to learning how?", "Would it make sense to..."],
+          "badExample": "I'd love to schedule a 30-minute call",
+          "benefit": "Prospects feel in control."
+        },
+        {
+          "principle": "Keep the ask about them, not you",
+          "details": "People care about what they want, not what you want.",
+          "example": "Would you be open to investing 20 minutes to hear a different perspective on improving forecast accuracy?"
+        },
+        {
+          "principle": "Reduce pressure",
+          "details": "Clarify that you're inviting them to explore options 'should a need arise in the future'.",
+          "benefit": "This reduces the immediate pressure to buy and keeps defences down."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 7,
+      "title": "Avoid door-slammer phrases",
+      "phrasesToAvoid": [
+        {
+          "phrase": "I'd love to...",
+          "reason": "Signals self-interest and can make prospects defensive.",
+          "alternative": "Would it make sense to..."
+        },
+        {
+          "phrases": [
+            "Hello, my name is...",
+            "Hope you're doing well.",
+            "I know you're busy so I'll keep it brief."
+          ],
+          "reason": "These generic phrases add no value and must be omitted."
+        },
+        {
+          "phrase": "Just bumping this to the top of your inbox.",
+          "alternative": "Instead of nagging, provide another way you can help."
+        }
+      ]
+    },
+    {
+      "ruleNumber": 8,
+      "title": "Mindset: spark curiosity without pressure",
+      "philosophy": "Josh Braun stresses that cold outreach should spark curiosity without pressuring the prospect.",
+      "keyPrinciples": [
+        "The aim is not to persuade or pitch but to help people think differently about a problem.",
+        "Detach from the outcome and focus on being helpful.",
+        "Prospects are more likely to engage when they feel safe, respected and intrigued."
+      ],
+      "implementation": "Adopting this mindset will keep Cold AI's DMs aligned with Braun's philosophy."
+    }
+  ],
+  "finalGuidance": "Use these rules collectively to craft LinkedIn DMs that respect your prospect's world, illuminate problems, provide evidence, and invite a low-pressure conversation. Cold AI must internalise these principles, and thus create messages that feel thoughtful and human – just like Josh Braun."
+}

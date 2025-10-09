@@ -36,13 +36,17 @@ interface ICPUnifiedModalProps {
   onClose: () => void;
   icp: any; // We'll type this properly based on your ICP type
   onUpdate?: () => void;
+  mode?: string; // Add mode prop for the modal flow system
+  renderWithoutDialog?: boolean; // Add flag to render without Dialog wrapper
 }
 
 export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
   isOpen,
   onClose,
   icp,
-  onUpdate
+  onUpdate,
+  mode: propMode,
+  renderWithoutDialog = false
 }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -55,8 +59,9 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
   // Track if approval is in progress to prevent double-clicks
   const [isApproving, setIsApproving] = useState(false);
   
-  // Determine modal mode based on ICP status
-  const { mode, isEditable, shouldLoadMetadata } = useModalMode(icp);
+  // Determine modal mode based on ICP status or use provided mode
+  const { mode: autoMode, isEditable, shouldLoadMetadata } = useModalMode(icp);
+  const mode = propMode || autoMode;
   
   // Load ICP data with conditional metadata loading
   const { formData, setFormData, metadata, isDataLoading } = useICPData(
@@ -105,8 +110,9 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
       console.log('Approval already in progress, ignoring click');
       return;
     }
-    
-    if (!user?.user_id) {
+
+    const userId = user?.user_id || user?.id;
+    if (!userId) {
       toast.error('User not authenticated');
       return;
     }
@@ -128,7 +134,7 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
 
       // 2. Create webhook event with original data, AI suggestions, and changed fields
       const webhookPayload = {
-        user_id: user.user_id,
+        user_id: user?.id || user?.user_id,
         event_type: 'icp_review',
         idempotency_key: approvalRequestId,  // Add idempotency key here
         payload: {
@@ -216,25 +222,43 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
     tabs.push({ id: 'personas', label: 'Personas', icon: Users });
   }
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] bg-gray-900 border-gray-700 p-0 flex flex-col">
+  // Define the modal content
+  const modalContent = (
+    <div className={`${renderWithoutDialog ? 'w-full h-full' : 'max-w-[95vw] w-[1400px] h-[90vh]'} bg-gray-900 border-gray-700 p-0 flex flex-col rounded-lg`}>
         {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b border-gray-700 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <DialogTitle className="text-xl font-semibold text-white">
-                {getModalTitle()}
-              </DialogTitle>
-              {getStatusBadge()}
-              {hasChanges && (
-                <Badge variant="outline" className="text-yellow-500 border-yellow-500">
-                  {changedFields.length} unsaved changes
-                </Badge>
-              )}
+        {renderWithoutDialog ? (
+          <div className="px-6 py-4 border-b border-gray-700 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-white">
+                  {getModalTitle()}
+                </h2>
+                {getStatusBadge()}
+                {hasChanges && (
+                  <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                    {changedFields.length} unsaved changes
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-        </DialogHeader>
+        ) : (
+          <DialogHeader className="px-6 py-4 border-b border-gray-700 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <DialogTitle className="text-xl font-semibold text-white">
+                  {getModalTitle()}
+                </DialogTitle>
+                {getStatusBadge()}
+                {hasChanges && (
+                  <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                    {changedFields.length} unsaved changes
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+        )}
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
@@ -318,6 +342,18 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
             )}
           </div>
         </div>
+    </div>
+  );
+
+  // Conditionally render with or without Dialog wrapper
+  if (renderWithoutDialog) {
+    return modalContent;
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] bg-gray-900 border-gray-700 p-0 flex flex-col">
+        {modalContent}
       </DialogContent>
     </Dialog>
   );

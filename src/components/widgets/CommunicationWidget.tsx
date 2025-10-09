@@ -35,11 +35,12 @@ export function CommunicationWidget({ isActive, onActivate }: CommunicationWidge
 
   const fetchPreferences = async () => {
     if (!user) return
-    
+
+    const userId = user?.id || user?.user_id
     const { data, error } = await supabase
       .from('communication_preferences')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (data) {
@@ -48,8 +49,8 @@ export function CommunicationWidget({ isActive, onActivate }: CommunicationWidge
       // Preferences don't exist, create defaults
       const { data: newPrefs } = await supabase
         .from('communication_preferences')
-        .insert({ 
-          user_id: user.id,
+        .insert({
+          user_id: userId,
           tone: 'professional',
           style: 'concise',
           emoji_use: false,
@@ -66,14 +67,17 @@ export function CommunicationWidget({ isActive, onActivate }: CommunicationWidge
 
   const handleSave = async () => {
     if (!user) return
-    
+
     setLoading(true)
+    const userId = user?.id || user?.user_id
     const { error } = await supabase
       .from('communication_preferences')
       .upsert({
         ...preferences,
-        user_id: user.id,
+        user_id: userId,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
       })
 
     if (error) {

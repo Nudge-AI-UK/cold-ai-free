@@ -9,6 +9,7 @@ import { User, Save, X, Edit } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import type { Profile } from '@/types'
 
 interface ProfileWidgetProps {
@@ -16,11 +17,20 @@ interface ProfileWidgetProps {
   onActivate: () => void
 }
 
+const validateLinkedInUrl = (url: string): boolean => {
+  if (!url) return false // Required field
+  // Allow alphanumeric, hyphens, underscores, and URL-encoded characters (like emojis: %F0%9F%94%AD)
+  const linkedinRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[\w%-]+\/?$/
+  return linkedinRegex.test(url)
+}
+
 export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
   const { user } = useAuth()
+  const { openModal } = useModalFlow()
   const [profile, setProfile] = useState<Partial<Profile>>({})
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [linkedinError, setLinkedinError] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -30,11 +40,12 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
 
   const fetchProfile = async () => {
     if (!user) return
-    
+
+    const userId = user?.id || user?.user_id
     const { data, error } = await supabase
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (data) {
@@ -42,8 +53,8 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
     } else if (error?.code === 'PGRST116') {
       // Profile doesn't exist, create one
       const { data: newProfile } = await supabase
-        .from('profiles')
-        .insert({ user_id: user.id })
+        .from('user_profiles')
+        .insert({ user_id: userId })
         .select()
         .single()
       
@@ -55,14 +66,27 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
 
   const handleSave = async () => {
     if (!user) return
-    
+
+    // Validate LinkedIn URL before saving (required field)
+    if (!validateLinkedInUrl(profile.linkedin_url || '')) {
+      const errorMsg = !profile.linkedin_url
+        ? 'LinkedIn URL is required'
+        : 'Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username'
+      setLinkedinError(errorMsg)
+      toast.error(errorMsg)
+      return
+    }
+
     setLoading(true)
+    const userId = user?.id || user?.user_id
     const { error } = await supabase
       .from('user_profiles')
       .upsert({
         ...profile,
-        user_id: user.id,
+        user_id: userId,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
       })
 
     if (error) {
@@ -139,7 +163,7 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setEditing(true)}
+                onClick={() => openModal('profile-personal', { flowName: 'profileComplete' })}
               >
                 <Edit className="h-4 w-4 mr-1" />
                 Edit
@@ -182,14 +206,31 @@ export function ProfileWidget({ isActive, onActivate }: ProfileWidgetProps) {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+          <Label htmlFor="linkedin_url">
+            LinkedIn URL <span className="text-red-500">*</span>
+          </Label>
           <Input
             id="linkedin_url"
             value={profile.linkedin_url || ''}
-            onChange={(e) => setProfile({ ...profile, linkedin_url: e.target.value })}
+            onChange={(e) => {
+              setProfile({ ...profile, linkedin_url: e.target.value })
+              setLinkedinError('')
+            }}
+            onBlur={(e) => {
+              if (!validateLinkedInUrl(e.target.value)) {
+                const errorMsg = !e.target.value
+                  ? 'LinkedIn URL is required'
+                  : 'Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username'
+                setLinkedinError(errorMsg)
+              }
+            }}
             disabled={!editing}
             placeholder="https://linkedin.com/in/yourprofile"
+            className={linkedinError ? 'border-red-500' : ''}
           />
+          {linkedinError && (
+            <p className="text-xs text-red-500">{linkedinError}</p>
+          )}
         </div>
         
         <div className="space-y-2">

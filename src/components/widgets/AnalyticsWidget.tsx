@@ -19,40 +19,102 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
     }
   }, [user, forceEmpty])
 
+  // Real-time subscription for usage tracking updates
+  useEffect(() => {
+    if (!user) return
+
+    const userId = user?.id || user?.user_id
+
+    const channel = supabase
+      .channel('usage_tracking_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'usage_tracking',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 Usage tracking updated:', payload)
+          fetchUsage()
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔌 Usage tracking subscription status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
   const fetchUsage = async () => {
     if (!user) return
-    
-    const currentDate = new Date()
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
-    
-    const { data } = await supabase
-      .from('usage_tracking')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('period_start', startOfMonth.toISOString())
-      .lte('period_end', endOfMonth.toISOString())
-      .single()
 
-    if (!data) {
-      // Create usage record if it doesn't exist
-      const { data: newUsage } = await supabase
+    const userId = user?.id || user?.user_id
+
+    try {
+      const currentDate = new Date()
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+
+      // Format dates as YYYY-MM-DD for PostgreSQL date comparison
+      const startDate = startOfMonth.toISOString().split('T')[0]
+      const endDate = endOfMonth.toISOString().split('T')[0]
+
+      // Query all daily rows for the current month
+      const { data, error } = await supabase
         .from('usage_tracking')
-        .insert({
-          user_id: user.id,
+        .select('messages_generated, messages_sent, messages_archived, research_performed')
+        .eq('user_id', userId)
+        .gte('usage_date', startDate)
+        .lte('usage_date', endDate)
+
+      if (error) {
+        // Table might not exist or columns missing - use default values
+        console.warn('Usage tracking not available:', error.message)
+        setUsage({
+          user_id: userId,
           messages_sent: 0,
           messages_remaining: FREE_TIER_LIMITS.MAX_MESSAGES,
           period_start: startOfMonth.toISOString(),
-          period_end: endOfMonth.toISOString(),
-        })
-        .select()
-        .single()
-      
-      if (newUsage) {
-        setUsage(newUsage)
+          period_end: endOfMonth.toISOString()
+        } as any)
+        return
       }
-    } else {
-      setUsage(data)
+
+      // Sum up all daily values for the month
+      const totalMessagesGenerated = data?.reduce((sum, row) => sum + (row.messages_generated || 0), 0) || 0
+      const totalMessagesSent = data?.reduce((sum, row) => sum + (row.messages_sent || 0), 0) || 0
+      const totalMessagesArchived = data?.reduce((sum, row) => sum + (row.messages_archived || 0), 0) || 0
+      const totalResearchPerformed = data?.reduce((sum, row) => sum + (row.research_performed || 0), 0) || 0
+
+      console.log('📊 Monthly usage:', {
+        generated: totalMessagesGenerated,
+        sent: totalMessagesSent,
+        archived: totalMessagesArchived,
+        research: totalResearchPerformed,
+        dailyRows: data?.length
+      })
+
+      setUsage({
+        user_id: userId,
+        messages_sent: totalMessagesGenerated, // Using messages_generated for the limit tracking
+        messages_remaining: Math.max(0, FREE_TIER_LIMITS.MAX_MESSAGES - totalMessagesGenerated),
+        period_start: startOfMonth.toISOString(),
+        period_end: endOfMonth.toISOString()
+      } as any)
+    } catch (error) {
+      console.warn('Usage tracking error:', error)
+      // Fallback to default values
+      setUsage({
+        user_id: userId,
+        messages_sent: 0,
+        messages_remaining: FREE_TIER_LIMITS.MAX_MESSAGES,
+        period_start: new Date().toISOString(),
+        period_end: new Date().toISOString()
+      } as any)
     }
   }
 
