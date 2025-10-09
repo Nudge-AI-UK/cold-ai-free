@@ -44,6 +44,7 @@ interface KnowledgeDetailsModalProps {
     id: string;
     title: string;
     content: string;
+    summary?: string;
     knowledge_type: string;
     metadata?: any;
     workflow_status?: string;
@@ -172,7 +173,7 @@ const parseMarkdownToStructuredData = (content: string) => {
 };
 
 // Helper function to render parsed section with appropriate icon and formatting
-const renderSection = (sectionKey: string, content: string) => {
+const _renderSection = (sectionKey: string, content: string) => {
   // Skip empty sections
   if (!content || content === 'undefined' || content === 'null') return null;
 
@@ -266,7 +267,7 @@ const parseMarkdownSections = (content: string) => {
 };
 
 export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => {
-  const { closeModal } = useModalFlow();
+  const { } = useModalFlow();
   const { user } = useAuth();
 
   // Guard clause - return null if entry is not available
@@ -278,7 +279,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
   const isDraftPending = entry.workflow_status === 'draft' && entry.review_status === 'pending';
 
   // State for editing
-  const [isEditing, setIsEditing] = useState(isDraftPending);
+  const [_isEditing, _setIsEditing] = useState(isDraftPending);
   const [editedTitle, setEditedTitle] = useState(entry.title || '');
   const [editedSummary, setEditedSummary] = useState(entry.summary || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -470,7 +471,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
   };
 
   // Handle save draft
-  const handleSaveDraft = async () => {
+  const _handleSaveDraft = async () => {
     setIsSaving(true);
     try {
       const reconstructedContent = reconstructMarkdown();
@@ -482,7 +483,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
           content: reconstructedContent,
           updated_at: new Date().toISOString()
         })
-        .eq('id', entry.id);
+        .eq('id', parseInt(entry.id));
 
       if (error) throw error;
 
@@ -506,7 +507,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
       const { error } = await supabase
         .from('knowledge_base')
         .delete()
-        .eq('id', entry.id);
+        .eq('id', parseInt(entry.id));
 
       if (error) throw error;
 
@@ -538,7 +539,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
   };
 
   const typeInfo = getTypeInfo();
-  const TypeIcon = typeInfo.icon;
+  const _TypeIcon = typeInfo.icon;
 
   // Check if entry is live/active and has markdown content
   const isLive = entry.review_status === 'approved' || entry.workflow_status === 'active';
@@ -546,7 +547,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
 
   // Parse markdown content if it's a live entry with markdown
   const parsedSections = isLive && hasMarkdownContent ? parseMarkdownSections(entry.content) : {};
-  const hasParsedSections = Object.keys(parsedSections).length > 0;
+  const _hasParsedSections = Object.keys(parsedSections).length > 0;
 
   // Extract metadata fields with safe fallbacks
   const metadata = entry.metadata || {};
@@ -555,7 +556,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
   const workflowMetadata = metadata.workflow_metadata || {};
 
   // Use top-level summary field (not metadata.summary)
-  const summaryContent = entry.summary || metadata.summary;
+  const _summaryContent = entry.summary || metadata.summary;
 
   // Format research URL - check multiple possible locations
   const researchUrl = workflowMetadata.research_url ||
@@ -586,7 +587,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
   });
 
   // Section order for consistent display (matches n8n markdown generation)
-  const sectionOrder = [
+  const _sectionOrder = [
     'problem_solved',
     'solution',
     'target_buyer',
