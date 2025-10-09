@@ -1,16 +1,11 @@
 // src/components/modals/ModalFlowManager.tsx
 import { useState, useEffect, createContext, useContext, useCallback, useMemo } from 'react'
-import { Plus, Package, Briefcase, MessageSquare, User, Building2, Target, Settings, CreditCard, Users } from 'lucide-react'
-import { AnimatedModalBackground } from './AnimatedModalBackground'
+import { Package, MessageSquare, User, Building2, Target, Settings, CreditCard, Users } from 'lucide-react'
 
 // Import Modal Components
 import { ProfilePersonalModal } from './ProfilePersonalModal'
 import { ProfileCompanyModal } from './ProfileCompanyModal'
 import { ProfileCommunicationModal } from './ProfileCommunicationModal'
-
-// Import existing modals and wrappers
-import { ICPCreationModalV2 } from '../states/ICPCreationModalV2'
-import { ProductAddModalEnhanced } from '../knowledge/ProductAddModalEnhanced'
 
 // Import modal wrappers
 import { ICPBasicModal, ICPDemographicsModal, ICPFirmographicsModal, ICPPainPointsModal, ICPGeneratingModal, KnowledgeGeneratingModal, ICPCreationModalWrapper, ICPUnifiedModalWrapper, ICPDetailsModal } from './ICPModalWrapper'
@@ -289,14 +284,14 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
       for (const [name, flow] of Object.entries(MODAL_FLOWS)) {
         if (flow.sequence.includes(modalId)) {
           flowName = name
-          flowSequence = flow.sequence
+          flowSequence = [...flow.sequence]
           stepIndex = flow.sequence.indexOf(modalId)
           break
         }
       }
     } else if (MODAL_FLOWS[flowName as keyof typeof MODAL_FLOWS]) {
       // Use explicitly specified flow
-      flowSequence = MODAL_FLOWS[flowName as keyof typeof MODAL_FLOWS].sequence
+      flowSequence = [...MODAL_FLOWS[flowName as keyof typeof MODAL_FLOWS].sequence]
       stepIndex = flowSequence.indexOf(modalId)
       if (stepIndex === -1) {
         // Modal not in specified flow, add it as first step
@@ -313,9 +308,6 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
       const isDifferentContext =
         prev.flowName !== flowName ||
         (prev.currentModal && prev.currentModal !== modalId && !prev.flowSequence.includes(modalId))
-
-      // Special case: switching from ICP modal to profile/settings modals
-      const isFromICPToSettings = prev.currentModal?.includes('icp') && modalId.startsWith('profile')
 
       // For different contexts, completely clear all data to prevent contamination
       const cleanData = isDifferentContext ? { ...data } : { ...prev.data, ...data }
@@ -361,7 +353,7 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
         for (const [name, flow] of Object.entries(MODAL_FLOWS)) {
           if (flow.sequence.includes(previousModal)) {
             flowName = name
-            flowSequence = flow.sequence
+            flowSequence = [...flow.sequence]
             stepIndex = flow.sequence.indexOf(previousModal)
             break
           }
@@ -570,13 +562,6 @@ export function ModalFlowProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  // Update modal data
-  const updateModalData = useCallback((newData: Partial<ModalFlowState['data']>) => {
-    setState(prev => ({
-      ...prev,
-      data: { ...prev.data, ...newData }
-    }))
-  }, [])
 
   // Check if a specific modal is open
   const isModalOpen = useCallback((modalId: string) => {

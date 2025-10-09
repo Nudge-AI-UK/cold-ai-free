@@ -1,5 +1,5 @@
 // src/components/modals/KnowledgeModal.tsx
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useModalFlow } from './ModalFlowManager'
 import { useAuth } from '@/hooks/useAuth'
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
@@ -11,7 +11,7 @@ import { User, Package, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function KnowledgeModal() {
-  const { state, updateModalData, navigateNext, openModal } = useModalFlow()
+  const { state, openModal } = useModalFlow()
   const { user } = useAuth()
   const { planType } = useSimpleSubscription(user?.id)
   const [hasProfile, setHasProfile] = useState<boolean | null>(null)
@@ -69,7 +69,9 @@ export function KnowledgeModal() {
     productLink: '',
     content: '',
     targetMarket: '',
-    additionalLinks: []
+    additionalLinks: [],
+    infoLink: '',
+    keyStatistics: ''
   })
 
   // Update state when edit mode data is available
@@ -153,14 +155,14 @@ export function KnowledgeModal() {
       setIsLoading(true)
       try {
         // Check users table for basic info
-        const { data: userData, error: userError } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('first_name, last_name')
           .eq('user_id', userId)
           .single()
 
         // Check user_profiles table for additional info
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData } = await supabase
           .from('user_profiles')
           .select('job_title, phone_number, territory')
           .eq('user_id', userId)
@@ -201,11 +203,11 @@ export function KnowledgeModal() {
     // No-op for free version
   }
 
-  const removeAdditionalLink = (id: string) => {
+  const removeAdditionalLink = () => {
     // No-op for free version
   }
 
-  const updateAdditionalLink = (id: string, field: 'title' | 'url', value: string) => {
+  const updateAdditionalLink = () => {
     // No-op for free version
   }
 
@@ -370,7 +372,6 @@ export function KnowledgeModal() {
       title="Add Product/Service"
       description="Add your product or service to the knowledge base"
       className="knowledge-modal-large !max-w-[95vw]"
-      hideDefaultContent={true}
     >
       <ProductAddModalEnhanced
         key={isEditMode ? existingEntry?.id || 'edit' : 'add'} // Force re-render when switching modes
