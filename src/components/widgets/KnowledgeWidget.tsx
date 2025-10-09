@@ -1,6 +1,6 @@
 // src/components/KnowledgeWidget.tsx
 import { useState, useEffect } from 'react'
-import { Plus, Edit2 } from 'lucide-react'
+import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
@@ -92,6 +92,28 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
       mode: 'edit',
       data: entry as any
     })
+  }
+
+  const handleDelete = async () => {
+    if (!entry || !window.confirm('Are you sure you want to delete this entry? This cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('knowledge_base')
+        .delete()
+        .eq('id', entry.id)
+
+      if (error) throw error
+
+      toast.success('Entry deleted successfully')
+      setEntry(null)
+      fetchKnowledge()
+    } catch (error: any) {
+      console.error('Error deleting entry:', error)
+      toast.error('Failed to delete entry')
+    }
   }
 
   // Empty State
@@ -414,14 +436,23 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
               </div>
             </div>
 
-            {/* Review Button */}
-            <button
-              onClick={handleViewDetails}
-              className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
-            >
-              <Edit2 className="w-5 h-5" />
-              <span>Review & Approve</span>
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleViewDetails}
+                className="flex-1 bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
+              >
+                <Edit2 className="w-5 h-5" />
+                <span>Review & Approve</span>
+              </button>
+              <button
+                onClick={handleDelete}
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 text-sm flex items-center justify-center border border-red-500/30"
+                title="Delete entry"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Right Side - What to Review */}
@@ -678,14 +709,23 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
             </div>
           )}
 
-          {/* View Button */}
-          <button
-            onClick={handleViewDetails}
-            className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
-          >
-            <Edit2 className="w-5 h-5" />
-            <span>View Details</span>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleViewDetails}
+              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
+            >
+              <Edit2 className="w-5 h-5" />
+              <span>View Details</span>
+            </button>
+            <button
+              onClick={handleDelete}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 text-sm flex items-center justify-center border border-red-500/30"
+              title="Delete entry"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Right Side - Metadata */}

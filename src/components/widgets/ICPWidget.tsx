@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
-import { Plus, Loader2, Edit2, Eye } from 'lucide-react'
+import { Plus, Loader2, Edit2, Eye, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
@@ -127,6 +127,28 @@ export function ICPWidget({ className }: ICPWidgetProps) {
     }
   }
 
+  const handleDelete = async () => {
+    if (!icp || !window.confirm('Are you sure you want to delete this ICP? This cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('icps')
+        .delete()
+        .eq('id', icp.id)
+
+      if (error) throw error
+
+      alert('ICP deleted successfully')
+      setIcp(null)
+      setIcpState('empty')
+      fetchICP()
+    } catch (error: any) {
+      console.error('Error deleting ICP:', error)
+      alert('Failed to delete ICP')
+    }
+  }
 
   if (loading) {
     return (
@@ -570,6 +592,13 @@ export function ICPWidget({ className }: ICPWidgetProps) {
               >
                 <Eye className="w-5 h-5" />
               </button>
+              <button
+                onClick={handleDelete}
+                className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl border border-red-500/30 hover:border-red-500/40 transition-all duration-200"
+                title="Delete ICP"
+              >
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </button>
             </div>
           </div>
   
@@ -892,6 +921,13 @@ export function ICPWidget({ className }: ICPWidgetProps) {
               className="p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-200"
             >
               <Edit2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl border border-red-500/30 hover:border-red-500/40 transition-all duration-200"
+              title="Delete ICP"
+            >
+              <Trash2 className="w-5 h-5 text-red-400" />
             </button>
           </div>
         </div>
