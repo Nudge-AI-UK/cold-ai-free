@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 export function KnowledgeModal() {
   const { state, updateModalData, navigateNext, openModal } = useModalFlow()
   const { user } = useAuth()
-  const { planType } = useSimpleSubscription(user?.user_id)
+  const { planType } = useSimpleSubscription(user?.id)
   const [hasProfile, setHasProfile] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [existingKnowledgeEntry, setExistingKnowledgeEntry] = useState<any>(null)
@@ -106,7 +106,7 @@ export function KnowledgeModal() {
   // Check for existing knowledge entries when in add mode (for navigation from other modals)
   useEffect(() => {
     const fetchExistingKnowledge = async () => {
-      const userId = user?.user_id || user?.id
+      const userId = user?.id
       if (!isEditMode && userId) {
         try {
           const { data: entries, error } = await supabase
@@ -132,7 +132,7 @@ export function KnowledgeModal() {
 
     fetchExistingKnowledge()
       .catch(err => console.error('fetchExistingKnowledge error:', err))
-  }, [isEditMode, user?.user_id])
+  }, [isEditMode, user?.id])
 
   // Check if user has completed profile setup (only in add mode)
   useEffect(() => {
@@ -145,7 +145,7 @@ export function KnowledgeModal() {
         return
       }
 
-      const userId = user?.user_id || user?.id
+      const userId = user?.id
       if (!userId) {
         return
       }
@@ -273,7 +273,7 @@ export function KnowledgeModal() {
         ...entryData,
         content: entryData.description, // n8nService expects "content" field
         metadata, // Include metadata for database storage
-        userId: user?.user_id || user?.id
+        userId: user?.id
       });
 
       if (result.success) {

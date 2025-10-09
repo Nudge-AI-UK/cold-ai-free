@@ -38,7 +38,7 @@ export const LoginPage = () => {
       } else {
         console.log('🔐 Attempting login for:', email);
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });

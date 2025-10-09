@@ -441,7 +441,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
       const { n8nService } = await import('@/services/n8nService');
       const result = await n8nService.approveEntry(
         entry.id,
-        user.user_id || user.id,
+        user.id,
         undefined, // no review notes for now
         {
           title: editedTitle,

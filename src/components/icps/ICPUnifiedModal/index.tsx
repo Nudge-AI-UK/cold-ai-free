@@ -1,23 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
+import {
+  CheckCircle2,
+  Clock,
+  AlertCircle,
   Loader2,
-  Save,
-  X,
   Info,
   Target,
   Building,
   Users,
   MessageSquare,
-  Lightbulb,
-  ChartBar
+  Lightbulb
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,7 +106,7 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
       return;
     }
 
-    const userId = user?.user_id || user?.id;
+    const userId = user?.id;
     if (!userId) {
       toast.error('User not authenticated');
       return;
@@ -134,7 +129,7 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
 
       // 2. Create webhook event with original data, AI suggestions, and changed fields
       const webhookPayload = {
-        user_id: user?.id || user?.user_id,
+        user_id: user?.id,
         event_type: 'icp_review',
         idempotency_key: approvalRequestId,  // Add idempotency key here
         payload: {

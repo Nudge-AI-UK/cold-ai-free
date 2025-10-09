@@ -13,11 +13,12 @@ interface ICPWidgetProps {
   className?: string
   isActive?: boolean
   onActivate?: () => void
+  forceEmpty?: boolean
 }
 
 type ICPState = 'empty' | 'generating' | 'draft' | 'reviewing' | 'active'
 
-export function ICPWidget({ className, isActive, onActivate }: ICPWidgetProps) {
+export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWidgetProps) {
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const [icp, setIcp] = useState<any>(null)

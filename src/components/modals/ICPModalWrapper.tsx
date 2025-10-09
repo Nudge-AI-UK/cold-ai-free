@@ -60,7 +60,7 @@ export function ICPUnifiedModalWrapper({
               title
             )
           `)
-          .eq('created_by', user?.id || user?.user_id)
+          .eq('created_by', user?.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .single()

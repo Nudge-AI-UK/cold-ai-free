@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { ICPWidget } from '@/components/widgets/ICPWidget'
