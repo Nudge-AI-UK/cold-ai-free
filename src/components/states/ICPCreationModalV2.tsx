@@ -5,29 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Sparkles, 
-  Package, 
+import {
+  Sparkles,
   Target,
-  AlertTriangle,
-  CheckCircle,
   Loader2,
-  Info,
-  ChevronRight,
-  CloudUpload,
-  FileText,
-  Brain
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { n8nService } from '@/services/n8nService';
 import { useAuth } from '@/hooks/useAuth';
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription';
 import { supabase } from '@/integrations/supabase/client';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Tooltip,
   TooltipContent,
@@ -68,16 +56,13 @@ const initialFormData: ICPFormData = {
 export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
   isOpen,
   onClose,
-  onSuccess,
   onGenerate,
   isWrapped = false
 }) => {
   const { user } = useAuth();
-  const { planType, teamMembership } = useSimpleSubscription(user?.user_id);
   const [formData, setFormData] = useState<ICPFormData>(initialFormData);
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('create');
   const [aiFields, setAiFields] = useState<Set<string>>(new Set([
     'buying_triggers',
     'decision_criteria',
@@ -88,7 +73,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
 
   // Load user's products on mount
   useEffect(() => {
-    const userId = user?.user_id || user?.id;
+    const userId = user?.id;
     console.log('🔍 ICP Modal useEffect triggered:', { isOpen, userId, user });
 
     const loadProducts = async () => {
@@ -148,7 +133,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
     if (isOpen) {
       loadProducts();
     }
-  }, [isOpen, user?.user_id, user?.id]);
+  }, [isOpen, user?.id]);
 
   const handleClose = () => {
     setFormData(initialFormData);
@@ -159,7 +144,6 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
       'engagement_preference',
       'budget_authority'
     ]));
-    setActiveTab('create');
     onClose();
   };
 
@@ -176,7 +160,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
   };
 
   const handleFieldChange = (field: keyof ICPFormData, value: string) => {
-    const limit = ICP_FIELD_LIMITS[field];
+    const limit = ICP_FIELD_LIMITS[field] as number | undefined;
     if (limit && value.length > limit) {
       return; // Don't update if over limit
     }
@@ -198,7 +182,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
       return;
     }
 
-    const userId = user?.user_id || user?.id;
+    const userId = user?.id;
     if (!userId) {
       toast.error('User not authenticated');
       return;
@@ -311,8 +295,8 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
   ) => {
     const isAIField = aiFields.has(fieldName);
     const Component = isTextarea ? Textarea : Input;
-    const currentLength = formData[fieldName].length;
-    const maxLength = ICP_FIELD_LIMITS[fieldName];
+    const currentLength = (formData[fieldName] as string).length;
+    const maxLength = ICP_FIELD_LIMITS[fieldName] as number | undefined;
 
     return (
       <div className="space-y-2">

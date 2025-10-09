@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Plus, MoreVertical, Loader2, Sparkles, Edit2, Eye } from 'lucide-react'
+import { Plus, Loader2, Edit2, Eye } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
@@ -18,13 +15,12 @@ interface ICPWidgetProps {
 
 type ICPState = 'empty' | 'generating' | 'draft' | 'reviewing' | 'active'
 
-export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWidgetProps) {
+export function ICPWidget({ className }: ICPWidgetProps) {
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const [icp, setIcp] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [icpState, setIcpState] = useState<ICPState>('empty')
-  const [generatingProgress, setGeneratingProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState(2)
 
   useEffect(() => {
@@ -42,9 +38,6 @@ export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWi
         if (parsed.length > 0) {
           const genIcp = parsed[0]
           const elapsed = Date.now() - genIcp.startTime
-          const progress = Math.min(95, (elapsed / 60000) * 100)
-
-          setGeneratingProgress(progress)
 
           if (elapsed > 60000) {
             setIcpState('active')
@@ -95,7 +88,7 @@ export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWi
             title
           )
         `)
-        .eq('created_by', user?.id || user?.user_id)
+        .eq('created_by', user?.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
@@ -109,9 +102,9 @@ export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWi
           setIcpState('draft')
         } else if (data.workflow_status === 'generating' || data.workflow_status === 'form') {
           setIcpState('generating')
-        } else if (data.workflow_status === 'processing' || data.workflow_status === 'reviewing') {
+        } else if (data.workflow_status === 'reviewing') {
           setIcpState('reviewing')
-        } else if (data.workflow_status === 'approved' || data.workflow_status === 'active') {
+        } else if (data.workflow_status === 'approved') {
           setIcpState('active')
         }
         // Fall back to is_active check if workflow_status doesn't tell us
@@ -134,20 +127,6 @@ export function ICPWidget({ className, isActive, onActivate, forceEmpty }: ICPWi
     }
   }
 
-  const handleGenerate = (icpData: any) => {
-    // Store in localStorage like main site
-    const newGenerating = {
-      id: Date.now().toString(),
-      title: icpData.icp_name || 'New ICP',
-      productName: 'Cold AI Free',
-      productId: '',
-      progress: 0,
-      status: 'generating',
-      startTime: Date.now()
-    }
-    localStorage.setItem('generating_icps', JSON.stringify([newGenerating]))
-    setIcpState('generating')
-  }
 
   if (loading) {
     return (

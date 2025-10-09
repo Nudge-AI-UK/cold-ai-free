@@ -4,9 +4,10 @@ import { Plus, Edit2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import { ProductAddModalEnhanced } from '@/components/knowledge/ProductAddModalEnhanced'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
-import type { KnowledgeEntry } from '@/types'
+import type { Database } from '@/types/supabase'
+
+type KnowledgeEntry = Database['public']['Tables']['knowledge_base']['Row']
 
 interface KnowledgeWidgetProps {
   forceEmpty?: boolean
@@ -17,21 +18,8 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
-  const [loading, setLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
-  
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [newEntry, setNewEntry] = useState({
-    knowledge_type: 'product',
-    productLink: '',
-    title: '',
-    targetMarket: '',
-    content: '',
-    additionalLinks: []
-  })
-  const [aiFields, setAiFields] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -42,7 +30,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const fetchKnowledge = async () => {
     if (!user) return
 
-    const userId = user?.id || user?.user_id
+    const userId = user?.id
     const { data } = await supabase
       .from('knowledge_base')
       .select('*')
@@ -102,81 +90,13 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
     // Open knowledge modal in edit mode with existing entry data
     openModal('knowledge', {
       mode: 'edit',
-      data: entry
+      data: entry as any
     })
   }
-
-  const handleModalClose = () => {
-    setIsModalOpen(false)
-    // Reset form state
-    setNewEntry({
-      knowledge_type: 'product',
-      productLink: '',
-      title: '',
-      targetMarket: '',
-      content: '',
-      additionalLinks: []
-    })
-    setAiFields(new Set())
-  }
-
-  const toggleAIField = (field: string) => {
-    setAiFields(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(field)) {
-        newSet.delete(field)
-      } else {
-        newSet.add(field)
-      }
-      return newSet
-    })
-  }
-
-  const handleAddEntry = async () => {
-    setIsGenerating(true)
-    setIsModalOpen(false) // Close modal when processing starts
-    
-    try {
-      // Your actual API call to create the product
-      const { data, error } = await supabase
-        .from('knowledge_base')
-        .insert({
-          created_by: user?.user_id,
-          knowledge_type: newEntry.knowledge_type,
-          title: newEntry.title || 'AI Generated',
-          content: newEntry.content || 'AI Generated',
-          metadata: {
-            productLink: newEntry.productLink,
-            targetMarket: newEntry.targetMarket,
-            aiFields: Array.from(aiFields)
-          }
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      toast.success('Product created successfully!')
-      setEntry(data)
-      handleModalClose()
-    } catch (error) {
-      toast.error('Failed to create product')
-      console.error(error)
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  // Knowledge types for the modal
-  const knowledgeTypes = [
-    { value: 'product', label: 'Product', icon: Plus },
-    { value: 'service', label: 'Service', icon: Plus }
-  ]
 
   // Empty State
   if (forceEmpty || (!entry && !isGenerating)) {
     return (
-      <>
         <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
              style={{
                background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
@@ -302,26 +222,6 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>
         </div>
-
-        {/* Product Add Modal */}
-        <ProductAddModalEnhanced
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          newEntry={newEntry}
-          setNewEntry={setNewEntry}
-          knowledgeTypes={knowledgeTypes}
-          canAddAdditionalLinks={false} // Free tier
-          getMaxAdditionalLinks={() => 0}
-          subscription={{ plan_type: 'free' }}
-          addAdditionalLink={() => {}}
-          removeAdditionalLink={() => {}}
-          updateAdditionalLink={() => {}}
-          aiFields={aiFields}
-          toggleAIField={toggleAIField}
-          handleAddEntry={handleAddEntry}
-          isProcessing={isGenerating}
-        />
-      </>
     )
   }
 
@@ -764,9 +664,9 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
           </p>
 
           {/* Key Features from metadata if available */}
-          {entry?.metadata?.features && (
+          {entry?.metadata && typeof entry.metadata === 'object' && 'features' in entry.metadata && (
             <div className="space-y-2 mb-4">
-              {(entry.metadata.features as string[]).slice(0, 4).map((feature, i) => (
+              {((entry.metadata as any).features as string[]).slice(0, 4).map((feature, i) => (
                 <div key={i} className="rounded-lg p-2 border border-white/5 flex items-center gap-2"
                      style={{
                        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
@@ -801,13 +701,13 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs text-gray-400">Completeness</span>
                     <span className="text-xs font-semibold text-[#FBAE1C]">
-                      {entry?.metadata?.quality_assessment?.completeness || 65}%
+                      {(entry?.metadata as any)?.quality_assessment?.completeness || 65}%
                     </span>
                   </div>
                   <div className="w-full bg-white/10 rounded-full h-1">
                     <div className="h-1 rounded-full"
                          style={{
-                           width: `${entry?.metadata?.quality_assessment?.completeness || 65}%`,
+                           width: `${(entry?.metadata as any)?.quality_assessment?.completeness || 65}%`,
                            background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
                          }}></div>
                   </div>
@@ -816,13 +716,13 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs text-gray-400">Sales Readiness</span>
                     <span className="text-xs font-semibold text-[#FBAE1C]">
-                      {entry?.metadata?.quality_assessment?.sales_readiness || 70}%
+                      {(entry?.metadata as any)?.quality_assessment?.sales_readiness || 70}%
                     </span>
                   </div>
                   <div className="w-full bg-white/10 rounded-full h-1">
                     <div className="h-1 rounded-full"
                          style={{
-                           width: `${entry?.metadata?.quality_assessment?.sales_readiness || 70}%`,
+                           width: `${(entry?.metadata as any)?.quality_assessment?.sales_readiness || 70}%`,
                            background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
                          }}></div>
                   </div>
@@ -835,7 +735,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Category</span>
-                  <span className="text-gray-300">{entry?.metadata?.workflow_metadata?.product_category || entry?.knowledge_type || 'Product'}</span>
+                  <span className="text-gray-300">{(entry?.metadata as any)?.workflow_metadata?.product_category || entry?.knowledge_type || 'Product'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Status</span>
@@ -843,7 +743,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">AI Generations</span>
-                  <span className="text-gray-300">{entry?.metadata?.source_info?.ai_generation_count || 0}</span>
+                  <span className="text-gray-300">{(entry?.metadata as any)?.source_info?.ai_generation_count || 0}</span>
                 </div>
               </div>
             </div>
