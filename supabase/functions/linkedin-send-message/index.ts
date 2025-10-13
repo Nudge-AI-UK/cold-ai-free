@@ -41,22 +41,21 @@ serve(async (req) => {
       throw new Error('Missing required fields')
     }
 
-    // Get user's LinkedIn account from integrations table
+    // Get user's LinkedIn account from user_profiles table
     console.log('🔍 Fetching LinkedIn account for user:', payload.user_id)
-    const { data: integration, error: integrationError } = await supabase
-      .from('integrations')
-      .select('account_id, access_token, provider_account_id')
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('unipile_account_id, linkedin_connected')
       .eq('user_id', payload.user_id)
-      .eq('provider', 'linkedin')
-      .eq('status', 'connected')
+      .eq('linkedin_connected', true)
       .single()
 
-    if (integrationError || !integration) {
-      console.error('❌ No LinkedIn account found:', integrationError)
+    if (profileError || !profile || !profile.unipile_account_id) {
+      console.error('❌ No LinkedIn account found:', profileError)
       throw new Error('LinkedIn account not connected. Please connect your LinkedIn account first.')
     }
 
-    console.log('✅ Found LinkedIn account:', integration.account_id)
+    console.log('✅ Found LinkedIn account:', profile.unipile_account_id)
 
     // Get Unipile API configuration
     const unipileApiUrl = Deno.env.get('UNIPILE_API_URL') || 'https://api.unipile.com:13443'
@@ -72,16 +71,36 @@ serve(async (req) => {
     if (!urlMatch) {
       throw new Error('Invalid LinkedIn URL format')
     }
-    const recipientIdentifier = decodeURIComponent(urlMatch[1])
+    const recipientPublicId = decodeURIComponent(urlMatch[1])
 
-    // Prepare Unipile API request to start new chat
+    // Step 1: Get recipient's provider internal ID from Unipile
+    console.log('🔍 Looking up recipient provider ID for:', recipientPublicId)
+    const profileLookupUrl = `${unipileApiUrl}/api/v1/users/${profile.unipile_account_id}/search?query=${encodeURIComponent(recipientPublicId)}&provider=LINKEDIN`
+
+    const profileResponse = await fetch(profileLookupUrl, {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': unipileApiKey,
+        'accept': 'application/json'
+      }
+    })
+
+    const profileData = await profileResponse.json()
+
+    if (!profileResponse.ok || !profileData.items || profileData.items.length === 0) {
+      console.error('❌ Failed to find recipient:', profileData)
+      throw new Error('Could not find recipient LinkedIn profile. Please verify the LinkedIn URL.')
+    }
+
+    // Extract provider internal ID from first result
+    const recipientProviderId = profileData.items[0].provider_id
+    console.log('✅ Found recipient provider ID:', recipientProviderId)
+
+    // Step 2: Prepare Unipile API request to start new chat
     console.log('📨 Sending message via Unipile API...')
     const unipilePayload = {
-      account_id: integration.account_id,
-      attendees: [{
-        identifier: recipientIdentifier,
-        provider: 'LINKEDIN'
-      }],
+      account_id: profile.unipile_account_id,
+      attendees_ids: [recipientProviderId],
       text: payload.message_text
     }
 

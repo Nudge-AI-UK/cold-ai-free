@@ -6,6 +6,7 @@ import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
 import { LoginPage } from '@/components/auth/LoginPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
+import { MobileBlocker } from '@/components/MobileBlocker'
 
 function AppContent() {
   const { user, loading } = useAuth()
@@ -35,6 +36,7 @@ function App() {
     <AuthProvider>
       <LoadingProvider>
         <ModalFlowProvider>
+          <MobileBlocker />
           <AppContent />
           <Toaster
             position="bottom-right"
