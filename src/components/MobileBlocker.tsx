@@ -103,7 +103,7 @@ export function MobileBlocker() {
           <p className="text-sm text-gray-500 text-center">
             Need help?{' '}
             <a
-              href="mailto:admin@coldai.com"
+              href="mailto:admin@nudgeai.com"
               className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
             >
               Contact Support
