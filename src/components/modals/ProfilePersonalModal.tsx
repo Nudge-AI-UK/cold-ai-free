@@ -31,15 +31,34 @@ export function ProfilePersonalModal() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasExistingData, setHasExistingData] = useState(false)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
-  // Load existing data
+  // Load existing data and onboarding status
   useEffect(() => {
     if (user?.id) {
       loadProfileData()
+      loadOnboardingStatus()
     }
   }, [user])
 
   // Note: Removed modal state effect to prevent feedback loops
+
+  const loadOnboardingStatus = async () => {
+    const userId = user?.id || user?.user_id
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('onboarding_completed')
+        .eq('user_id', userId)
+        .single()
+
+      if (data && !error) {
+        setOnboardingCompleted(data.onboarding_completed || false)
+      }
+    } catch (error) {
+      console.error('Error loading onboarding status:', error)
+    }
+  }
 
   const loadProfileData = async () => {
     setIsLoading(true)
@@ -176,7 +195,7 @@ export function ProfilePersonalModal() {
 
   if (isLoading) {
     return (
-      <BaseModal title="Personal Information" description="Loading your profile...">
+      <BaseModal title="Personal Information" description="Loading your profile..." dismissible={onboardingCompleted}>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-3 border-[#FBAE1C] border-t-transparent rounded-full animate-spin" />
         </div>
@@ -188,6 +207,7 @@ export function ProfilePersonalModal() {
     <BaseModal
       title="Personal Information"
       description="Tell us about yourself to personalise your messages"
+      dismissible={onboardingCompleted}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
@@ -332,6 +352,7 @@ export function ProfilePersonalModal() {
         dynamicMode={true}
         hasExistingData={hasExistingData}
         hasChanges={hasUnsavedChanges()}
+        isFormValid={validateForm()}
       />
     </BaseModal>
   )

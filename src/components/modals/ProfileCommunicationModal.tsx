@@ -47,7 +47,7 @@ const ctaOptions = [
 
 export function ProfileCommunicationModal() {
   const { user } = useAuth()
-  const { updateModalData, state, navigateNext, navigatePrevious, closeAllModals, markDataAsOriginal, hasUnsavedChanges, resetUnsavedChanges } = useModalFlow()
+  const { updateModalData, state, navigateNext, navigatePrevious, closeAllModals, openModal, markDataAsOriginal, hasUnsavedChanges, resetUnsavedChanges } = useModalFlow()
   const [formData, setFormData] = useState<CommunicationInfo>({
     communicationStyle: 'consultative',
     messageLength: 'moderate',
@@ -61,15 +61,34 @@ export function ProfileCommunicationModal() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasExistingData, setHasExistingData] = useState(false)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
-  // Load existing data
+  // Load existing data and onboarding status
   useEffect(() => {
     if (user?.id || user?.user_id) {
       loadCommunicationData()
+      loadOnboardingStatus()
     }
   }, [user])
 
   // Note: Removed modal state effect to prevent feedback loops
+
+  const loadOnboardingStatus = async () => {
+    const userId = user?.id || user?.user_id
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('onboarding_completed')
+        .eq('user_id', userId)
+        .single()
+
+      if (data && !error) {
+        setOnboardingCompleted(data.onboarding_completed || false)
+      }
+    } catch (error) {
+      console.error('Error loading onboarding status:', error)
+    }
+  }
 
   const loadCommunicationData = async () => {
     setIsLoading(true)
@@ -187,16 +206,33 @@ export function ProfileCommunicationModal() {
 
       toast.success('Communication preferences saved successfully')
 
-      // Only show completion message and close for first-time setup
+      // Only show completion message and open Knowledge modal for first-time setup
       if (!hasExistingData) {
-        toast.success('Profile setup completed!')
+        // Mark onboarding as completed in users table
+        const { error: onboardingError } = await supabase
+          .from('users')
+          .update({
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
 
-        // Refresh to update widgets
+        if (onboardingError) {
+          console.error('Error updating onboarding status:', onboardingError)
+        } else {
+          setOnboardingCompleted(true)
+        }
+
+        toast.success('Profile setup completed! Let\'s add your first product or service.')
+
+        // Close current modal and open Knowledge modal after a short delay
         setTimeout(() => {
-          window.location.reload()
+          closeAllModals()
+          // Open Knowledge modal in 'add' mode after a short delay
+          setTimeout(() => {
+            openModal('knowledge', { mode: 'add' })
+          }, 300)
         }, 1000) // Delay to show toast message
-
-        closeAllModals()
       }
     } catch (error) {
       console.error('Error saving communication data:', error)
@@ -206,7 +242,15 @@ export function ProfileCommunicationModal() {
     }
   }
 
+  const validateForm = () => {
+    return !!formData.communicationStyle
+  }
+
   const handleComplete = () => {
+    if (!validateForm()) {
+      toast.error('Please select a communication style')
+      return
+    }
     handleSave()
   }
 
@@ -216,7 +260,7 @@ export function ProfileCommunicationModal() {
 
   if (isLoading) {
     return (
-      <BaseModal title="Communication Preferences" description="Loading your preferences...">
+      <BaseModal title="Communication Preferences" description="Loading your preferences..." dismissible={onboardingCompleted}>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-3 border-[#FBAE1C] border-t-transparent rounded-full animate-spin" />
         </div>
@@ -228,6 +272,7 @@ export function ProfileCommunicationModal() {
     <BaseModal
       title="Communication Preferences"
       description="Customise how your messages sound"
+      dismissible={onboardingCompleted}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
@@ -454,6 +499,7 @@ export function ProfileCommunicationModal() {
         dynamicMode={true}
         hasExistingData={hasExistingData}
         hasChanges={hasUnsavedChanges()}
+        isFormValid={validateForm()}
       />
     </BaseModal>
   )

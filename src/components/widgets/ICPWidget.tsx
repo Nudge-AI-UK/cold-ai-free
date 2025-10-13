@@ -22,12 +22,39 @@ export function ICPWidget({ className }: ICPWidgetProps) {
   const [loading, setLoading] = useState(true)
   const [icpState, setIcpState] = useState<ICPState>('empty')
   const [currentStep, setCurrentStep] = useState(2)
+  const [hasApprovedProduct, setHasApprovedProduct] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (user) {
       fetchICP()
+      checkApprovedProducts()
     }
   }, [user])
+
+  const checkApprovedProducts = async () => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_base')
+        .select('id')
+        .eq('created_by', user?.id)
+        .eq('workflow_status', 'reviewing')
+        .eq('review_status', 'approved')
+        .limit(1)
+
+      if (error) {
+        console.error('Error checking approved products:', error)
+        setHasApprovedProduct(false)
+        return
+      }
+
+      setHasApprovedProduct(data && data.length > 0)
+    } catch (error) {
+      console.error('Error checking approved products:', error)
+      setHasApprovedProduct(false)
+    }
+  }
 
   useEffect(() => {
     // Check for generating ICP in localStorage (matching main site pattern)
@@ -162,6 +189,8 @@ export function ICPWidget({ className }: ICPWidgetProps) {
 
   // Empty State
   if (icpState === 'empty') {
+    const isLocked = hasApprovedProduct === false
+
     return (
       <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
            style={{
@@ -170,10 +199,38 @@ export function ICPWidget({ className }: ICPWidgetProps) {
              WebkitBackdropFilter: 'blur(10px)'
            }}>
         
+        {/* Blur Overlay - Only show when locked */}
+        {isLocked && (
+          <div className="absolute inset-0 backdrop-blur-md bg-black/80 z-40 rounded-3xl flex items-center justify-center">
+            <div className="text-center px-6">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#FBAE1C]/10 border border-[#FBAE1C]/20 flex items-center justify-center">
+                <span className="text-4xl">🔒</span>
+              </div>
+              <h3 className="text-white font-semibold mb-2 text-lg">Product Required</h3>
+              <p className="text-gray-300 text-sm mb-4 max-w-xs mx-auto">
+                Add and get approval for a product or service before creating your ICP
+              </p>
+              <button
+                onClick={() => openModal('knowledge', { mode: 'add' })}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium hover:shadow-lg hover:shadow-[#FBAE1C]/30 transition-all"
+              >
+                <span>Add Product/Service</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Status Badge */}
         <div className="absolute top-4 right-4 z-30">
-          <div className="bg-gray-700/50 text-gray-400 border border-gray-600/50 px-3 py-1 rounded-full text-xs">
-            Not Created
+          <div className={`px-3 py-1 rounded-full text-xs ${
+            isLocked
+              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+              : 'bg-gray-700/50 text-gray-400 border border-gray-600/50'
+          }`}>
+            {isLocked ? 'Locked' : 'Not Created'}
           </div>
         </div>
   
@@ -268,11 +325,16 @@ export function ICPWidget({ className }: ICPWidgetProps) {
   
           {/* CTA Button */}
           <button
-            onClick={() => openModal('icp-edit', { flowName: 'main', mode: 'add' })}
-            className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-4 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
+            onClick={() => isLocked ? openModal('knowledge', { mode: 'add' }) : openModal('icp-edit', { flowName: 'main', mode: 'add' })}
+            disabled={isLocked}
+            className={`w-full font-semibold py-4 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 group ${
+              isLocked
+                ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
+            }`}
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-            <span>Create Your First ICP</span>
+            <span>{isLocked ? 'Add Product First' : 'Create Your First ICP'}</span>
           </button>
   
           {/* Helper Text */}

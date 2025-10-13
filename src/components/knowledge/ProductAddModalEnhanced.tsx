@@ -1,12 +1,10 @@
 // src/components/knowledge/ProductAddModalEnhanced.tsx
 
-import { Package, Building, Sparkles, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Package, Building, Sparkles, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useModalFlow } from '@/components/modals/ModalFlowManager';
 
 interface ProductAddModalEnhancedProps {
@@ -25,15 +23,8 @@ interface ProductAddModalEnhancedProps {
   isProcessing?: boolean;
 }
 
-// Character limits
-const CHAR_LIMITS = {
-  title: 80,
-  productLink: 250,
-  infoLink: 250,
-  targetMarket: 300,
-  content: 800,
-  keyStatistics: 500
-};
+// Character limit for URL
+const MAX_URL_LENGTH = 250;
 
 export const ProductAddModalEnhanced = ({
   newEntry,
@@ -52,89 +43,16 @@ export const ProductAddModalEnhanced = ({
 }: ProductAddModalEnhancedProps) => {
 
   // Get navigation functions from modal flow context
-  const { 
-    closeModal, 
-    navigateNext, 
-    navigatePrevious, 
-    canNavigate,
-    isAnyModalOpen 
+  const {
+    closeModal,
+    isAnyModalOpen
   } = useModalFlow();
-  
+
   // Check if this modal is actually open
   const isModalOpen = isAnyModalOpen();
 
-  const hasProductLink = newEntry.productLink && newEntry.productLink.trim() !== '';
-  
   // Simplified type - just Product or Service
   const entryTypeLabel = newEntry.knowledge_type === 'service' ? 'Service' : 'Product';
-  
-  const renderAIField = (
-    fieldName: string,
-    label: string,
-    placeholder: string,
-    isTextarea: boolean = false,
-    maxLength?: number,
-    isRequired: boolean = false
-  ) => {
-    const Component = isTextarea ? Textarea : Input;
-    const isAIEnabled = aiFields.has(fieldName);
-    const canUseAI = hasProductLink;
-    const currentLength = newEntry[fieldName]?.length || 0;
-
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium text-orange-300">
-            {label} {isRequired && <span className="text-red-400">*</span>}
-          </Label>
-          {canUseAI && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleAIField(fieldName)}
-              disabled={isProcessing}
-              className={cn(
-                "text-xs flex items-center gap-1 transition-colors",
-                isAIEnabled 
-                  ? "text-orange-400 hover:text-orange-300" 
-                  : "text-gray-400 hover:text-gray-300"
-              )}
-            >
-              <Sparkles className="w-3 h-3" />
-              Fill With AI
-            </Button>
-          )}
-        </div>
-        
-        {isAIEnabled && canUseAI ? (
-          <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-orange-400 animate-pulse" />
-            <span className="text-sm text-orange-300">AI will generate this field</span>
-          </div>
-        ) : (
-          <>
-            <Component
-              placeholder={placeholder}
-              value={newEntry[fieldName] || ''}
-              onChange={(e) => setNewEntry({...newEntry, [fieldName]: e.target.value})}
-              rows={isTextarea ? (fieldName === 'content' ? 4 : 3) : undefined}
-              maxLength={maxLength}
-              disabled={isProcessing}
-              className="bg-black/30 border-white/10 focus:border-orange-500/50 text-white placeholder:text-gray-500 
-                         disabled:opacity-50 rounded-xl transition-all duration-300 resize-none
-                         focus:shadow-[0_0_0_3px_rgba(251,174,28,0.1)]"
-            />
-            {maxLength && (
-              <div className="text-xs text-gray-500 text-right">
-                {currentLength}/{maxLength} characters
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
 
   // If modal is not open via ModalFlowManager, don't render
   if (!isModalOpen) return null;
@@ -152,188 +70,105 @@ export const ProductAddModalEnhanced = ({
 
         {/* Body */}
         <div className="space-y-6">
-              
-              {/* Type Selection */}
-              <div className="mb-6">
-                <Label className="text-sm font-medium text-orange-300 mb-2 block">
-                  Type <span className="text-red-400">*</span>
+          {/* Type Selection */}
+          <div className="mb-6">
+            <Label className="text-sm font-medium text-orange-300 mb-2 block">
+              Type <span className="text-red-400">*</span>
+            </Label>
+            <Select
+              value={newEntry.knowledge_type || 'product'}
+              onValueChange={(value) => setNewEntry({...newEntry, knowledge_type: value})}
+              disabled={isProcessing}
+            >
+              <SelectTrigger className="bg-black/50 border-white/10 text-white hover:border-orange-500/50
+                                        focus:border-orange-500 transition-all duration-300 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a1f36] border-white/10 rounded-xl">
+                <SelectItem value="product" className="text-white hover:bg-white/10 focus:bg-white/10 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Product
+                  </div>
+                </SelectItem>
+                <SelectItem value="service" className="text-white hover:bg-white/10 focus:bg-white/10 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    Service
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* URL Input */}
+          <div className="rounded-2xl p-6 bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-orange-400" />
+                <h3 className="text-base font-medium text-orange-300">
+                  {entryTypeLabel} URL
+                </h3>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-orange-300">
+                  {entryTypeLabel} Link <span className="text-red-400">*</span>
                 </Label>
-                <Select 
-                  value={newEntry.knowledge_type || 'product'} 
-                  onValueChange={(value) => setNewEntry({...newEntry, knowledge_type: value})}
+                <Input
+                  placeholder={`https://your-${newEntry.knowledge_type || 'product'}.com`}
+                  value={newEntry.productLink || ''}
+                  onChange={(e) => setNewEntry({...newEntry, productLink: e.target.value})}
+                  maxLength={MAX_URL_LENGTH}
                   disabled={isProcessing}
-                >
-                  <SelectTrigger className="bg-black/50 border-white/10 text-white hover:border-orange-500/50 
-                                            focus:border-orange-500 transition-all duration-300 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1f36] border-white/10 rounded-xl">
-                    <SelectItem value="product" className="text-white hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4" />
-                        Product
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="service" className="text-white hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Building className="w-4 h-4" />
-                        Service
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-  
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Required Information */}
-                <div>
-                  <div className="rounded-2xl p-4 bg-gradient-to-br from-white/5 to-white/[0.02] 
-                                  border border-white/10">
-                    <h3 className="text-sm font-medium text-orange-300 mb-4 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Required Information
-                    </h3>
-                    
-                    {/* Product/Service Link */}
-                    <div className="space-y-2 mb-4">
-                      <Label className="text-sm font-medium text-orange-300">
-                        {entryTypeLabel} Link <span className="text-red-400">*</span>
-                      </Label>
-                      <Input
-                        placeholder={`https://your-${newEntry.knowledge_type || 'product'}.com`}
-                        value={newEntry.productLink || ''}
-                        onChange={(e) => setNewEntry({...newEntry, productLink: e.target.value})}
-                        maxLength={CHAR_LIMITS.productLink}
-                        disabled={isProcessing}
-                        className="bg-black/30 border-white/10 focus:border-orange-500/50 text-white 
-                                   placeholder:text-gray-500 disabled:opacity-50 rounded-xl transition-all duration-300
-                                   focus:shadow-[0_0_0_3px_rgba(251,174,28,0.1)]"
-                      />
-                      <p className="text-xs text-gray-500">Cold AI will analyse this page</p>
-                    </div>
-                    
-                    {/* Product/Service Name */}
-                    {renderAIField(
-                      'title',
-                      `${entryTypeLabel} Name`,
-                      'Will be extracted from URL',
-                      false,
-                      CHAR_LIMITS.title
-                    )}
-                  </div>
-                </div>
-                
-                {/* Right Column - Strategic Insights */}
-                <div>
-                  <div className="rounded-2xl p-4 bg-gradient-to-br from-white/5 to-white/[0.02] 
-                                  border border-white/10">
-                    <h3 className="text-sm font-medium text-amber-400 mb-4 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      Strategic Insights
-                    </h3>
-                    
-                    {renderAIField(
-                      'targetMarket',
-                      'Target Market',
-                      'AI will identify your ideal customers',
-                      true,
-                      CHAR_LIMITS.targetMarket
-                    )}
-                    
-                    <div className="mt-4">
-                      {renderAIField(
-                        'content',
-                        'Description',
-                        'AI will create a detailed description',
-                        true,
-                        CHAR_LIMITS.content
-                      )}
-                    </div>
-                  </div>
+                  className="bg-black/30 border-white/10 focus:border-orange-500/50 text-white
+                             placeholder:text-gray-500 disabled:opacity-50 rounded-xl transition-all duration-300
+                             focus:shadow-[0_0_0_3px_rgba(251,174,28,0.1)]"
+                />
+                <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                  <Sparkles className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-orange-300/90">
+                    AI will analyse this URL and automatically generate the title, description, and target market for your {entryTypeLabel.toLowerCase()}
+                  </p>
                 </div>
               </div>
-              
-              {/* Additional Links (Premium) */}
-              {canAddAdditionalLinks && newEntry.additionalLinks?.length > 0 && (
-                <div className="mt-6 rounded-2xl p-4 bg-gradient-to-br from-white/5 to-white/[0.02] 
-                                border border-white/10">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-300">Additional Resources</h3>
-                    {newEntry.additionalLinks.length < getMaxAdditionalLinks() && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addAdditionalLink}
-                        disabled={isProcessing}
-                        className="text-xs border-white/20 hover:bg-white/10 text-gray-300"
-                      >
-                        Add Link
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {newEntry.additionalLinks.map((link: any) => (
-                    <div key={link.id} className="flex gap-2 mb-2">
-                      <Input
-                        placeholder="Link title"
-                        value={link.title}
-                        onChange={(e) => updateAdditionalLink(link.id, 'title', e.target.value)}
-                        disabled={isProcessing}
-                        className="bg-black/30 border-white/10 text-white placeholder:text-gray-500 rounded-xl"
-                      />
-                      <Input
-                        placeholder="URL"
-                        value={link.url}
-                        onChange={(e) => updateAdditionalLink(link.id, 'url', e.target.value)}
-                        disabled={isProcessing}
-                        className="bg-black/30 border-white/10 text-white placeholder:text-gray-500 rounded-xl"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAdditionalLink(link.id)}
-                        disabled={isProcessing}
-                        className="text-gray-400 hover:text-red-400"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-  
-            {/* Footer */}
-            <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 
-                            bg-gradient-to-t from-black/20 to-transparent">
-              <div className="flex justify-end gap-3">
-                <Button 
-                  variant="outline"
-                  onClick={closeModal}
-                  disabled={isProcessing}
-                  className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 
-                             hover:border-orange-500 transition-all duration-300 rounded-lg"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleAddEntry}
-                  disabled={isProcessing || !newEntry.productLink}
-                  className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 
-                             hover:to-amber-700 text-white disabled:opacity-50 rounded-lg
-                             shadow-lg hover:shadow-orange-500/25 transition-all duration-300"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Add Entry'
-                  )}
-                </Button>
-              </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 mt-6
+                        bg-gradient-to-t from-black/20 to-transparent">
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={closeModal}
+              disabled={isProcessing}
+              className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10
+                         hover:border-orange-500 transition-all duration-300 rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddEntry}
+              disabled={isProcessing || !newEntry.productLink}
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700
+                         hover:to-amber-700 text-white disabled:opacity-50 rounded-lg
+                         shadow-lg hover:shadow-orange-500/25 transition-all duration-300"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Add & Generate with AI
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

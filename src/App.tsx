@@ -7,6 +7,8 @@ import { LoginPage } from '@/components/auth/LoginPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
 import { MobileBlocker } from '@/components/MobileBlocker'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function AppContent() {
   const { user, loading } = useAuth()
@@ -48,6 +50,8 @@ function App() {
               },
             }}
           />
+          <Analytics />
+          <SpeedInsights />
         </ModalFlowProvider>
       </LoadingProvider>
     </AuthProvider>

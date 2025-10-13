@@ -43,10 +43,37 @@ export function ICPUnifiedModalWrapper({
   onUpdate,
   mode
 }: any) {
-  const { closeModal } = useModalFlow()
+  const { closeModal, openModal } = useModalFlow()
   const { user } = useAuth()
   const [icpData, setIcpData] = useState(icp)
   const [loading, setLoading] = useState(!icp)
+  const [hasApprovedProduct, setHasApprovedProduct] = useState<boolean | null>(null)
+
+  // Function to check for approved products
+  const checkApprovedProducts = async () => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_base')
+        .select('id')
+        .eq('created_by', user?.id)
+        .eq('workflow_status', 'reviewing')
+        .eq('review_status', 'approved')
+        .limit(1)
+
+      if (error) {
+        console.error('Error checking approved products:', error)
+        setHasApprovedProduct(false)
+        return
+      }
+
+      setHasApprovedProduct(data && data.length > 0)
+    } catch (error) {
+      console.error('Error checking approved products:', error)
+      setHasApprovedProduct(false)
+    }
+  }
 
   // Function to fetch ICP data
   const fetchICP = async () => {
@@ -69,11 +96,14 @@ export function ICPUnifiedModalWrapper({
         if (data) {
           setIcpData(data)
         } else {
-          // No ICP exists, show create mode
+          // No ICP exists, check for approved products before showing create mode
+          await checkApprovedProducts()
           setIcpData(null)
         }
       } catch (error) {
         console.error('Error fetching ICP:', error)
+        // Check for approved products before showing create mode
+        await checkApprovedProducts()
         setIcpData(null)
       } finally {
         setLoading(false)
@@ -102,8 +132,63 @@ export function ICPUnifiedModalWrapper({
     )
   }
 
-  // If no ICP exists, show creation modal
+  // If no ICP exists, check for approved products first
   if (!icpData) {
+    // If we haven't checked for approved products yet, show loading
+    if (hasApprovedProduct === null) {
+      return (
+        <BaseModal
+          title="Loading ICP"
+          description="Loading your ideal customer profile..."
+          className="icp-modal-large"
+        >
+          <div className="flex items-center justify-center h-64">
+            <div className="w-8 h-8 border-3 border-[#FBAE1C] border-t-transparent rounded-full animate-spin" />
+          </div>
+        </BaseModal>
+      )
+    }
+
+    // If no approved product exists, show locked state
+    if (!hasApprovedProduct) {
+      return (
+        <BaseModal
+          title="Complete Your Product Setup First"
+          description="You need an approved product before creating your ICP"
+          className="icp-modal-large"
+        >
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-white/3 to-white/1 border border-white/10 rounded-2xl p-6">
+              <div className="text-center py-8">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#FBAE1C]/10 border border-[#FBAE1C]/20 flex items-center justify-center">
+                  <span className="text-4xl">🔒</span>
+                </div>
+                <h3 className="text-white font-medium mb-2 text-lg">Product Approval Required</h3>
+                <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">
+                  Before creating your Ideal Customer Profile, you need to add and get approval for at least one product or service. This helps us create a more accurate ICP for your business.
+                </p>
+                <button
+                  onClick={() => {
+                    closeModal()
+                    setTimeout(() => {
+                      openModal('knowledge', { mode: 'add' })
+                    }, 300)
+                  }}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-black font-medium hover:shadow-lg hover:shadow-[#FBAE1C]/30 transition-all"
+                >
+                  <span>Add Product/Service</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </BaseModal>
+      )
+    }
+
+    // If approved product exists, show creation modal
     return (
       <BaseModal
         title="Create Ideal Customer Profile"

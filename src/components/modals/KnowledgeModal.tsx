@@ -223,79 +223,47 @@ export function KnowledgeModal() {
 
   const handleAddEntry = async () => {
     if (!user) {
-      console.error("You must be logged in to add entries");
+      toast.error("You must be logged in to add entries");
       return;
     }
 
-    // Validation based on knowledge type
-    if (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') {
-      if (!newEntry.productLink) {
-        console.error("Please provide a link");
-        return;
-      }
+    // Validation - just check URL is provided
+    if (!newEntry.productLink) {
+      toast.error("Please provide a URL");
+      return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Build a streamlined entry object for the service
-      // "content" field in the form represents the description
-      const entryData: any = {
-        // Core fields
-        title: aiFields.has('title') ? 'fill_with_ai' : (newEntry.title || `${newEntry.knowledge_type} - ${new Date().toLocaleDateString('en-GB')}`),
-        description: aiFields.has('content') ? 'fill_with_ai' : (newEntry.content || ''), // Map content to description
+      // Minimal payload - just URL and type, AI will generate everything else
+      const entryData = {
         knowledge_type: newEntry.knowledge_type,
-
-        // Type-specific fields
-        productLink: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ? (newEntry.productLink || '') : '',
-        targetMarket: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ?
-          (aiFields.has('targetMarket') ? 'fill_with_ai' : (newEntry.targetMarket || '')) : '',
-        infoLink: (newEntry.knowledge_type === 'company' || newEntry.knowledge_type === 'case_study') ?
-          (newEntry.infoLink || '') : '',
-        keyStatistics: newEntry.knowledge_type === 'case_study' ?
-          (aiFields.has('keyStatistics') ? 'fill_with_ai' : (newEntry.keyStatistics || '')) : '',
-        additionalLinks: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ?
-          (newEntry.additionalLinks?.filter((link: any) => link.url && link.title) || []) : [],
-
-        // AI fields tracking
-        aiFieldsRequested: Array.from(aiFields)
+        productLink: newEntry.productLink
       };
 
-      // Build metadata (only for database storage, not for n8n)
-      const metadata = {
-        aiFieldsRequested: Array.from(aiFields),
-        aiFields: Array.from(aiFields) // For compatibility
-      };
-
-      // Log what we're sending for debugging
+      console.log('Sending minimal entry to n8n:', entryData);
 
       // Use the n8n service directly to add the entry (will trigger n8n workflow)
       const { n8nService } = await import('@/services/n8nService');
       const result = await n8nService.addKnowledgeEntry({
         ...entryData,
-        content: entryData.description, // n8nService expects "content" field
-        metadata, // Include metadata for database storage
         userId: user?.id
       });
 
       if (result.success) {
-        const message = aiFields.size > 0
-          ? "Knowledge base entry added. AI is generating the requested content..."
-          : "Knowledge base entry has been added successfully";
-
-        console.log("Success!", message);
-        toast.success(message);
+        toast.success("Product added! AI is generating content from your URL...");
 
         // Refresh the page to show the generating widget
         setTimeout(() => {
           window.location.reload()
-        }, 1000) // Delay to ensure toast message shows
+        }, 1000)
       } else {
         throw new Error(result.error || 'Failed to add entry');
       }
     } catch (error) {
       console.error('Error adding knowledge entry:', error);
-      // Error will be shown in the UI by the ProductAddModalEnhanced component
+      toast.error('Failed to add entry. Please try again.');
     } finally {
       setIsProcessing(false);
     }
