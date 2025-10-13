@@ -228,9 +228,9 @@ export function KnowledgeModal() {
     }
 
     // Validation based on knowledge type
-    if (newEntry.knowledge_type === 'product') {
+    if (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') {
       if (!newEntry.productLink) {
-        console.error("Please provide a product link");
+        console.error("Please provide a link");
         return;
       }
     }
@@ -247,14 +247,14 @@ export function KnowledgeModal() {
         knowledge_type: newEntry.knowledge_type,
 
         // Type-specific fields
-        productLink: newEntry.knowledge_type === 'product' ? (newEntry.productLink || '') : '',
-        targetMarket: newEntry.knowledge_type === 'product' ?
+        productLink: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ? (newEntry.productLink || '') : '',
+        targetMarket: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ?
           (aiFields.has('targetMarket') ? 'fill_with_ai' : (newEntry.targetMarket || '')) : '',
         infoLink: (newEntry.knowledge_type === 'company' || newEntry.knowledge_type === 'case_study') ?
           (newEntry.infoLink || '') : '',
         keyStatistics: newEntry.knowledge_type === 'case_study' ?
           (aiFields.has('keyStatistics') ? 'fill_with_ai' : (newEntry.keyStatistics || '')) : '',
-        additionalLinks: newEntry.knowledge_type === 'product' ?
+        additionalLinks: (newEntry.knowledge_type === 'product' || newEntry.knowledge_type === 'service') ?
           (newEntry.additionalLinks?.filter((link: any) => link.url && link.title) || []) : [],
 
         // AI fields tracking
