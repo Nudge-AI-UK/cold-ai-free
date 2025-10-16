@@ -218,7 +218,7 @@ export const LoginPage = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur-sm border border-orange-500/20">
-                  <Sparkles className="w-8 h-8 text-orange-400" />
+                  <img src="/Square_bishop.svg" alt="Cold AI" className="w-10 h-10" />
                 </div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
                   Cold AI
@@ -287,7 +287,7 @@ export const LoginPage = () => {
                     {isSignUp ? "Create Account" : "Welcome Back"}
                   </CardTitle>
                   <div className="md:hidden p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
-                    <Sparkles className="w-5 h-5 text-orange-400" />
+                    <img src="/Square_bishop.svg" alt="Cold AI" className="w-6 h-6" />
                   </div>
                 </div>
                 <CardDescription className="text-gray-400">
@@ -461,7 +461,7 @@ export const LoginPage = () => {
 
             {/* Footer Links */}
             <div className="mt-6 flex items-center justify-center gap-4 text-sm">
-              <a href="/" className="text-gray-400 hover:text-orange-400 transition-colors">
+              <a href="https://coldai.uk" className="text-gray-400 hover:text-orange-400 transition-colors">
                 Back to Home
               </a>
               <span className="text-gray-600">•</span>

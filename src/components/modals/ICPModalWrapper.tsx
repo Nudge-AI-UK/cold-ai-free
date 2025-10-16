@@ -58,7 +58,7 @@ export function ICPUnifiedModalWrapper({
         .from('knowledge_base')
         .select('id')
         .eq('created_by', user?.id)
-        .eq('workflow_status', 'reviewing')
+        .in('workflow_status', ['reviewing', 'active'])
         .eq('review_status', 'approved')
         .limit(1)
 
