@@ -13,12 +13,19 @@ export const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [lockoutInfo, setLockoutInfo] = useState<{
+    locked: boolean;
+    minutes_remaining?: number;
+    attempts_remaining?: number;
+  } | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+      // For sign up, skip rate limiting
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
           email,
@@ -38,19 +45,78 @@ export const LoginPage = () => {
       } else {
         console.log('🔐 Attempting login for:', email);
 
+        // Check rate limit before attempting login
+        const { data: rateLimitCheck, error: rateLimitError } = await supabase.functions.invoke(
+          'check-login-rate-limit',
+          {
+            body: { email, action: 'check' }
+          }
+        );
+
+        if (rateLimitError) {
+          console.warn('⚠️ Rate limit check failed, proceeding with login:', rateLimitError);
+        }
+
+        if (rateLimitCheck?.locked) {
+          setLockoutInfo({
+            locked: true,
+            minutes_remaining: rateLimitCheck.minutes_remaining
+          });
+          toast.error(rateLimitCheck.message);
+          setIsLoading(false);
+          return;
+        }
+
+        // Show warning if approaching lockout
+        if (rateLimitCheck?.attempts_remaining <= 2 && rateLimitCheck?.attempts_remaining > 0) {
+          toast.warning(`Warning: ${rateLimitCheck.attempts_remaining} attempt(s) remaining before lockout`);
+        }
+
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
+        // Record the login attempt
+        await supabase.functions.invoke('check-login-rate-limit', {
+          body: {
+            email,
+            action: 'record_attempt',
+            success: !error,
+            user_agent: navigator.userAgent
+          }
+        });
+
         if (error) {
           console.error('❌ Login error:', error);
+
+          // Check if this caused a lockout
+          const { data: postAttemptCheck } = await supabase.functions.invoke(
+            'check-login-rate-limit',
+            {
+              body: { email, action: 'check' }
+            }
+          );
+
+          if (postAttemptCheck?.locked) {
+            setLockoutInfo({
+              locked: true,
+              minutes_remaining: postAttemptCheck.minutes_remaining
+            });
+          } else if (postAttemptCheck?.attempts_remaining !== undefined) {
+            setLockoutInfo({
+              locked: false,
+              attempts_remaining: postAttemptCheck.attempts_remaining
+            });
+          }
+
           throw error;
         }
 
         // Success - the AuthContext will handle updating the user state
         // and the App will automatically show the dashboard
         console.log('✅ Login successful');
+        setLockoutInfo(null); // Clear any lockout info
         toast.success("Welcome back!");
       }
     } catch (error: any) {
@@ -79,6 +145,26 @@ export const LoginPage = () => {
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google.");
       setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (resetEmail: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      // Unlock account when password reset is requested
+      await supabase.functions.invoke('check-login-rate-limit', {
+        body: { email: resetEmail, action: 'unlock' }
+      });
+
+      toast.success("Password reset link sent! Check your email.");
+      setShowPasswordReset(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send reset email.");
     }
   };
 
@@ -271,7 +357,25 @@ export const LoginPage = () => {
                   </Button>
                 </form>
 
-                <div className="mt-6 text-center">
+                {/* Lockout Warning */}
+                {lockoutInfo?.locked && (
+                  <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <p className="text-sm text-red-400 text-center">
+                      🔒 Account locked for {lockoutInfo.minutes_remaining} minutes due to too many failed attempts
+                    </p>
+                  </div>
+                )}
+
+                {/* Attempts Remaining Warning */}
+                {lockoutInfo?.attempts_remaining !== undefined && lockoutInfo.attempts_remaining <= 2 && !lockoutInfo.locked && (
+                  <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                    <p className="text-sm text-yellow-400 text-center">
+                      ⚠️ {lockoutInfo.attempts_remaining} attempt(s) remaining before lockout
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-6 text-center space-y-2">
                   <p className="text-sm text-gray-400">
                     {isSignUp ? "Already have an account?" : "Don't have an account?"}
                     <button
@@ -282,6 +386,19 @@ export const LoginPage = () => {
                       {isSignUp ? "Sign in" : "Sign up"}
                     </button>
                   </p>
+
+                  {/* Forgot Password Link */}
+                  {!isSignUp && (
+                    <p className="text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordReset(true)}
+                        className="text-gray-400 hover:text-orange-400 transition-colors"
+                      >
+                        Forgot your password?
+                      </button>
+                    </p>
+                  )}
                 </div>
 
                 {/* Divider */}
@@ -334,6 +451,60 @@ export const LoginPage = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      {showPasswordReset && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+             onClick={() => setShowPasswordReset(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-800/95 backdrop-blur-xl border border-gray-700 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-2">Reset Password</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formEmail = (e.target as HTMLFormElement).email.value;
+              handlePasswordReset(formEmail);
+            }}>
+              <div className="space-y-2 mb-4">
+                <Label htmlFor="reset-email" className="text-gray-300">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Input
+                    id="reset-email"
+                    name="email"
+                    type="email"
+                    defaultValue={email}
+                    className="pl-10 bg-gray-900/50 border-gray-600 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/20"
+                    placeholder="you@company.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  onClick={() => setShowPasswordReset(false)}
+                  variant="outline"
+                  className="flex-1 bg-gray-900/50 border-gray-700 text-gray-300 hover:bg-gray-800/50">
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
+                  Send Reset Link
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,9 +1,12 @@
 // src/App.tsx
 import { Toaster } from 'sonner'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoadingProvider } from '@/contexts/LoadingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
+import { InboxPage } from '@/pages/InboxPage'
 import { LoginPage } from '@/components/auth/LoginPage'
+import { PasswordResetPage } from '@/components/auth/PasswordResetPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
 import { MobileBlocker } from '@/components/MobileBlocker'
@@ -12,6 +15,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function AppContent() {
   const { user, loading } = useAuth()
+  const isResetPasswordPage = window.location.pathname === '/reset-password'
 
   if (loading) {
     return (
@@ -26,35 +30,49 @@ function AppContent() {
     )
   }
 
-  if (!user) {
+  // Allow unauthenticated access to password reset page
+  if (!user && !isResetPasswordPage) {
     return <LoginPage />
   }
 
-  return <WidgetDashboard />
+  if (!user && isResetPasswordPage) {
+    return <PasswordResetPage />
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<WidgetDashboard />} />
+      <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/reset-password" element={<PasswordResetPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <LoadingProvider>
-        <ModalFlowProvider>
-          <MobileBlocker />
-          <AppContent />
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: 'hsl(222 41% 11%)',
-                border: '1px solid hsl(217 33% 18%)',
-                color: 'hsl(210 20% 95%)',
-              },
-            }}
-          />
-          <Analytics />
-          <SpeedInsights />
-        </ModalFlowProvider>
-      </LoadingProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <LoadingProvider>
+          <ModalFlowProvider>
+            <MobileBlocker />
+            <AppContent />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: 'hsl(222 41% 11%)',
+                  border: '1px solid hsl(217 33% 18%)',
+                  color: 'hsl(210 20% 95%)',
+                },
+              }}
+            />
+            <Analytics />
+            <SpeedInsights />
+          </ModalFlowProvider>
+        </LoadingProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 
