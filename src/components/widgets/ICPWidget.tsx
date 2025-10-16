@@ -235,11 +235,6 @@ export function ICPWidget({ className }: ICPWidgetProps) {
         </div>
   
         <div className="relative z-20">
-          {/* Account Type */}
-          <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
-            Free Account: 1 ICP Limit
-          </div>
-  
           {/* Empty Title Area */}
           <div className="flex items-center mb-2">
             <div className="text-5xl mr-3">🎯</div>
@@ -691,11 +686,6 @@ export function ICPWidget({ className }: ICPWidgetProps) {
         </div>
   
         <div className="relative z-20">
-          {/* Available text */}
-          <div className="text-sm font-light opacity-10 mb-1 tracking-wide">
-            Available for message generation
-          </div>
-  
           {/* ICP Name with icon */}
           <div className="flex items-center mb-2">
             <div className="text-5xl mr-3">🎯</div>

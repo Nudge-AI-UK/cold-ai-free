@@ -174,7 +174,7 @@ export function ICPUnifiedModalWrapper({
                       openModal('knowledge', { mode: 'add' })
                     }, 300)
                   }}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-black font-medium hover:shadow-lg hover:shadow-[#FBAE1C]/30 transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium hover:shadow-lg hover:shadow-[#FBAE1C]/30 transition-all"
                 >
                   <span>Add Product/Service</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
