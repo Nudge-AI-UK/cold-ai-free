@@ -297,6 +297,40 @@ export const LoginPage = () => {
               </CardHeader>
 
               <CardContent>
+                {/* Google Login - Prioritized */}
+                <div className="space-y-3">
+                  <div className="text-center">
+                    <span className="inline-block px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-medium mb-2">
+                      Recommended
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="w-full bg-gray-900/50 border-gray-700 text-gray-300 hover:bg-gray-800/50 hover:border-orange-500/50 hover:text-white transition-all group"
+                  >
+                    <div className="flex items-center justify-center gap-3">
+                      <Chrome className="w-5 h-5 group-hover:text-orange-400 transition-colors" />
+                      <span>Continue with Google</span>
+                    </div>
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center">
+                    Quick setup, no password needed
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-gray-800 px-2 text-gray-500">Or use email</span>
+                  </div>
+                </div>
+
                 <form onSubmit={handleAuth} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-gray-300">
@@ -400,30 +434,6 @@ export const LoginPage = () => {
                     </p>
                   )}
                 </div>
-
-                {/* Divider */}
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-700"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-gray-800 px-2 text-gray-500">Or continue with</span>
-                  </div>
-                </div>
-
-                {/* Google Login Only */}
-                <Button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="w-full bg-gray-900/50 border-gray-700 text-gray-300 hover:bg-gray-800/50 hover:border-orange-500/50 hover:text-white transition-all group"
-                >
-                  <div className="flex items-center justify-center gap-3">
-                    <Chrome className="w-5 h-5 group-hover:text-orange-400 transition-colors" />
-                    <span>Continue with Google</span>
-                  </div>
-                </Button>
 
                 {/* Security Note */}
                 <div className="mt-6 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
