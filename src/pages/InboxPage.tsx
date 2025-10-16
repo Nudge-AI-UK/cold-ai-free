@@ -123,9 +123,20 @@ export function InboxPage() {
         const cacheId = msg.research_cache_id
         if (!cacheId) return
 
-        const prospect = msg.research_cache?.research_data
-        const prospectName = prospect?.name || 'Unknown Prospect'
-        const prospectCompany = prospect?.organizations?.[0]?.name || 'Unknown Company'
+        // Parse research_data if it's a string
+        let researchData = msg.research_cache?.research_data
+        if (typeof researchData === 'string') {
+          try {
+            researchData = JSON.parse(researchData)
+          } catch (e) {
+            console.error('Failed to parse research_data:', e)
+            researchData = null
+          }
+        }
+
+        const prospectName = researchData?.name || 'Unknown Prospect'
+        // Handle both personal_prospect (headline) and personal_user (occupation) formats
+        const prospectCompany = researchData?.headline || researchData?.occupation || researchData?.organizations?.[0]?.name || 'Unknown Company'
         const prospectUrl = msg.research_cache?.profile_url || ''
 
         if (!conversationMap.has(cacheId)) {

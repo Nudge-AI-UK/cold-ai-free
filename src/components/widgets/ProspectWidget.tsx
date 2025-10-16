@@ -276,6 +276,23 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     return colors[index % colors.length]
   }
 
+  // Parse research_data for selected prospect (for modal display)
+  const parseResearchData = (data: any) => {
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data)
+      } catch (e) {
+        console.error('Failed to parse research_data:', e)
+        return { name: 'Unknown', headline: 'Unknown' }
+      }
+    }
+    return data
+  }
+
+  const modalResearchData = selectedProspect?.research_cache?.research_data
+    ? parseResearchData(selectedProspect.research_cache.research_data)
+    : null
+
   // Empty State
   if (forceEmpty || prospects.length === 0) {
     return (
@@ -466,7 +483,16 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
 
           // Full prospect card with research_cache data
           const cache = prospect.research_cache
-          const researchData = cache.research_data
+          // Parse research_data if it's a string
+          let researchData = cache.research_data
+          if (typeof researchData === 'string') {
+            try {
+              researchData = JSON.parse(researchData)
+            } catch (e) {
+              console.error('Failed to parse research_data:', e)
+              researchData = { name: 'Unknown', headline: 'Unknown' }
+            }
+          }
           const profilePicture = cache.profile_picture_url ||
                                 `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
 
@@ -493,7 +519,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-white">{researchData.name}</h3>
-                    <p className="text-xs text-gray-400">{researchData.headline}</p>
+                    <p className="text-xs text-gray-400">{researchData.headline || researchData.occupation || 'No title'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -529,35 +555,35 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
       </div>
 
       {/* Prospect Details Modal - Rendered via Portal */}
-      {isModalOpen && selectedProspect && selectedProspect.research_cache && createPortal(
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setIsModalOpen(false)}>
+      {isModalOpen && selectedProspect && selectedProspect.research_cache && modalResearchData && createPortal(
           <div
-            className="bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="border-b border-white/10 p-6"
-                 style={{
-                   background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)'
-                 }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={selectedProspect.research_cache.profile_picture_url ||
-                         `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProspect.research_cache.research_data.name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
-                    alt={selectedProspect.research_cache.research_data.name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
-                  />
-                  <div>
-                    <h2 className="text-xl font-bold text-white">
-                      {selectedProspect.research_cache.research_data.name}
-                    </h2>
-                    <p className="text-sm text-gray-400">
-                      {selectedProspect.research_cache.research_data.headline}
-                    </p>
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setIsModalOpen(false)}>
+            <div
+              className="bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              {/* Modal Header */}
+              <div className="border-b border-white/10 p-6"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)'
+                   }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={selectedProspect.research_cache.profile_picture_url ||
+                           `https://ui-avatars.com/api/?name=${encodeURIComponent(modalResearchData.name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
+                      alt={modalResearchData.name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
+                    />
+                    <div>
+                      <h2 className="text-xl font-bold text-white">
+                        {modalResearchData.name}
+                      </h2>
+                      <p className="text-sm text-gray-400">
+                        {modalResearchData.headline || modalResearchData.occupation || 'No title'}
+                      </p>
+                    </div>
                   </div>
-                </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
                   className="text-gray-400 hover:text-white transition-colors">
