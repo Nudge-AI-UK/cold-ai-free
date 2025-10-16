@@ -26,6 +26,7 @@ export function InboxPage() {
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedConversation, setSelectedConversation] = useState<ProspectConversation | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
   const [showWipBanner, setShowWipBanner] = useState(() => {
     // Check localStorage on mount
     const dismissed = localStorage.getItem('inbox_wip_banner_dismissed')
@@ -251,44 +252,67 @@ export function InboxPage() {
               </h1>
               <p className="text-gray-400 text-sm">Track and manage your outreach conversations</p>
             </div>
-            <button
-              onClick={fetchConversations}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FBAE1C]/10 hover:bg-[#FBAE1C]/20 text-[#FBAE1C] transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSearch(!showSearch)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  showSearch
+                    ? 'bg-[#FBAE1C]/20 text-[#FBAE1C] border border-[#FBAE1C]/30'
+                    : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                {showSearch ? 'Hide Search' : 'Search'}
+              </button>
+              <button
+                onClick={fetchConversations}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FBAE1C]/10 hover:bg-[#FBAE1C]/20 text-[#FBAE1C] transition-colors border border-[#FBAE1C]/30"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+            </div>
           </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search prospects by name or company..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-[#FBAE1C]/50 focus:ring-2 focus:ring-[#FBAE1C]/10 transition-all"
-          />
-        </div>
+        {/* Collapsible Search Bar */}
+        {showSearch && (
+          <div className="relative mb-4">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search prospects by name or company..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-[#FBAE1C]/50 focus:ring-2 focus:ring-[#FBAE1C]/10 transition-all"
+              autoFocus
+            />
+          </div>
+        )}
 
-        {/* Filters */}
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {filters.map(filter => (
-            <button
-              key={filter.id}
-              onClick={() => setSelectedFilter(filter.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-                selectedFilter === filter.id
-                  ? 'bg-[#FBAE1C]/20 text-[#FBAE1C] border border-[#FBAE1C]/30'
-                  : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              {filter.label}
-              <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">{filter.count}</span>
-            </button>
-          ))}
+        {/* Tabs */}
+        <div className="border-b border-white/10 mb-4">
+          <div className="flex gap-1 overflow-x-auto">
+            {filters.map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setSelectedFilter(filter.id)}
+                className={`flex items-center gap-2 px-4 py-2 whitespace-nowrap transition-all border-b-2 ${
+                  selectedFilter === filter.id
+                    ? 'border-[#FBAE1C] text-[#FBAE1C]'
+                    : 'border-transparent text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                {filter.label}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  selectedFilter === filter.id
+                    ? 'bg-[#FBAE1C]/20 text-[#FBAE1C]'
+                    : 'bg-white/10 text-gray-500'
+                }`}>
+                  {filter.count}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
