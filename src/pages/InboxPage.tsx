@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { Header } from '@/components/layout/Header'
-import { Filter, Search, ThumbsUp, ThumbsDown, MessageSquare, Send, Archive, RefreshCw } from 'lucide-react'
+import { Filter, Search, ThumbsUp, ThumbsDown, MessageSquare, Send, Archive, RefreshCw, X, AlertCircle } from 'lucide-react'
 
 interface ProspectConversation {
   research_cache_id: number
@@ -26,6 +26,16 @@ export function InboxPage() {
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedConversation, setSelectedConversation] = useState<ProspectConversation | null>(null)
+  const [showWipBanner, setShowWipBanner] = useState(() => {
+    // Check localStorage on mount
+    const dismissed = localStorage.getItem('inbox_wip_banner_dismissed')
+    return dismissed !== 'true'
+  })
+
+  const handleDismissBanner = () => {
+    localStorage.setItem('inbox_wip_banner_dismissed', 'true')
+    setShowWipBanner(false)
+  }
 
   useEffect(() => {
     if (user) {
@@ -205,6 +215,32 @@ export function InboxPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e1b] via-[#1a1f36] to-[#0a0e1b] text-white">
       {/* Use shared Header component */}
       <Header />
+
+      {/* Work in Progress Banner */}
+      {showWipBanner && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/30 backdrop-blur-sm">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-yellow-400 text-sm font-medium">
+                  Work in Progress
+                </p>
+                <p className="text-yellow-300/80 text-xs">
+                  This inbox is currently under development. Some features may not work as expected, and data may not be fully accurate.
+                </p>
+              </div>
+              <button
+                onClick={handleDismissBanner}
+                className="p-1 rounded-lg hover:bg-yellow-500/20 text-yellow-400 transition-colors"
+                aria-label="Dismiss banner"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-6">
         <div className="max-w-7xl mx-auto mb-6">
