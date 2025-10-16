@@ -339,7 +339,6 @@ export function KnowledgeModal() {
     <BaseModal
       title="Add Product/Service"
       description="Add your product or service to the knowledge base"
-      className="knowledge-modal-large !max-w-[95vw]"
     >
       <ProductAddModalEnhanced
         key={isEditMode ? existingEntry?.id || 'edit' : 'add'} // Force re-render when switching modes

@@ -58,8 +58,12 @@ serve(async (req) => {
     console.log('✅ Found LinkedIn account:', profile.unipile_account_id)
 
     // Get Unipile API configuration
-    const unipileApiUrl = Deno.env.get('UNIPILE_API_URL') || 'https://api.unipile.com:13443'
+    const unipileApiUrl = Deno.env.get('UNIPILE_API_URL')
     const unipileApiKey = Deno.env.get('UNIPILE_API_KEY')
+
+    if (!unipileApiUrl) {
+      throw new Error('UNIPILE_API_URL not configured')
+    }
 
     if (!unipileApiKey) {
       throw new Error('UNIPILE_API_KEY not configured')
@@ -73,8 +77,8 @@ serve(async (req) => {
     }
     const recipientPublicId = decodeURIComponent(urlMatch[1])
 
-    // Step 1: Get recipient's provider internal ID from Unipile
-    console.log('🔍 Looking up recipient provider ID for:', recipientPublicId)
+    // Step 1: Get recipient's messaging ID from Unipile
+    console.log('🔍 Looking up recipient messaging ID for:', recipientPublicId)
     const profileLookupUrl = `${unipileApiUrl}/api/v1/users/${profile.unipile_account_id}/search?query=${encodeURIComponent(recipientPublicId)}&provider=LINKEDIN`
 
     const profileResponse = await fetch(profileLookupUrl, {
@@ -92,28 +96,36 @@ serve(async (req) => {
       throw new Error('Could not find recipient LinkedIn profile. Please verify the LinkedIn URL.')
     }
 
-    // Extract provider internal ID from first result
-    const recipientProviderId = profileData.items[0].provider_id
-    console.log('✅ Found recipient provider ID:', recipientProviderId)
+    // Extract messaging ID from first result
+    const recipientMessagingId = profileData.items[0].provider_id
+    console.log('✅ Found recipient messaging ID:', recipientMessagingId)
 
-    // Step 2: Prepare Unipile API request to start new chat
-    console.log('📨 Sending message via Unipile API...')
-    const unipilePayload = {
+    // Step 2: Send message using Classic API with multipart/form-data
+    console.log('📨 Sending message via Unipile Classic API...')
+
+    // Build form data
+    const formData = new FormData()
+    formData.append('attendees_ids', recipientMessagingId)
+    formData.append('text', payload.message_text)
+    formData.append('account_id', profile.unipile_account_id)
+    formData.append('inmail', 'false')
+    formData.append('api', 'classic')
+
+    console.log('🔧 Unipile Classic API request:', {
+      attendees_ids: recipientMessagingId,
       account_id: profile.unipile_account_id,
-      attendees_ids: [recipientProviderId],
-      text: payload.message_text
-    }
-
-    console.log('🔧 Unipile request:', { ...unipilePayload, text: '[REDACTED]' })
+      text: '[REDACTED]',
+      inmail: false
+    })
 
     const unipileResponse = await fetch(`${unipileApiUrl}/api/v1/chats`, {
       method: 'POST',
       headers: {
-        'X-API-KEY': unipileApiKey,
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
+        'accept': 'application/json',
+        'X-API-KEY': unipileApiKey
+        // Note: Don't set Content-Type - Deno sets it automatically with boundary for FormData
       },
-      body: JSON.stringify(unipilePayload)
+      body: formData
     })
 
     const unipileData = await unipileResponse.json()
