@@ -14,6 +14,7 @@ export const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [lockoutInfo, setLockoutInfo] = useState<{
     locked: boolean;
     minutes_remaining?: number;
@@ -319,17 +320,31 @@ export const LoginPage = () => {
                   </p>
                 </div>
 
-                {/* Divider */}
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-700"></div>
+                {/* Divider / Email Toggle */}
+                {!showEmailForm ? (
+                  <div className="my-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailForm(true)}
+                      className="w-full text-sm text-gray-400 hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Use email instead</span>
+                    </button>
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-gray-800 px-2 text-gray-500">Or use email</span>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Divider */}
+                    <div className="relative my-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-700"></div>
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-gray-800 px-2 text-gray-500">Or use email</span>
+                      </div>
+                    </div>
 
-                <form onSubmit={handleAuth} className="space-y-4">
+                    <form onSubmit={handleAuth} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-gray-300">
                       Email
@@ -432,6 +447,8 @@ export const LoginPage = () => {
                     </p>
                   )}
                 </div>
+                  </>
+                )}
 
                 {/* Security Note */}
                 <div className="mt-6 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
