@@ -59,6 +59,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [isArchiving, setIsArchiving] = useState(false)
   const [recipientUrl, setRecipientUrl] = useState<string>('')
   const [isCheckingSetup, setIsCheckingSetup] = useState(false)
+  const [generationStartTime, setGenerationStartTime] = useState<Date | null>(null)
+  const [isStuck, setIsStuck] = useState(false)
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -66,6 +68,26 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       checkForInProgressGeneration()
     }
   }, [user, forceEmpty])
+
+  // Timeout mechanism - detect stuck generations after 3 minutes
+  useEffect(() => {
+    if (!currentLogId || !isGenerating || !progressStatus) return
+
+    const checkTimeout = setInterval(() => {
+      if (generationStartTime) {
+        const elapsed = Date.now() - generationStartTime.getTime()
+        const THREE_MINUTES = 3 * 60 * 1000
+
+        if (elapsed > THREE_MINUTES) {
+          console.warn('⏰ Generation appears stuck - no progress for 3 minutes')
+          setIsStuck(true)
+          toast.error('Message generation timed out. Please try again.')
+        }
+      }
+    }, 10000) // Check every 10 seconds
+
+    return () => clearInterval(checkTimeout)
+  }, [currentLogId, isGenerating, progressStatus, generationStartTime])
 
   // Check for any in-progress message generation on mount
   const checkForInProgressGeneration = async () => {
@@ -76,7 +98,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message')
+      .select('id, message_status, generated_message, edited_message, created_at')
       .eq('user_id', userId)
       .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
       .order('created_at', { ascending: false })
@@ -94,9 +116,23 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
 
       // Check if it's in progress
       if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(existingLog.message_status)) {
-        setProgressStatus(existingLog.message_status)
-        setIsGenerating(true)
-        toast.info('Resuming message generation...')
+        const createdAt = new Date(existingLog.created_at)
+        const elapsed = Date.now() - createdAt.getTime()
+        const THREE_MINUTES = 3 * 60 * 1000
+
+        // Check if the generation is stuck (older than 3 minutes with no progress)
+        if (elapsed > THREE_MINUTES) {
+          console.warn('⏰ Found stuck generation from', createdAt)
+          setIsStuck(true)
+          setProgressStatus(existingLog.message_status)
+          setIsGenerating(false)
+          toast.error('Previous message generation timed out. Please reset and try again.')
+        } else {
+          setProgressStatus(existingLog.message_status)
+          setIsGenerating(true)
+          setGenerationStartTime(createdAt)
+          toast.info('Resuming message generation...')
+        }
       } else if (existingLog.message_status === 'generated' && existingLog.generated_message) {
         // Load completed message
         setGeneratedMessage(parseMessage(existingLog.generated_message))
@@ -267,6 +303,9 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
           if (newData.message_status) {
             setProgressStatus(newData.message_status)
             console.log('📊 Progress:', newData.message_status)
+            // Reset timeout timer on any progress update
+            setGenerationStartTime(new Date())
+            setIsStuck(false)
           }
 
           // Check if generation is complete (only reset on first completion)
@@ -412,6 +451,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     setGeneratedMessage('') // Clear previous message
     setEditedMessage('') // Clear any previous edits
     setProgressStatus('') // Will be set by n8n workflow
+    setGenerationStartTime(new Date()) // Start timeout timer
+    setIsStuck(false) // Reset stuck flag
 
     try {
       const userId = user?.id || user?.user_id
@@ -573,6 +614,33 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     setIsGenerating(false)
     setLinkedinUrl('')
     setRecipientUrl('')
+    setGenerationStartTime(null)
+    setIsStuck(false)
+  }
+
+  const handleResetStuckGeneration = async () => {
+    if (!currentLogId) return
+
+    try {
+      // Mark the stuck generation as failed
+      const { error } = await supabase
+        .from('message_generation_logs')
+        .update({
+          message_status: 'failed',
+          message_metadata: { error: 'Generation timed out - no progress for 3 minutes' },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentLogId)
+
+      if (error) throw error
+
+      toast.success('Reset complete. You can try generating again.')
+      resetWidget()
+
+    } catch (error: any) {
+      console.error('❌ Error resetting stuck generation:', error)
+      toast.error('Failed to reset. Please refresh the page.')
+    }
   }
 
   const copyToClipboard = async () => {
@@ -888,14 +956,23 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
               </div>
             </div>
 
-            {/* Generate Button */}
-            <button 
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group disabled:opacity-50">
-              <Zap className={`w-5 h-5 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-              <span>{isGenerating ? 'Generating...' : 'Generate Message'}</span>
-            </button>
+            {/* Generate Button / Reset Button */}
+            {isStuck ? (
+              <button
+                onClick={handleResetStuckGeneration}
+                className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2">
+                <AlertCircle className="w-5 h-5" />
+                <span>Reset & Try Again</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group disabled:opacity-50">
+                <Zap className={`w-5 h-5 ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                <span>{isGenerating ? 'Generating...' : 'Generate Message'}</span>
+              </button>
+            )}
 
             {/* Quick Tips */}
             <div className="text-xs text-gray-500 space-y-1">
@@ -925,23 +1002,38 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   />
                 ) : progressStatus ? (
                   <div className="text-gray-400 p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="relative flex items-center justify-center">
-                        <div className="w-3 h-3 bg-[#FBAE1C] rounded-full animate-pulse"></div>
-                        <div className="absolute w-3 h-3 bg-[#FBAE1C] rounded-full animate-ping opacity-75"></div>
+                    {isStuck ? (
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                          <span className="text-sm font-medium text-red-400">Generation Timed Out</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-2">
+                          The message generation has been stuck for over 3 minutes. This usually happens when the workflow was interrupted.
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Click "Reset & Try Again" below to start fresh.
+                        </p>
                       </div>
-                      <span className="text-sm font-medium text-[#FBAE1C] animate-pulse">
-                        {progressStatus === 'analysing_prospect' && 'Analysing prospect profile'}
-                        {progressStatus === 'researching_product' && 'Researching product context'}
-                        {progressStatus === 'analysing_icp' && 'Analysing ICP alignment'}
-                        {progressStatus === 'generating_message' && 'Crafting personalised message'}
-                        <span className="inline-block ml-1">
-                          <span className="animate-[bounce_1s_ease-in-out_infinite]">.</span>
-                          <span className="animate-[bounce_1s_ease-in-out_0.1s_infinite]">.</span>
-                          <span className="animate-[bounce_1s_ease-in-out_0.2s_infinite]">.</span>
+                    ) : (
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="relative flex items-center justify-center">
+                          <div className="w-3 h-3 bg-[#FBAE1C] rounded-full animate-pulse"></div>
+                          <div className="absolute w-3 h-3 bg-[#FBAE1C] rounded-full animate-ping opacity-75"></div>
+                        </div>
+                        <span className="text-sm font-medium text-[#FBAE1C] animate-pulse">
+                          {progressStatus === 'analysing_prospect' && 'Analysing prospect profile'}
+                          {progressStatus === 'researching_product' && 'Researching product context'}
+                          {progressStatus === 'analysing_icp' && 'Analysing ICP alignment'}
+                          {progressStatus === 'generating_message' && 'Crafting personalised message'}
+                          <span className="inline-block ml-1">
+                            <span className="animate-[bounce_1s_ease-in-out_infinite]">.</span>
+                            <span className="animate-[bounce_1s_ease-in-out_0.1s_infinite]">.</span>
+                            <span className="animate-[bounce_1s_ease-in-out_0.2s_infinite]">.</span>
+                          </span>
                         </span>
-                      </span>
-                    </div>
+                      </div>
+                    )}
                     <div className="space-y-3 pl-1">
                       {/* Analysing prospect */}
                       <div className={`flex items-start gap-3 transition-all duration-500 ${

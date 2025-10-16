@@ -52,11 +52,6 @@ This file contains the database schema for reference when writing queries.
 - Foreign key: `user_id` → `users.user_id`
 - Contains: communication_style, message_length, message_types, signature_style, etc.
 
-## Complete Schema (Context Only)
-
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
@@ -96,6 +91,27 @@ CREATE TABLE public.agent_messages (
   CONSTRAINT agent_messages_pkey PRIMARY KEY (id),
   CONSTRAINT agent_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.agent_conversations(id)
 );
+CREATE TABLE public.auth_account_lockouts (
+  id bigint NOT NULL DEFAULT nextval('auth_account_lockouts_id_seq'::regclass),
+  email text NOT NULL UNIQUE,
+  locked_at timestamp with time zone NOT NULL DEFAULT now(),
+  locked_until timestamp with time zone NOT NULL,
+  failed_attempts integer NOT NULL DEFAULT 0,
+  last_attempt_ip text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT auth_account_lockouts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.auth_login_attempts (
+  id bigint NOT NULL DEFAULT nextval('auth_login_attempts_id_seq'::regclass),
+  email text NOT NULL,
+  ip_address text,
+  attempt_time timestamp with time zone NOT NULL DEFAULT now(),
+  success boolean NOT NULL DEFAULT false,
+  user_agent text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT auth_login_attempts_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.business_profiles (
   user_id character varying UNIQUE,
   company_name character varying NOT NULL,
@@ -128,7 +144,7 @@ CREATE TABLE public.communication_preferences (
   user_id character varying UNIQUE,
   communication_style character varying DEFAULT 'professional'::character varying CHECK (communication_style::text = ANY (ARRAY['professional'::character varying, 'casual'::character varying, 'consultative'::character varying]::text[])),
   message_length character varying DEFAULT 'medium'::character varying CHECK (message_length::text = ANY (ARRAY['short'::character varying::text, 'medium'::character varying::text, 'long'::character varying::text, 'brief'::character varying::text, 'moderate'::character varying::text, 'detailed'::character varying::text])),
-  cta_preference character varying DEFAULT 'meeting'::character varying CHECK (cta_preference::text = ANY (ARRAY['meeting'::character varying, 'call'::character varying, 'email'::character varying, 'soft'::character varying]::text[])),
+  cta_preference character varying DEFAULT 'meeting'::character varying CHECK (cta_preference::text = ANY (ARRAY['meeting'::character varying::text, 'call'::character varying::text, 'email'::character varying::text, 'website'::character varying::text, 'soft'::character varying::text, 'custom'::character varying::text])),
   signature_style text DEFAULT 'Best regards'::text,
   avoid_phrases ARRAY,
   calendar_link character varying,
@@ -334,22 +350,24 @@ CREATE TABLE public.message_generation_logs (
   message_id character varying DEFAULT (gen_random_uuid())::text UNIQUE,
   user_id character varying,
   team_id character varying,
-  linkedin_url character varying,
-  prospect_name character varying,
-  prospect_company character varying,
   generated_message text,
   edited_message text,
-  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['generated'::character varying, 'approved'::character varying, 'sent'::character varying, 'archived'::character varying, 'failed'::character varying]::text[])),
-  communication_style character varying,
-  message_length character varying,
-  cta_preference character varying,
+  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_prospect'::character varying, 'researching_product'::character varying, 'analysing_icp'::character varying, 'generating_message'::character varying, 'generated'::character varying, 'approved'::character varying, 'sent'::character varying, 'archived'::character varying, 'failed'::character varying]::text[])),
   ai_model_used character varying,
   generation_cost numeric,
   sent_at timestamp with time zone,
   response_received_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  research_cache_id integer,
+  ai_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+  parent_message_id character varying,
+  conversation_thread_id character varying DEFAULT (gen_random_uuid())::text,
+  response_id integer,
+  message_metadata jsonb,
   CONSTRAINT message_generation_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT message_generation_logs_research_cache_id_fkey FOREIGN KEY (research_cache_id) REFERENCES public.research_cache(id),
+  CONSTRAINT message_generation_logs_parent_message_id_fkey FOREIGN KEY (parent_message_id) REFERENCES public.message_generation_logs(message_id),
   CONSTRAINT message_generation_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT message_generation_logs_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
 );
@@ -414,13 +432,14 @@ CREATE TABLE public.product_research_queue (
 );
 CREATE TABLE public.research_cache (
   id integer NOT NULL DEFAULT nextval('research_cache_id_seq'::regclass),
-  profile_url character varying UNIQUE,
-  profile_type character varying CHECK (profile_type::text = ANY (ARRAY['personal'::character varying, 'company'::character varying]::text[])),
+  profile_url character varying,
+  profile_type character varying CHECK (profile_type::text = ANY (ARRAY['personal_user'::character varying::text, 'personal_prospect'::character varying::text, 'company_user'::character varying::text, 'company_prospect'::character varying::text])),
   research_data jsonb,
   research_depth character varying CHECK (research_depth::text = ANY (ARRAY['basic'::character varying, 'standard'::character varying, 'deep'::character varying]::text[])),
   last_researched_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   research_version integer DEFAULT 1,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  profile_picture_url text,
   CONSTRAINT research_cache_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.subscriptions (
@@ -513,6 +532,7 @@ CREATE TABLE public.user_profiles (
   linkedin_profile_updated_at timestamp with time zone,
   linkedin_profile_scraped_at timestamp with time zone,
   linkedin_profile_hash character varying,
+  linkedin_premium boolean,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
