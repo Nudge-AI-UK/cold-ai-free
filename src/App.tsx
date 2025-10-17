@@ -10,6 +10,7 @@ import { PasswordResetPage } from '@/components/auth/PasswordResetPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
 import { MobileBlocker } from '@/components/MobileBlocker'
+import { MaintenanceBlocker } from '@/components/MaintenanceBlocker'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 
@@ -56,6 +57,7 @@ function App() {
         <LoadingProvider>
           <ModalFlowProvider>
             <MobileBlocker />
+            <MaintenanceBlocker />
             <AppContent />
             <Toaster
               position="bottom-right"
