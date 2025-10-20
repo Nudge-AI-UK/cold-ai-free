@@ -134,7 +134,7 @@ class N8NService {
       const token = session?.access_token || this.supabaseAnonKey;
 
       const response = await fetch(
-        `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`,
+        `${this.supabaseUrl}/functions/v1/server-knowledge-action`,
         {
           method: 'OPTIONS',
           headers: {
@@ -188,7 +188,7 @@ class N8NService {
       };
 
       const response = await fetch(
-        `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`,
+        `${this.supabaseUrl}/functions/v1/server-knowledge-action`,
         {
           method: 'POST',
           headers: {
@@ -661,8 +661,8 @@ class N8NService {
       const token = session?.access_token || this.supabaseAnonKey;
 
       // Use the Supabase Edge Function as a secure proxy
-      const url = `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`;
-      
+      const url = `${this.supabaseUrl}/functions/v1/server-knowledge-action`;
+
       console.group(`🚀 [n8nService] Calling Knowledge Action: ${payload.action}`);
       console.log('📍 URL:', url);
       console.log('👤 User ID:', payload.userId);

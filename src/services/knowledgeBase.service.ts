@@ -61,8 +61,8 @@ class KnowledgeBaseService {
   constructor() {
     // Get the Supabase URL and construct the Edge Function URL
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    // Use the dedicated n8n-knowledge-action edge function
-    this.baseUrl = `${supabaseUrl}/functions/v1/n8n-knowledge-action`;
+    // Use the dedicated server-knowledge-action edge function
+    this.baseUrl = `${supabaseUrl}/functions/v1/server-knowledge-action`;
   }
 
   /**

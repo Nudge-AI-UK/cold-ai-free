@@ -61,13 +61,32 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [isCheckingSetup, setIsCheckingSetup] = useState(false)
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [isStuck, setIsStuck] = useState(false)
+  const [environment, setEnvironment] = useState<'production' | 'testing'>('production')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     if (user && !forceEmpty) {
+      checkUserRole()
       checkSetupStatus()
       checkForInProgressGeneration()
     }
   }, [user, forceEmpty])
+
+  // Check if user is Admin
+  const checkUserRole = async () => {
+    if (!user) return
+
+    const userId = user?.id || user?.user_id
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('user_role')
+      .eq('user_id', userId)
+      .single()
+
+    if (userProfile?.user_role === 'Admin') {
+      setIsAdmin(true)
+    }
+  }
 
   // Timeout mechanism - detect stuck generations after 2 minutes of no updates
   useEffect(() => {
@@ -475,8 +494,9 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         icp_id: icpData?.id || null
       }
 
-      // Call the edge function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/message-generate`, {
+      // Call the edge function (use environment selection for admins)
+      const edgeFunctionName = environment === 'testing' ? 'message-generate' : 'server-message-generate'
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${edgeFunctionName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -612,7 +632,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     setIsGenerating(false)
     setLinkedinUrl('')
     setRecipientUrl('')
-    setGenerationStartTime(null)
+    setLastUpdateTime(null)
     setIsStuck(false)
   }
 
@@ -845,8 +865,24 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
            WebkitBackdropFilter: 'blur(10px)'
          }}>
       
-      {/* Status Badge */}
-      <div className="absolute top-4 right-4 z-30">
+      {/* Status Badge and Environment Selector */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-3">
+        {/* Admin Environment Selector */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-full px-3 py-1">
+            <label className="text-xs text-gray-400">Env:</label>
+            <select
+              value={environment}
+              onChange={(e) => setEnvironment(e.target.value as 'production' | 'testing')}
+              className="bg-transparent text-xs text-white font-medium border-none outline-none cursor-pointer"
+            >
+              <option value="production" className="bg-gray-900">Production</option>
+              <option value="testing" className="bg-gray-900">Testing</option>
+            </select>
+          </div>
+        )}
+
+        {/* Ready Status Badge */}
         <div className="bg-green-700/50 text-green-400 border border-green-600/50 px-3 py-1 rounded-full text-xs flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           <span>Ready</span>

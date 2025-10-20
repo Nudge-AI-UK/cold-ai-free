@@ -1,0 +1,1000 @@
+{
+  "name": "Cold: Knowledge Review",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "Review Entry",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        1072,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "approve_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a817b65c-f702-4c45-b9b7-f5920c406815"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approve Entry"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1296,
+        64
+      ],
+      "id": "09cc1476-1828-45ad-b760-470671840090",
+      "name": "Action Router"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kd6Z2Ak0IzKWE30Y",
+          "mode": "list",
+          "cachedResultName": "Cold: Knowledge Base Wiki"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3072,
+        336
+      ],
+      "id": "265d537c-27b5-4e71-87b0-65376ca30ac1",
+      "name": "Update Wiki",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  user_id,\n  title,\n  entry_count,\n  entry_ids,\n  status,\n  last_compiled_at\nFROM knowledge_base_wiki\nWHERE user_id = $1\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $('Review Entry').item.json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2400,
+        336
+      ],
+      "id": "524dc056-4a01-4d48-b18f-1f024c04624a",
+      "name": "Does Full Wiki Exist?",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d251408e-2009-47ab-80f3-0357e09e3d67",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "492e325e-59e0-4212-91c3-afdef47f52db",
+              "leftValue": "={{ $json[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        336
+      ],
+      "id": "9d0329ac-3dd3-4499-af58-44746464e9e0",
+      "name": "First Entry?",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7267ea2a-e99e-4f0d-90d3-4d0a27c9a9c6",
+              "name": "operation",
+              "value": "first_entry",
+              "type": "string"
+            },
+            {
+              "id": "a08bc44b-0d4e-47f3-a041-943198762953",
+              "name": "user_id",
+              "value": "={{ $('Review Entry').item.json.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "566b5183-02ff-4a20-be09-c3e32ea80cc8",
+              "name": "plan_type",
+              "value": "={{ $('Review Entry').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "00234057-218a-4619-996c-403fd4afa5fc",
+              "name": "email",
+              "value": "={{ $('Review Entry').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "9ee9dc4b-8f17-475b-94f2-04ea1ab505b3",
+              "name": "job_title",
+              "value": "={{ $('Review Entry').item.json.job_title}}",
+              "type": "string"
+            },
+            {
+              "id": "9846b366-9a9c-401d-911e-11812df9ec49",
+              "name": "company_name",
+              "value": "={{ $('Review Entry').item.json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "32f6bca0-a600-425d-967c-9d22e15ab56f",
+              "name": "log_id",
+              "value": "={{ $('Review Entry').item.json.log_id }}",
+              "type": "string"
+            },
+            {
+              "id": "fce98346-2ce2-41ca-80bc-a3226f7d377e",
+              "name": "entry_id",
+              "value": "={{ $('Review Entry').item.json.data.entry_id}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        240
+      ],
+      "id": "e36317b2-53db-48b6-8c2e-0b25efe1b4bd",
+      "name": "First Entry",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Review this approved knowledge base entry and assess its current state.\n\nIMPORTANT: Check if any actual changes were made by comparing the content.\n\nEntry ID: {{$json.data.entry_id}}\nUser Action: APPROVED {{ $json.data.database_entry.review_notes }}\n\nCURRENT SAVED CONTENT:\n{{$json.data}}\n\nPREVIOUS QUALITY SCORES:\n- Completeness: {{ $json.data.database_entry.metadata.quality_assessment.completeness }}%\n- Sales Readiness: {{ $json.data.database_entry.metadata.quality_assessment.sales_readiness }}%\n\nPREVIOUS MISSING INTEL:\n{{$json.data.database_entry.metadata.quality_assessment.missing_intel.join(', ')}}\n\nUSER SUBMITTED AND APPROVED:\n{{ $json.title }}, {{ $json.content }}, {{ $json.metadata }}\n\nInstructions:\n1. First determine: Were any changes actually made to the content?\n2. If NO changes: Keep the same scores and note \"approved without changes\"\n3. If changes made: Identify what specifically changed\n4. Provide honest assessment of current state\n5. Return ONLY the JSON structure specified"
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are reviewing user-approved knowledge base entries to document improvements and provide final quality scores.\n\n## Your Task:\nCompare the edited entry against previous AI suggestions and score the final version.\n\n## Important Context:\n- This entry has been APPROVED by the user\n- You are documenting changes, not gatekeeping\n- Focus on what improvements were made\n- If there is no or neglible difference then do not create new feedback just pass on what has already been provided\n- Provide constructive scoring for future reference when changes have been made\n\n## Review Focus:\n1. Which previous suggestions were implemented?\n2. What new information was added?\n3. How has the sales readiness improved?\n4. What could still enhance this entry in future?\n\n## Output Format:\nReturn ONLY a JSON object with this structure:\n{\n  \"changes_detected\": true/false,\n  \"quality_scores\": {\n    \"completeness\": [keep same if no changes],\n    \"sales_readiness\": [keep same if no changes],\n    \"overall_quality\": [calculate based on above]\n  },\n  \"changes_made\": [\n    \"List actual changes if any, or ['No major changes detected - approved as is']\"\n  ],\n  \"remaining_enhancements\": [\n    \"Keep the same list from before\"\n  ],\n  \"score_reasoning\": {\n    \"completeness\": \"If no changes: 'Score unchanged - content approved without modification'\",\n    \"sales_readiness\": \"Similar logic\",\n    \"overall_quality\": \"Similar logic\"\n  },\n  \"review_summary\": \"Entry approved as-is without modifications, maintaining original assessment scores.\"\n}\n\n## Scoring Guidelines:\n- Score based on what IS present, not what's missing\n- 70+ is good for production use\n- 50-69 is functional but could be enhanced\n- Focus on practical usability for cold outreach\n- Remember this is approved and will be used regardless of score\n\n## Important:\n- Be constructive and positive\n- Score fairly based on actual content\n- Remaining enhancements are suggestions only\n- Use British English throughout",
+          "maxTokens": 800,
+          "temperature": 0.2,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        64
+      ],
+      "id": "beaf3764-6c6a-47d2-ba52-72e02c852663",
+      "name": "Review Product Entry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE knowledge_base\nSET \n  title = $1::text,\n  summary = $2::text,\n  content = convert_from(decode($3, 'base64'), 'UTF8'),\n  metadata = convert_from(decode($4, 'base64'), 'UTF8')::jsonb,\n  workflow_metadata = $5::jsonb,\n  \n  -- Approval specific updates\n  workflow_status = 'active',\n  review_status = 'approved',\n  reviewed_at = NOW(),\n  reviewed_by = $6,\n  \n  -- Increment counters\n  ai_generation_count = COALESCE(ai_generation_count, 0) + 1,\n  last_ai_generation = NOW(),\n  last_enhanced_at = NOW(),\n  updated_at = NOW()\n  \nWHERE id = $7::integer\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.title) }},\n{{ JSON.stringify($json.summary) }},\n{{ $json.content }},\n{{ $json.metadata }},\n{{ JSON.stringify($json.workflow_metadata) }},\n{{ $json.reviewed_by }},\n{{ $json.entry_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1776,
+        336
+      ],
+      "id": "0ee4a62e-4601-4b04-97d6-2416125b4652",
+      "name": "Save Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract AI Review and Parse it\nconst aiReview = $input.item.json.content?.[0]?.text || $input.item.json.output || $input.item.json;\n\n// Parse AI review response\nlet reviewParsed;\ntry {\n  if (typeof aiReview === 'string') {\n    const jsonMatch = aiReview.match(/```json\\n?([\\s\\S]*?)\\n?```/) || \n                      aiReview.match(/\\{[\\s\\S]*\\}$/);\n    \n    if (jsonMatch) {\n      reviewParsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    } else {\n      reviewParsed = JSON.parse(aiReview);\n    }\n  } else {\n    reviewParsed = aiReview;\n  }\n} catch (e) {\n  throw new Error('Failed to parse AI review: ' + e.message);\n}\n\n// Get webhook data using the $ function to reference the Review Entry node directly\nconst webhookNode = $('Review Entry').first();\nconst webhookData = webhookNode.json;\nconst originalData = webhookData.data;\n\n// Clean content function\nfunction cleanBulletPoints(content) {\n  return content\n    .replace(/\\s*•\\s*•\\s*•\\s*•\\s*/g, '- ')           // Replace 4 bullets with dash\n    .replace(/^\\s*•\\s*•\\s*•\\s*•\\s*/gm, '- ')        // Handle line starts with 4 bullets\n    .replace(/\\s*\\u2022\\s*\\u2022\\s*\\u2022\\s*\\u2022\\s*/g, '- ') // Unicode version\n    .replace(/^\\s*\\u2022\\s*\\u2022\\s*\\u2022\\s*\\u2022\\s*/gm, '- ') // Unicode line starts\n    .replace(/\\s*•{2,}\\s*/g, '- ')                  // Any multiple bullets (2 or more)\n    .replace(/\\s*\\u2022{2,}\\s*/g, '- ');           // Unicode multiple bullets\n}\n\n// Build structured output for approved entry\nconst approvedEntry = {\n  // Core identifiers\n  entry_id: originalData.entry_id || originalData.database_entry?.id,\n  user_id: webhookData.user_id,\n  \n  // Keep the approved content as-is but clean up bullets\n  title: originalData.title,\n  summary: originalData.summary,\n  content_raw: cleanBulletPoints(originalData.content),\n  \n  // Merge existing metadata with AI review\n  existing_metadata: originalData.metadata,\n  \n  // New quality scores from AI review\n  quality_scores: reviewParsed.quality_scores,\n  changes_made: reviewParsed.changes_made,\n  remaining_enhancements: reviewParsed.remaining_enhancements,\n  review_summary: reviewParsed.review_summary,\n  changes_detected: reviewParsed.changes_detected,\n  \n  // Set to active since user approved\n  workflow_status: 'active',\n  review_status: 'approved',\n  \n  // Review metadata\n  reviewed_at: new Date().toISOString(),\n  reviewed_by: webhookData.user_id,\n  review_notes: originalData.review_notes || \"User approved after editing\"\n};\n\nreturn {\n  json: {\n    success: true,\n    approved_entry: approvedEntry,\n    ai_review: reviewParsed\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        336
+      ],
+      "id": "c11fee16-b632-47e7-b769-98b88cd106a3",
+      "name": "Extract and Structure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use the approved content directly (already in markdown format)\nconst entry = $json.approved_entry;\n\n// The content is already formatted markdown from the user's edits\n// Just ensure it's properly formatted\nlet markdown = entry.content_raw;\n\n// If content needs any cleanup or isn't already markdown\nif (!markdown.includes('##')) {\n  // Fallback to generate markdown if needed\n  markdown = `## Product Overview\\n${entry.content_raw}`;\n}\n\n// CREATE UPDATED METADATA OBJECT\nconst metadata = {\n  // Merge existing metadata\n  ...entry.existing_metadata,\n  \n  // Update quality assessment with AI review\n  quality_assessment: {\n    completeness: entry.quality_scores.completeness,\n    sales_readiness: entry.quality_scores.sales_readiness,\n    overall_quality: entry.quality_scores.overall_quality,\n    improvements_made: entry.improvements_made,\n    future_enhancements: entry.remaining_enhancements,\n    ai_review_summary: entry.review_summary\n  },\n  \n  // Approval info\n  approval_info: {\n    approved_by: entry.reviewed_by,\n    approved_at: entry.reviewed_at,\n    review_notes: entry.review_notes\n  },\n  \n  // Update source info\n  source_info: {\n    ...entry.existing_metadata?.source_info,\n    last_ai_review: new Date().toISOString(),\n    ai_generation_count: (entry.existing_metadata?.source_info?.ai_generation_count || 0) + 1\n  },\n  \n  // Keep workflow metadata\n  workflow_metadata: {\n    ...entry.existing_metadata?.workflow_metadata,\n    approved: true,\n    production_ready: true\n  }\n};\n\nreturn {\n  json: {\n    ...entry,\n    title: entry.title,\n    summary: entry.summary,\n    markdown_content: markdown,\n    quality_metadata: metadata,\n    ready_to_save: true\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        336
+      ],
+      "id": "bbdebc53-b19e-4eb9-9dd2-6da14c65b353",
+      "name": "Generate Markdown"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare final data for Supabase approval update\nconst data = $json;\n\nreturn {\n  json: {\n    // Update knowledge_base table\n    entry_id: data.entry_id,\n    title: data.title,\n    summary: data.summary,\n    \n    // Keep using base64 encoding\n    content: Buffer.from(data.markdown_content).toString('base64'),\n    metadata: Buffer.from(JSON.stringify(data.quality_metadata)).toString('base64'),\n    \n    // Approval specific fields\n    workflow_status: 'active', // Active since approved\n    review_status: 'approved',\n    reviewed_at: data.reviewed_at,\n    reviewed_by: data.reviewed_by,\n    \n    // Workflow metadata\n    workflow_metadata: {\n      processed_at: new Date().toISOString(),\n      approval_completed: true,\n      ai_review_completed: true,\n      quality_scores: {\n        completeness: data.quality_scores.completeness,\n        sales_readiness: data.quality_scores.sales_readiness,\n        overall_quality: data.quality_scores.overall_quality\n      }\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        336
+      ],
+      "id": "f186520f-8376-4e50-b432-96d2f4961a6a",
+      "name": "Prepare for Supabase"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7267ea2a-e99e-4f0d-90d3-4d0a27c9a9c6",
+              "name": "=operation",
+              "value": "add_entry",
+              "type": "string"
+            },
+            {
+              "id": "a08bc44b-0d4e-47f3-a041-943198762953",
+              "name": "={{ $('Review Entry').item.json.user_id }}",
+              "value": "user_id",
+              "type": "string"
+            },
+            {
+              "id": "566b5183-02ff-4a20-be09-c3e32ea80cc8",
+              "name": "={{ $('Review Entry').item.json.plan_type }}",
+              "value": "plan_type",
+              "type": "string"
+            },
+            {
+              "id": "00234057-218a-4619-996c-403fd4afa5fc",
+              "name": "={{ $('Review Entry').item.json.email }}",
+              "value": "email",
+              "type": "string"
+            },
+            {
+              "id": "9ee9dc4b-8f17-475b-94f2-04ea1ab505b3",
+              "name": "={{ $('Review Entry').item.json.job_title}}",
+              "value": "job_title",
+              "type": "string"
+            },
+            {
+              "id": "9846b366-9a9c-401d-911e-11812df9ec49",
+              "name": "={{ $('Review Entry').item.json.company_name }}",
+              "value": "company_name",
+              "type": "string"
+            },
+            {
+              "id": "32f6bca0-a600-425d-967c-9d22e15ab56f",
+              "name": "={{ $('Review Entry').item.json.log_id }}",
+              "value": "log_id",
+              "type": "string"
+            },
+            {
+              "id": "fce98346-2ce2-41ca-80bc-a3226f7d377e",
+              "name": "={{ $('Review Entry').item.json.data.entry_id}}",
+              "value": "entry_id",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2848,
+        432
+      ],
+      "id": "28d25f9b-227c-4bd4-92ba-dd1f6f8b727f",
+      "name": "Add Entry",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1,\n  status = $2\nWHERE id = $3 ",
+        "options": {
+          "queryReplacement": "={{ 'true' }}, {{ 'completed' }}, {{ $('Review Entry').item.json.log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2000,
+        64
+      ],
+      "id": "ae5e00d8-3d5d-4187-9c93-50cb6aa73cb6",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## INCOMPLETE\n\nIn the paid version, users may have numerous products. By that point we would have collected a significant amount of data. The users will be provided a \"wiki\"-type page to view all of the company, user profile and product data we have researched at their request.",
+        "height": 496,
+        "width": 880
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2272,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "9a299019-6d2e-4529-b8f1-74f9ae491f03",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {
+    "Review Entry": [
+      {
+        "json": {
+          "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+          "email": "philipsmith96@btinternet.com",
+          "onboarding_step": 6,
+          "onboarding_completed": true,
+          "job_title": "CTO",
+          "company_name": "Cold AI",
+          "linkedin_url": "",
+          "team_id": null,
+          "team_role": null,
+          "can_manage_knowledge_base": null,
+          "can_invite_members": null,
+          "can_manage_company_profile": null,
+          "can_manage_icps": null,
+          "team_name": null,
+          "monthly_message_limit": null,
+          "monthly_messages_used": null,
+          "recent_kb_entries": "1",
+          "total_active_entries": "1",
+          "active_entries_of_type": "1",
+          "action": "approve_entry",
+          "title": "Cold AI - LinkedIn Messages That Get Replies",
+          "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**\n  • • • • Sales Development Representative\n  • • • • Account Executive\n  • • • • Business Development Manager\n  • • • • Sales Manager\n\n**Industries:**\n  • • • • B2B SaaS\n  • • • • Professional Services\n  • • • • Technology\n  • • • • Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n",
+          "entry_id": "10",
+          "timestamp": "2025-09-03T17:22:15.411Z",
+          "metadata": "{\"summary\":\"AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.\",\"edited_by\":\"3d2360d8-f592-4071-9f37-5d8e5b2b3c02\",\"approved_at\":\"2025-09-03T16:53:48.777Z\",\"approved_by\":\"3d2360d8-f592-4071-9f37-5d8e5b2b3c02\",\"last_edited\":\"2025-09-03T17:22:13.612Z\",\"source_info\":{\"generated_at\":\"2025-09-03T11:08:14.862Z\",\"research_url\":\"https://coldai.uk\",\"ai_generation_count\":1},\"workflow_metadata\":{\"keywords\":[\"LinkedIn outreach\",\"AI personalisation\",\"sales automation\",\"cold messaging\"],\"research_url\":\"https://coldai.uk\",\"research_date\":\"2025-09-03\",\"buying_urgency\":\"medium\",\"product_category\":\"Sales Automation\",\"typical_sales_cycle\":\"2-4 weeks\"},\"quality_assessment\":{\"completeness\":65,\"missing_intel\":[\"Pricing information\",\"Specific ROI metrics\",\"Customer testimonials\",\"Integration capabilities\",\"Competitor comparisons\"],\"sales_readiness\":70},\"was_edited\":true}",
+          "plan_type": "free",
+          "knowledge_type": null,
+          "data": {
+            "entryId": 10,
+            "entry_id": 10,
+            "reviewNotes": "User approved after editing",
+            "reviewerId": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+            "timestamp": "2025-09-03T17:22:15.411Z",
+            "title": "Cold AI - LinkedIn Messages That Get Replies",
+            "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**\n  • • • • Sales Development Representative\n  • • • • Account Executive\n  • • • • Business Development Manager\n  • • • • Sales Manager\n\n**Industries:**\n  • • • • B2B SaaS\n  • • • • Professional Services\n  • • • • Technology\n  • • • • Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n",
+            "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+            "metadata": {
+              "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+              "edited_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "approved_at": "2025-09-03T16:53:48.777Z",
+              "approved_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "last_edited": "2025-09-03T17:22:13.612Z",
+              "source_info": {
+                "generated_at": "2025-09-03T11:08:14.862Z",
+                "research_url": "https://coldai.uk",
+                "ai_generation_count": 1
+              },
+              "workflow_metadata": {
+                "keywords": [
+                  "LinkedIn outreach",
+                  "AI personalisation",
+                  "sales automation",
+                  "cold messaging"
+                ],
+                "research_url": "https://coldai.uk",
+                "research_date": "2025-09-03",
+                "buying_urgency": "medium",
+                "product_category": "Sales Automation",
+                "typical_sales_cycle": "2-4 weeks"
+              },
+              "quality_assessment": {
+                "completeness": 65,
+                "missing_intel": [
+                  "Pricing information",
+                  "Specific ROI metrics",
+                  "Customer testimonials",
+                  "Integration capabilities",
+                  "Competitor comparisons"
+                ],
+                "sales_readiness": 70
+              },
+              "was_edited": true
+            },
+            "database_entry": {
+              "id": 10,
+              "team_id": null,
+              "knowledge_type": "product",
+              "title": "Cold AI - LinkedIn Messages That Get Replies",
+              "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**\n  • • • • Sales Development Representative\n  • • • • Account Executive\n  • • • • Business Development Manager\n  • • • • Sales Manager\n\n**Industries:**\n  • • • • B2B SaaS\n  • • • • Professional Services\n  • • • • Technology\n  • • • • Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n",
+              "metadata": {
+                "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+                "edited_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "was_edited": true,
+                "approved_at": "2025-09-03T16:53:48.777Z",
+                "approved_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "last_edited": "2025-09-03T17:22:13.612Z",
+                "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "source_info": {
+                  "generated_at": "2025-09-03T11:08:14.862Z",
+                  "research_url": "https://coldai.uk",
+                  "ai_generation_count": 1
+                },
+                "review_notes": "User approved after editing",
+                "review_started_at": "2025-09-03T17:22:15.506Z",
+                "workflow_metadata": {
+                  "keywords": [
+                    "LinkedIn outreach",
+                    "AI personalisation",
+                    "sales automation",
+                    "cold messaging"
+                  ],
+                  "research_url": "https://coldai.uk",
+                  "research_date": "2025-09-03",
+                  "buying_urgency": "medium",
+                  "product_category": "Sales Automation",
+                  "typical_sales_cycle": "2-4 weeks"
+                },
+                "quality_assessment": {
+                  "completeness": 65,
+                  "missing_intel": [
+                    "Pricing information",
+                    "Specific ROI metrics",
+                    "Customer testimonials",
+                    "Integration capabilities",
+                    "Competitor comparisons"
+                  ],
+                  "sales_readiness": 70
+                }
+              },
+              "embedding": null,
+              "created_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "created_at": "2025-09-02T11:01:54.662351+00:00",
+              "updated_at": "2025-09-03T17:22:15.411+00:00",
+              "deleted_at": null,
+              "can_restore_until": null,
+              "ai_generation_count": 6,
+              "last_ai_generation": "2025-09-03T11:08:16.558564+00:00",
+              "workflow_status": "reviewing",
+              "workflow_metadata": {
+                "processed_at": "2025-09-03T11:08:14.904Z",
+                "needs_enrichment": true
+              },
+              "last_enhanced_at": "2025-09-03T11:08:16.558564+00:00",
+              "review_status": "pending",
+              "review_notes": null,
+              "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "reviewed_at": "2025-09-03T17:22:15.411+00:00",
+              "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams."
+            },
+            "updates_applied": {
+              "workflow_status": "reviewing",
+              "reviewed_at": "2025-09-03T17:22:15.411Z",
+              "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "updated_at": "2025-09-03T17:22:15.411Z",
+              "title": "Cold AI - LinkedIn Messages That Get Replies",
+              "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**\n  • • • • Sales Development Representative\n  • • • • Account Executive\n  • • • • Business Development Manager\n  • • • • Sales Manager\n\n**Industries:**\n  • • • • B2B SaaS\n  • • • • Professional Services\n  • • • • Technology\n  • • • • Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n",
+              "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+              "metadata": {
+                "summary": "AI-powered LinkedIn, email and call script outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+                "edited_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "approved_at": "2025-09-03T16:53:48.777Z",
+                "approved_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "last_edited": "2025-09-03T17:22:13.612Z",
+                "source_info": {
+                  "generated_at": "2025-09-03T11:08:14.862Z",
+                  "research_url": "https://coldai.uk",
+                  "ai_generation_count": 1
+                },
+                "workflow_metadata": {
+                  "keywords": [
+                    "LinkedIn outreach",
+                    "AI personalisation",
+                    "sales automation",
+                    "cold messaging"
+                  ],
+                  "research_url": "https://coldai.uk",
+                  "research_date": "2025-09-03",
+                  "buying_urgency": "medium",
+                  "product_category": "Sales Automation",
+                  "typical_sales_cycle": "2-4 weeks"
+                },
+                "quality_assessment": {
+                  "completeness": 65,
+                  "missing_intel": [
+                    "Pricing information",
+                    "Specific ROI metrics",
+                    "Customer testimonials",
+                    "Integration capabilities",
+                    "Competitor comparisons"
+                  ],
+                  "sales_readiness": 70
+                },
+                "was_edited": true,
+                "review_started_at": "2025-09-03T17:22:15.506Z",
+                "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "review_notes": "User approved after editing"
+              }
+            },
+            "review_notes": "User approved after editing"
+          },
+          "log_id": "39"
+        }
+      }
+    ],
+    "Review Product Entry": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "```json\n{\n  \"changes_detected\": false,\n  \"quality_scores\": {\n    \"completeness\": 65,\n    \"sales_readiness\": 70,\n    \"overall_quality\": 68\n  },\n  \"changes_made\": [\n    \"No major changes detected - approved as is\"\n  ],\n  \"remaining_enhancements\": [\n    \"Pricing information\",\n    \"Specific ROI metrics\",\n    \"Customer testimonials\",\n    \"Integration capabilities\",\n    \"Competitor comparisons\"\n  ],\n  \"score_reasoning\": {\n    \"completeness\": \"Score unchanged - content approved without modification. Entry maintains solid foundation with clear problem/solution fit, target buyer profiles, and practical sales hooks.\",\n    \"sales_readiness\": \"Score unchanged - content approved without modification. Strong qualifying questions and elevator pitch provide good foundation for sales conversations.\",\n    \"overall_quality\": \"Calculated average of completeness and sales readiness scores, reflecting a functional entry ready for production use.\"\n  },\n  \"review_summary\": \"Entry approved as-is without modifications, maintaining original assessment scores. The content provides a solid foundation for cold outreach with clear value proposition, well-defined target audience, and practical sales angles. Whilst enhancement opportunities remain around pricing and social proof, the current state is functional and ready for sales team deployment.\"\n}\n```"
+            }
+          ]
+        }
+      }
+    ],
+    "Extract and Structure": [
+      {
+        "json": {
+          "success": true,
+          "approved_entry": {
+            "entry_id": 15,
+            "user_id": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+            "title": "\"Cold AI - LinkedIn Outreach That Gets Responses\"",
+            "summary": "\"AI-powered LinkedIn messaging tool that personalises outreach to spark conversations and win meetings through intelligent prospect analysis.\"",
+            "content_raw": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nCold AI combines artificial intelligence with proven sales strategies to automatically craft personalised LinkedIn messages that prospects actually respond to\n\n### Key Features:\n- AI analyses prospect profiles for personalisation\n- Generates hundreds of messages quickly\n- Built-in LinkedIn compliance safeguards\n- Team collaboration and template sharing\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and need to scale personalised outreach\n\n**Ideal Titles:**\n  • Sales Development Representative\n  • Account Executive\n  • Business Development Manager\n  • Sales Manager\n\n**Industries:**\n  • B2B SaaS\n  • Professional Services\n  • Technology\n  • Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: Stop wasting time on generic outreach that doesn't convert\n- Angle 3: Join the early adopters revolutionising LinkedIn prospecting\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend personalising messages?\n- Are you concerned about LinkedIn compliance?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams scale outreach without losing the personal touch.\"",
+            "existing_metadata": {
+              "source_info": {
+                "generated_at": "2025-10-07T13:43:49.321Z",
+                "research_url": "https://coldai.uk",
+                "last_ai_review": "2025-10-07T13:44:20.853Z",
+                "ai_generation_count": 2
+              },
+              "approval_info": {
+                "approved_at": "2025-10-07T13:44:20.847Z",
+                "approved_by": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+                "review_notes": "User approved after editing"
+              },
+              "workflow_metadata": {
+                "approved": true,
+                "keywords": [
+                  "LinkedIn outreach",
+                  "AI personalisation",
+                  "sales automation",
+                  "cold messaging",
+                  "LinkedIn compliance"
+                ],
+                "research_url": "https://coldai.uk",
+                "research_date": "2025-10-07",
+                "buying_urgency": "medium",
+                "product_category": "Sales Automation",
+                "production_ready": true,
+                "typical_sales_cycle": "2-4 weeks"
+              },
+              "quality_assessment": {
+                "completeness": 65,
+                "overall_quality": 68,
+                "sales_readiness": 70,
+                "ai_review_summary": "Entry approved as-is without modifications, maintaining original assessment scores. The content provides a solid foundation for sales outreach with clear value proposition, well-defined target buyers, and practical sales tools. While enhancement opportunities remain around pricing and social proof, the current state is fully functional for cold outreach activities.",
+                "future_enhancements": [
+                  "Pricing information",
+                  "Specific ROI metrics",
+                  "Customer testimonials",
+                  "Integration capabilities",
+                  "Competitor comparisons"
+                ]
+              }
+            },
+            "quality_scores": {
+              "completeness": 65,
+              "sales_readiness": 70,
+              "overall_quality": 68
+            },
+            "changes_made": [
+              "No major changes detected - approved as is"
+            ],
+            "remaining_enhancements": [
+              "Pricing information",
+              "Specific ROI metrics",
+              "Customer testimonials",
+              "Integration capabilities",
+              "Competitor comparisons"
+            ],
+            "review_summary": "Entry approved as-is without modifications, maintaining original assessment scores. The content provides a solid foundation for sales outreach with clear value proposition, well-defined target buyers, and practical sales tools. While enhancement opportunities remain around pricing and social proof, the current state is fully functional for cold outreach activities.",
+            "changes_detected": false,
+            "workflow_status": "active",
+            "review_status": "approved",
+            "reviewed_at": "2025-10-07T13:49:30.081Z",
+            "reviewed_by": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+            "review_notes": "User approved after editing"
+          },
+          "ai_review": {
+            "changes_detected": false,
+            "quality_scores": {
+              "completeness": 65,
+              "sales_readiness": 70,
+              "overall_quality": 68
+            },
+            "changes_made": [
+              "No major changes detected - approved as is"
+            ],
+            "remaining_enhancements": [
+              "Pricing information",
+              "Specific ROI metrics",
+              "Customer testimonials",
+              "Integration capabilities",
+              "Competitor comparisons"
+            ],
+            "score_reasoning": {
+              "completeness": "Score unchanged - content approved without modification",
+              "sales_readiness": "Score unchanged - content approved without modification",
+              "overall_quality": "Score unchanged - content approved without modification"
+            },
+            "review_summary": "Entry approved as-is without modifications, maintaining original assessment scores. The content provides a solid foundation for sales outreach with clear value proposition, well-defined target buyers, and practical sales tools. While enhancement opportunities remain around pricing and social proof, the current state is fully functional for cold outreach activities."
+          }
+        }
+      }
+    ],
+    "Action Router": [
+      {
+        "json": {
+          "user_id": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+          "email": "philip.smith@bristol.ac.uk",
+          "onboarding_step": 0,
+          "onboarding_completed": false,
+          "job_title": "Chief Technology Officer",
+          "company_name": "Cold AI",
+          "linkedin_url": "https://linkedin.com/in/philip-m-smith/",
+          "team_id": null,
+          "team_role": null,
+          "can_manage_knowledge_base": null,
+          "can_invite_members": null,
+          "can_manage_company_profile": null,
+          "can_manage_icps": null,
+          "team_name": null,
+          "monthly_message_limit": null,
+          "monthly_messages_used": null,
+          "recent_kb_entries": "1",
+          "total_active_entries": "1",
+          "active_entries_of_type": "1",
+          "action": "approve_entry",
+          "title": "Cold AI - LinkedIn Messages That Get Replies",
+          "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach ineffective\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale whilst maintaining compliance\n\n### Key Features:\n- AI profile analysis for personalisation\n- Precision targeting of decision-makers\n- Lightning-fast message generation\n- GDPR and LinkedIn compliance built-in\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn outreach for lead generation and prospecting\n\n**Ideal Titles:**\n  • Sales Development Representative\n  • Account Executive\n  • Business Development Manager\n  • Sales Manager\n\n**Industries:**\n  • SaaS\n  • Professional Services\n  • Technology\n  • B2B Services\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages being ignored? Most sales teams see 2-5% response rates\n- Angle 2: What if you could generate hundreds of personalised LinkedIn messages in minutes?\n- Angle 3: Stop playing spray and pray with LinkedIn - precision targeting gets results\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend personalising messages?\n- Are you concerned about LinkedIn compliance?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"",
+          "entry_id": "16",
+          "timestamp": "2025-10-07T14:11:18.969Z",
+          "metadata": "{}",
+          "plan_type": "free",
+          "knowledge_type": "product",
+          "data": {
+            "entryId": 16,
+            "entry_id": 16,
+            "reviewerId": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+            "timestamp": "2025-10-07T14:11:18.969Z",
+            "title": "Cold AI - LinkedIn Messages That Get Replies",
+            "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach ineffective\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale whilst maintaining compliance\n\n### Key Features:\n- AI profile analysis for personalisation\n- Precision targeting of decision-makers\n- Lightning-fast message generation\n- GDPR and LinkedIn compliance built-in\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn outreach for lead generation and prospecting\n\n**Ideal Titles:**\n  • Sales Development Representative\n  • Account Executive\n  • Business Development Manager\n  • Sales Manager\n\n**Industries:**\n  • SaaS\n  • Professional Services\n  • Technology\n  • B2B Services\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages being ignored? Most sales teams see 2-5% response rates\n- Angle 2: What if you could generate hundreds of personalised LinkedIn messages in minutes?\n- Angle 3: Stop playing spray and pray with LinkedIn - precision targeting gets results\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend personalising messages?\n- Are you concerned about LinkedIn compliance?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"",
+            "summary": "AI-powered LinkedIn outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.",
+            "knowledge_type": "product",
+            "database_entry": {
+              "id": 16,
+              "team_id": null,
+              "knowledge_type": "product",
+              "title": "Cold AI - LinkedIn Messages That Get Replies",
+              "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach ineffective\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale whilst maintaining compliance\n\n### Key Features:\n- AI profile analysis for personalisation\n- Precision targeting of decision-makers\n- Lightning-fast message generation\n- GDPR and LinkedIn compliance built-in\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn outreach for lead generation and prospecting\n\n**Ideal Titles:**\n  • Sales Development Representative\n  • Account Executive\n  • Business Development Manager\n  • Sales Manager\n\n**Industries:**\n  • SaaS\n  • Professional Services\n  • Technology\n  • B2B Services\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages being ignored? Most sales teams see 2-5% response rates\n- Angle 2: What if you could generate hundreds of personalised LinkedIn messages in minutes?\n- Angle 3: Stop playing spray and pray with LinkedIn - precision targeting gets results\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend personalising messages?\n- Are you concerned about LinkedIn compliance?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"",
+              "metadata": {
+                "source_info": {
+                  "generated_at": "2025-10-07T14:10:58.722Z",
+                  "research_url": "https://coldai.uk",
+                  "ai_generation_count": 1
+                },
+                "workflow_metadata": {
+                  "keywords": [
+                    "LinkedIn outreach",
+                    "AI personalisation",
+                    "sales automation",
+                    "LinkedIn compliance",
+                    "B2B prospecting"
+                  ],
+                  "research_url": "https://coldai.uk",
+                  "research_date": "2025-10-07",
+                  "buying_urgency": "medium",
+                  "product_category": "Sales Automation",
+                  "typical_sales_cycle": "2-4 weeks"
+                },
+                "quality_assessment": {
+                  "completeness": 65,
+                  "missing_intel": [
+                    "Pricing information",
+                    "Specific ROI metrics",
+                    "Customer testimonials",
+                    "Integration capabilities",
+                    "Competitor comparisons",
+                    "Implementation timeline"
+                  ],
+                  "sales_readiness": 70
+                }
+              },
+              "embedding": null,
+              "created_by": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+              "created_at": "2025-10-07T14:10:32.561224+00:00",
+              "updated_at": "2025-10-07T14:11:18.969+00:00",
+              "deleted_at": null,
+              "can_restore_until": null,
+              "ai_generation_count": 1,
+              "last_ai_generation": "2025-10-07T14:10:58.908684+00:00",
+              "workflow_status": "reviewing",
+              "workflow_metadata": {
+                "processed_at": "2025-10-07T14:10:58.731Z",
+                "needs_enrichment": true
+              },
+              "last_enhanced_at": "2025-10-07T14:10:58.908684+00:00",
+              "review_status": "pending",
+              "review_notes": null,
+              "reviewed_by": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+              "reviewed_at": "2025-10-07T14:11:18.969+00:00",
+              "summary": "AI-powered LinkedIn outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams."
+            },
+            "updates_applied": {
+              "workflow_status": "reviewing",
+              "reviewed_at": "2025-10-07T14:11:18.969Z",
+              "reviewed_by": "681e2401-1b8a-4e6f-812f-ca18bf29a821",
+              "updated_at": "2025-10-07T14:11:18.969Z",
+              "title": "Cold AI - LinkedIn Messages That Get Replies",
+              "content": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach ineffective\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale whilst maintaining compliance\n\n### Key Features:\n- AI profile analysis for personalisation\n- Precision targeting of decision-makers\n- Lightning-fast message generation\n- GDPR and LinkedIn compliance built-in\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn outreach for lead generation and prospecting\n\n**Ideal Titles:**\n  • Sales Development Representative\n  • Account Executive\n  • Business Development Manager\n  • Sales Manager\n\n**Industries:**\n  • SaaS\n  • Professional Services\n  • Technology\n  • B2B Services\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages being ignored? Most sales teams see 2-5% response rates\n- Angle 2: What if you could generate hundreds of personalised LinkedIn messages in minutes?\n- Angle 3: Stop playing spray and pray with LinkedIn - precision targeting gets results\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend personalising messages?\n- Are you concerned about LinkedIn compliance?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"",
+              "summary": "AI-powered LinkedIn outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams."
+            }
+          },
+          "log_id": "83"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Review Entry": {
+      "main": [
+        [
+          {
+            "node": "Action Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action Router": {
+      "main": [
+        [
+          {
+            "node": "Review Product Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Does Full Wiki Exist?": {
+      "main": [
+        [
+          {
+            "node": "First Entry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Entry?": {
+      "main": [
+        [
+          {
+            "node": "First Entry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Wiki",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Product Entry": {
+      "main": [
+        [
+          {
+            "node": "Extract and Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract and Structure": {
+      "main": [
+        [
+          {
+            "node": "Generate Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Markdown": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Supabase": {
+      "main": [
+        [
+          {
+            "node": "Save Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Entry": {
+      "main": [
+        [
+          {
+            "node": "Does Full Wiki Exist?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Wiki",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a5b3c1e4-3fa9-4ddb-960a-e3c87b9a00e3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "zN7YGVsiJB3GsTyQ",
+  "tags": []
+}

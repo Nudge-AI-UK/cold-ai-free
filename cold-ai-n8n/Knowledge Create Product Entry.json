@@ -1,0 +1,1284 @@
+{
+  "name": "Cold: Knowledge Hub: Entry Management",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.knowledge_type }}",
+                    "rightValue": "product",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4bc2d368-8fcc-421c-ac14-0df13652ea2f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Product/Service"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1d5b8744-d817-4698-b521-640fdbe79488",
+                    "leftValue": "={{ $json.knowledge_type }}",
+                    "rightValue": "company_info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Company Info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "85432cef-c4ce-4c7f-bf26-60a7dcb17a82",
+                    "leftValue": "={{ $json.knowledge_type }}",
+                    "rightValue": "case_study",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Case Study"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1088,
+        -80
+      ],
+      "id": "92ff5109-9b02-4173-9ee0-d0d755344983",
+      "name": "Entry Type"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze this scraped product content to create a sales-focused knowledge base entry.\n\nProduct URL: {{$('Universal URL Validation').item.json.validated_url}}\nEntry ID: {{$('Universal URL Validation').item.json.entry_id}}\n\nSCRAPED WEBSITE CONTENT:\n{{$json.scraped_content}}\n\nPage Title: {{$json.page_metadata.title}}\nPage Description: {{$json.page_metadata.description}}\n\nInstructions:\n1. Analyze the content provided above\n2. Extract all sales-relevant information available\n3. If information is limited, work with what's available and note gaps in quality_scores\n4. Create a complete knowledge base entry\n5. Return ONLY the JSON structure specified\n6. DO NOT attempt to fetch additional content"
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are a sales intelligence specialist focused on product research for cold outreach campaigns.\n\n## Your Task:\nAnalyse the scraped website content to create a focused knowledge base entry for cold sales.\n\n## Research Focus:\n1. What problem does this product solve?\n2. Who experiences this problem most acutely?  \n3. What's the key value proposition?\n4. What makes this product different?\n5. What objections might prospects have?\n6. What's the typical buying trigger?\n\n## Important Instructions:\n- Work with whatever content is provided, even if limited\n- If content is insufficient, note this in quality_scores\n- Focus on extracting sales-relevant intelligence\n- Do NOT use web_search or web_fetch tools\n\n## Output Format:\nReturn ONLY a JSON object with this exact structure:\n\n```json\n{\n  \"entry_type\": \"product\",\n  \"title\": \"Product Name - Key Benefit (max 80 chars)\",\n  \"slug\": \"product-name\",\n  \"summary\": \"One powerful sentence describing what this product does and who it's for. Focus on the transformation it provides. (max 200 chars)\",\n  \"content\": {\n    \"problem_statement\": {\n      \"text\": \"The specific problem this product solves\",\n      \"pain_points\": [\"Pain point 1\", \"Pain point 2\", \"Pain point 3\"]\n    },\n    \"solution_overview\": {\n      \"text\": \"How the product solves the problem\",\n      \"key_features\": [\"Feature + benefit\", \"Feature + benefit\", \"Feature + benefit\"]\n    },\n    \"target_buyer\": {\n      \"text\": \"Description of the ideal buyer\",\n      \"titles\": [\"Job Title 1\", \"Job Title 2\"],\n      \"industries\": [\"Industry 1\", \"Industry 2\"],\n      \"company_characteristics\": [\"Characteristic 1\", \"Characteristic 2\"]\n    },\n    \"value_proposition\": {\n      \"text\": \"The core promise of the product\",\n      \"outcomes\": [\"Outcome 1\", \"Outcome 2\", \"Outcome 3\"]\n    },\n    \"differentiators\": {\n      \"text\": \"What makes this unique\",\n      \"competitive_advantages\": [\"Advantage 1\", \"Advantage 2\"]\n    },\n    \"objection_handlers\": {\n      \"common_objections\": [\n        {\"objection\": \"Too expensive\", \"response\": \"ROI-focused response\"},\n        {\"objection\": \"We have a solution\", \"response\": \"Differentiation response\"}\n      ]\n    }\n  },\n  \"sales_intelligence\": {\n    \"hook_angles\": [\n      \"Angle 1: Problem-focused opener\",\n      \"Angle 2: Benefit-focused opener\",\n      \"Angle 3: Social proof opener\"\n    ],\n    \"trigger_events\": [\"Event that indicates need\", \"Another trigger\"],\n    \"qualifying_questions\": [\"Question to identify need\", \"Question to gauge urgency\"],\n    \"proof_points\": [\"Metric or case study\", \"Another proof point\"],\n    \"talk_tracks\": {\n      \"elevator_pitch\": \"30-second pitch\",\n      \"problem_agitation\": \"2-3 sentences that highlight the problem\",\n      \"value_statement\": \"One sentence on primary value\"\n    }\n  },\n  \"metadata\": {\n    \"keywords\": [\"keyword1\", \"keyword2\"],\n    \"typical_sales_cycle\": \"X-Y weeks/months\",\n    \"buying_urgency\": \"low/medium/high\",\n    \"product_category\": \"category name\",\n    \"research_url\": \"{{ $json.validated_url}}\",\n    \"research_date\": \"ISO date\"\n  },\n  \"quality_score\": {\n    \"completeness\": 0-100,\n    \"sales_readiness\": 0-100,\n    \"missing_intel\": [\"What's missing for better cold outreach\"]\n  }\n}\nScoring Guidelines:\n\nCompleteness: How much useful product information was extracted\nSales Readiness: How ready is this entry to support cold outreach\nMissing Intel: What additional information would improve cold messaging\n\nImportant:\n\nFocus ONLY on the product, not the entire company\nExtract information that directly helps with cold sales messaging\nBe specific about benefits and outcomes, not just features\nUse British English (personalised, optimise, centre)\nReturn ONLY the JSON - no markdown, no extra text",
+          "webSearch": true,
+          "allowedDomains": "={{ $json.validated_url }}",
+          "maxTokens": 2500,
+          "temperature": 0.3,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        -256
+      ],
+      "id": "8247456b-3cf6-4e40-930d-5eabae153a08",
+      "name": "Create Product Entry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE knowledge_base\nSET \n  title = $1,\n  summary = $2,\n  content = convert_from(decode($3, 'base64'), 'UTF8'),\n  workflow_status = 'draft',\n  metadata = convert_from(decode($4, 'base64'), 'UTF8')::jsonb,\n  workflow_metadata = $5,\n  ai_generation_count = COALESCE(ai_generation_count, 0) + 1,\n  last_ai_generation = NOW(),\n  last_enhanced_at = NOW(),\n  review_status = 'pending',\n  updated_at = NOW()\nWHERE id = $6        \nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ $json.title }},\n{{ JSON.stringify($json.summary) }},\n{{ $json.content }},\n{{ $json.metadata }},\n{{ JSON.stringify($json.workflow_metadata) }},\n{{ $json.entry_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2912,
+        -256
+      ],
+      "id": "b2d2ff05-7b63-4685-8e44-05328d2cfbc7",
+      "name": "Save Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1376,
+        320
+      ],
+      "id": "e72d0f56-c3b6-41c3-bb46-dd223d4614a7",
+      "name": "Update Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "add_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "24848ae7-6282-42d7-9944-991ba3d0f832"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Entry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2a3663b0-f520-4536-82db-ebc472e6655d",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "update_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Update Entry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a32f02d9-5977-4226-aa3e-7bb11838423d",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "delete_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete Entry"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown KB Action"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        416,
+        288
+      ],
+      "id": "f51750c9-042d-44b0-89ee-ecc3c5ed157b",
+      "name": "Entry Action Switch"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        320
+      ],
+      "id": "5b5d171f-aae9-48fc-a08d-7060c4dd0e36",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "webSearch": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        128
+      ],
+      "id": "a7f356c2-b016-4f8b-a13c-7559e5df7a8d",
+      "name": "Create Case Study Entry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n## Delete Entry\nChecks if the soft delete in the edge function has been successful, sends to Wiki workflow for markdown removal (entry removal does not use AI)",
+        "height": 240,
+        "width": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        544,
+        576
+      ],
+      "typeVersion": 1,
+      "id": "d5e6b53f-cfeb-4641-801f-a9765c4ef28f",
+      "name": "Sticky Note",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, deleted_at, can_restore_until, title\nFROM knowledge_base\nWHERE id = $1::integer\nAND deleted_at IS NOT NULL;",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        640,
+        512
+      ],
+      "id": "bb5bf244-b649-44b2-8633-7e47f0f8e3e2",
+      "name": "Check Soft Delete",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c6e9e50-a65e-42ae-a657-aa263e861619",
+              "name": "action",
+              "value": "={{ $('When Executed by Another Workflow').item.json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "36a1400b-515a-4ea4-8b10-49067d9ff4bb",
+              "name": "title",
+              "value": "={{ $('When Executed by Another Workflow').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "8d688e5d-6fb0-4e9e-a11a-68300afcdf4e",
+              "name": "content",
+              "value": "={{ $('When Executed by Another Workflow').item.json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "7f634744-656d-4172-958f-b10d090c3892",
+              "name": "entry_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.entry_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6b9d9b39-e0f0-4093-bb53-ba35b0a74ad9",
+              "name": "timestamp",
+              "value": "={{ $('When Executed by Another Workflow').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "6a44f057-46ae-466c-8f91-6b2b9b882205",
+              "name": "team_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.team_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cc73b85b-eb09-44a3-ae68-c64d05c75eeb",
+              "name": "metadata",
+              "value": "={{ $('When Executed by Another Workflow').item.json.metadata }}",
+              "type": "string"
+            },
+            {
+              "id": "e37f3087-c6ed-4711-9ce6-54625dbc624f",
+              "name": "plan_type",
+              "value": "={{ $('When Executed by Another Workflow').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "d2c76e4f-3d12-43e7-a176-d6e0c562358e",
+              "name": "={{ $json.operation }}",
+              "value": "remove_entry",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        512
+      ],
+      "id": "9665efb0-dcc4-4429-89d1-c9d9f5e102fe",
+      "name": "Delete Variables",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kd6Z2Ak0IzKWE30Y",
+          "mode": "list",
+          "cachedResultName": "Cold: Knowledge Base Wiki"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1376,
+        512
+      ],
+      "id": "5a0b3fbd-62ab-4b1b-8d48-f40a538fe5c0",
+      "name": "Remove From KB",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kd6Z2Ak0IzKWE30Y",
+          "mode": "list",
+          "cachedResultName": "Cold: Knowledge Base Wiki"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1968,
+        176
+      ],
+      "id": "9cc1db1f-b718-475d-9d57-50269d52e8d3",
+      "name": "Add To KB",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c6e9e50-a65e-42ae-a657-aa263e861619",
+              "name": "action",
+              "value": "={{ $('When Executed by Another Workflow').item.json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "36a1400b-515a-4ea4-8b10-49067d9ff4bb",
+              "name": "title",
+              "value": "={{ $('When Executed by Another Workflow').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "8d688e5d-6fb0-4e9e-a11a-68300afcdf4e",
+              "name": "content",
+              "value": "={{ $('When Executed by Another Workflow').item.json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "7f634744-656d-4172-958f-b10d090c3892",
+              "name": "entry_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.entry_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6b9d9b39-e0f0-4093-bb53-ba35b0a74ad9",
+              "name": "timestamp",
+              "value": "={{ $('When Executed by Another Workflow').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "6a44f057-46ae-466c-8f91-6b2b9b882205",
+              "name": "team_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.team_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cc73b85b-eb09-44a3-ae68-c64d05c75eeb",
+              "name": "metadata",
+              "value": "={{ $('When Executed by Another Workflow').item.json.metadata }}",
+              "type": "string"
+            },
+            {
+              "id": "e37f3087-c6ed-4711-9ce6-54625dbc624f",
+              "name": "plan_type",
+              "value": "={{ $('When Executed by Another Workflow').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "d2c76e4f-3d12-43e7-a176-d6e0c562358e",
+              "name": "operation",
+              "value": "add_entry",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1664,
+        -64
+      ],
+      "id": "3d06d43d-0be6-4906-a7da-4e254d56455e",
+      "name": "Add Variables",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c6e9e50-a65e-42ae-a657-aa263e861619",
+              "name": "action",
+              "value": "={{ $('When Executed by Another Workflow').item.json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "36a1400b-515a-4ea4-8b10-49067d9ff4bb",
+              "name": "title",
+              "value": "={{ $('When Executed by Another Workflow').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "8d688e5d-6fb0-4e9e-a11a-68300afcdf4e",
+              "name": "content",
+              "value": "={{ $('When Executed by Another Workflow').item.json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "7f634744-656d-4172-958f-b10d090c3892",
+              "name": "entry_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.entry_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6b9d9b39-e0f0-4093-bb53-ba35b0a74ad9",
+              "name": "timestamp",
+              "value": "={{ $('When Executed by Another Workflow').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "6a44f057-46ae-466c-8f91-6b2b9b882205",
+              "name": "team_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.team_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cc73b85b-eb09-44a3-ae68-c64d05c75eeb",
+              "name": "metadata",
+              "value": "={{ $('When Executed by Another Workflow').item.json.metadata }}",
+              "type": "string"
+            },
+            {
+              "id": "e37f3087-c6ed-4711-9ce6-54625dbc624f",
+              "name": "plan_type",
+              "value": "={{ $('When Executed by Another Workflow').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "d2c76e4f-3d12-43e7-a176-d6e0c562358e",
+              "name": "operation",
+              "value": "update_entry",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1664,
+        320
+      ],
+      "id": "c10801c1-5822-47b7-9342-029d88d51082",
+      "name": "Update Variables",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "webSearch": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        -64
+      ],
+      "id": "29c790c1-79f0-4c87-a155-1a354d47ee7e",
+      "name": "Create Company Entry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Universal URL Validation for All Knowledge Types (n8n Compatible)\nconst input = $input.first().json;\nconst knowledgeType = input.knowledge_type || input.data?.knowledge_type || 'unknown';\nconst entryId = input.entry_id || input.data?.entry_id;\n\n// Map knowledge types to their URL field names\nconst urlFieldMap = {\n  'product': ['productLink', 'product_link', 'product_url', 'url', 'website'],\n  'company': ['companyWebsite', 'company_website', 'company_url', 'website', 'url'],\n  'case_study': ['caseStudyLink', 'case_study_link', 'case_study_url', 'url', 'website', 'source_url']\n};\n\n// Function to find URL in data object\nfunction findUrlInData(data, fieldNames) {\n  for (const fieldName of fieldNames) {\n    if (data[fieldName] && data[fieldName] !== 'fill_with_ai') {\n      return data[fieldName];\n    }\n  }\n  return null;\n}\n\n// Function to validate URL without using URL constructor\nfunction isValidUrl(string) {\n  try {\n    // Basic regex pattern for URL validation\n    const pattern = /^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$/i;\n    \n    // Even more permissive pattern if the above fails\n    const simplePattern = /^(https?:\\/\\/)?([\\w\\-]+\\.)+[\\w\\-]+(\\/.*)?$/i;\n    \n    return pattern.test(string) || simplePattern.test(string);\n  } catch (e) {\n    return false;\n  }\n}\n\n// Function to extract domain from URL\nfunction extractDomain(url) {\n  let domain = url;\n  \n  // Remove protocol\n  domain = domain.replace(/^https?:\\/\\//i, '');\n  \n  // Remove path\n  domain = domain.split('/')[0];\n  \n  // Remove port\n  domain = domain.split(':')[0];\n  \n  return domain;\n}\n\n// Get possible field names for this knowledge type\nconst possibleFields = urlFieldMap[knowledgeType] || ['url', 'website', 'link'];\n\n// Try to find URL in data object\nlet rawUrl = findUrlInData(input.data || {}, possibleFields);\n\n// If not found in data, check root level\nif (!rawUrl) {\n  rawUrl = findUrlInData(input, possibleFields);\n}\n\nconsole.log('URL Validation Debug:', {\n  knowledge_type: knowledgeType,\n  fields_checked: possibleFields,\n  url_found: rawUrl,\n  entry_id: entryId\n});\n\n// Validation Step 1: Check if URL exists\nif (!rawUrl || rawUrl === 'fill_with_ai' || rawUrl.trim() === '') {\n  return {\n    json: {\n      ...input, // Pass through all original data\n      validation_result: {\n        passed: false,\n        error: true,\n        stage: 'missing_url',\n        message: `No valid URL provided for ${knowledgeType}`,\n        entry_id: entryId,\n        knowledge_type: knowledgeType,\n        fields_checked: possibleFields\n      }\n    }\n  };\n}\n\n// Validation Step 2: Clean and format URL\nlet cleanUrl = rawUrl.trim();\n\n// Remove any whitespace and common mistakes\ncleanUrl = cleanUrl.replace(/\\s+/g, '');\n\n// Add protocol if missing\nif (!cleanUrl.match(/^https?:\\/\\//i)) {\n  cleanUrl = `https://${cleanUrl}`;\n}\n\n// Remove trailing slashes for consistency\ncleanUrl = cleanUrl.replace(/\\/+$/, '');\n\n// Validation Step 3: Validate URL format (without URL constructor)\nconst domain = extractDomain(cleanUrl);\n\n// Basic validation checks\nif (!domain || domain.length < 4) {\n  return {\n    json: {\n      ...input,\n      validation_result: {\n        passed: false,\n        error: true,\n        stage: 'invalid_url_format',\n        message: `Invalid domain format for ${knowledgeType}: ${rawUrl}`,\n        error_detail: 'Domain too short or invalid',\n        entry_id: entryId,\n        knowledge_type: knowledgeType,\n        raw_url: rawUrl,\n        attempted_clean_url: cleanUrl\n      }\n    }\n  };\n}\n\n// Check for valid domain structure\nif (!domain.includes('.')) {\n  return {\n    json: {\n      ...input,\n      validation_result: {\n        passed: false,\n        error: true,\n        stage: 'invalid_url_format',\n        message: `Invalid URL format for ${knowledgeType}: ${rawUrl}`,\n        error_detail: 'Missing top-level domain (e.g., .com, .uk)',\n        entry_id: entryId,\n        knowledge_type: knowledgeType,\n        raw_url: rawUrl,\n        attempted_clean_url: cleanUrl\n      }\n    }\n  };\n}\n\n// Check if URL passes basic validation\nif (!isValidUrl(cleanUrl)) {\n  return {\n    json: {\n      ...input,\n      validation_result: {\n        passed: false,\n        error: true,\n        stage: 'invalid_url_format',\n        message: `Invalid URL format for ${knowledgeType}: ${rawUrl}`,\n        error_detail: 'URL format validation failed',\n        entry_id: entryId,\n        knowledge_type: knowledgeType,\n        raw_url: rawUrl,\n        attempted_clean_url: cleanUrl\n      }\n    }\n  };\n}\n\n// Validation Step 4: Type-specific validation (optional)\nlet additionalValidation = {};\n\nswitch(knowledgeType) {\n  case 'product':\n    additionalValidation.url_type = 'product_page';\n    additionalValidation.suggested_research_depth = 'detailed_features';\n    break;\n    \n  case 'company':\n    additionalValidation.url_type = 'company_website';\n    additionalValidation.suggested_research_depth = 'company_overview';\n    break;\n    \n  case 'case_study':\n    additionalValidation.url_type = 'case_study_page';\n    additionalValidation.suggested_research_depth = 'results_focused';\n    break;\n    \n  default:\n    additionalValidation.url_type = 'general';\n    additionalValidation.suggested_research_depth = 'standard';\n}\n\n// SUCCESS - Return all data with validation results\nreturn {\n  json: {\n    ...input, // Pass through ALL original data\n    \n    // Add validated URL info\n    validated_url: cleanUrl,\n    original_url: rawUrl,\n    domain: domain,\n    \n    // Add validation results\n    validation_result: {\n      passed: true,\n      error: false,\n      stage: 'validation_complete',\n      message: `URL validated successfully for ${knowledgeType}`,\n      entry_id: entryId,\n      knowledge_type: knowledgeType,\n      ...additionalValidation\n    },\n    \n    // Add helpful metadata for next nodes\n    processing_metadata: {\n      validated_at: new Date().toISOString(),\n      url_was_cleaned: rawUrl !== cleanUrl,\n      protocol_added: !rawUrl.match(/^https?:\\/\\//i),\n      knowledge_type: knowledgeType,\n      entry_id: entryId\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -64
+      ],
+      "id": "d2a00920-571f-442d-8771-b3b40588f8f7",
+      "name": "Universal URL Validation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7e2daa31-7f6f-4a35-8670-acf2c0d0d790",
+              "leftValue": "={{ $json.validation_result.passed }}",
+              "rightValue": "passed",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        -64
+      ],
+      "id": "c41244da-6b14-454b-b646-74ec120d8177",
+      "name": "Validated"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer fc-527dc1be9d904ed8adbae14fc874e8a6"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.validated_url }}\",\n  \"formats\": [\"markdown\"],\n  \"onlyMainContent\": true,\n  \"waitFor\": 2000\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1376,
+        -256
+      ],
+      "id": "9871faf4-4bbf-4c9f-a222-822a33c461e4",
+      "name": "Product Scrape"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process Firecrawl Response\nconst scrapedData = $input.item.json;\nconst originalData = $input.all()[0].json;\n\n// Check if scraping was successful\nif (!scrapedData.success || !scrapedData.data) {\n  // Pass through with error flag\n  return {\n    json: {\n      ...originalData,\n      scraping_failed: true,\n      scraped_content: \"Unable to scrape website content\",\n      error_message: scrapedData.error || 'Scraping failed'\n    }\n  };\n}\n\n// Extract the markdown content\nconst markdownContent = scrapedData.data.markdown || \n                        scrapedData.data.content || \n                        \"No content extracted\";\n\n// Pass all data forward with scraped content\nreturn {\n  json: {\n    ...originalData,\n    scraped_content: markdownContent,\n    page_metadata: {\n      title: scrapedData.data.metadata?.title || \"No title\",\n      description: scrapedData.data.metadata?.description || \"No description\",\n      scraped_at: new Date().toISOString()\n    },\n    scraping_failed: false\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -256
+      ],
+      "id": "2c151591-70d8-428f-aa6b-71f70ac43332",
+      "name": "Process Scraped Content"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and Structure Knowledge Base Entry\nconst aiResponse = $input.item.json.content?.[0]?.text || $input.item.json.output || $input.item.json;\nconst originalData = $input.all()[0].json;\n\ntry {\n  // Extract JSON from markdown code block or plain text\n  let parsed;\n  if (typeof aiResponse === 'string') {\n    const jsonMatch = aiResponse.match(/```json\\n?([\\s\\S]*?)\\n?```/) || \n                      aiResponse.match(/\\{[\\s\\S]*\\}$/);\n    \n    if (jsonMatch) {\n      parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    } else {\n      parsed = JSON.parse(aiResponse);\n    }\n  } else {\n    parsed = aiResponse;\n  }\n  \n  // Build structured output for database\n  const kbEntry = {\n    // Core fields for database\n    entry_id: originalData.entry_id,\n    user_id: originalData.user_id,\n    knowledge_type: 'product',\n    title: parsed.title,\n    slug: parsed.slug,\n    summary: parsed.summary,\n    \n    // Main content for markdown generation\n    content: {\n      problem_statement: parsed.content.problem_statement,\n      solution_overview: parsed.content.solution_overview,\n      target_buyer: parsed.content.target_buyer,\n      value_proposition: parsed.content.value_proposition,\n      differentiators: parsed.content.differentiators,\n      objection_handlers: parsed.content.objection_handlers\n    },\n    \n    // Sales intelligence\n    sales_intelligence: parsed.sales_intelligence,\n    \n    // Metadata and scoring\n    metadata: {\n      ...parsed.metadata,\n      source_url: originalData.validated_url,\n      scraped_at: originalData.page_metadata?.scraped_at\n    },\n    \n    quality_scores: parsed.quality_score,\n    \n    // Workflow status\n    workflow_status: parsed.quality_score.sales_readiness >= 60 ? 'draft' : 'needs_review',\n    \n    // Flag for incomplete data\n    needs_enrichment: parsed.quality_score.completeness < 80\n  };\n  \n  return {\n    json: {\n      success: true,\n      knowledge_entry: kbEntry,\n      markdown_ready: true\n    }\n  };\n  \n} catch (error) {\n  return {\n    json: {\n      success: false,\n      error: error.message,\n      raw_response: aiResponse,\n      entry_id: originalData.entry_id\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -256
+      ],
+      "id": "99ce54c2-88b7-48c4-8b2e-e02f8ca19555",
+      "name": "Extract and Structure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate Markdown for Knowledge Base Display\nconst entry = $json.knowledge_entry;\n\n// Build main markdown content (WITHOUT title, summary, quality assessment, and metadata)\nlet markdown = `## Problem Solved\\n`;\nmarkdown += `${entry.content.problem_statement.text}\\n\\n`;\n\nmarkdown += `### Pain Points:\\n`;\nentry.content.problem_statement.pain_points.forEach(point => {\n  markdown += `- ${point}\\n`;\n});\n\nmarkdown += `\\n## Solution\\n`;\nmarkdown += `${entry.content.solution_overview.text}\\n\\n`;\n\nmarkdown += `### Key Features:\\n`;\nentry.content.solution_overview.key_features.forEach(feature => {\n  markdown += `- ${feature}\\n`;\n});\n\n// Target Market\nmarkdown += `\\n## Target Buyer\\n`;\nmarkdown += `${entry.content.target_buyer.text}\\n\\n`;\n\nmarkdown += `**Ideal Titles:**\\n`;\nentry.content.target_buyer.titles.forEach(title => {\n  markdown += `  • ${title}\\n`;\n});\n\nmarkdown += `\\n**Industries:**\\n`;\nentry.content.target_buyer.industries.forEach(industry => {\n  markdown += `  • ${industry}\\n`;\n});\n\n// Sales Intelligence\nmarkdown += `\\n## Sales Intelligence\\n\\n`;\n\nmarkdown += `### Hook Angles:\\n`;\nentry.sales_intelligence.hook_angles.forEach(angle => {\n  markdown += `- ${angle}\\n`;\n});\n\nmarkdown += `\\n### Qualifying Questions:\\n`;\nentry.sales_intelligence.qualifying_questions.forEach(q => {\n  markdown += `- ${q}\\n`;\n});\n\nmarkdown += `\\n### Elevator Pitch:\\n`;\nmarkdown += `> \"${entry.sales_intelligence.talk_tracks.elevator_pitch}\"\\n`;\n\n// CREATE SEPARATE METADATA OBJECT\nconst metadata = {\n  // Quality Assessment\n  quality_assessment: {\n    completeness: entry.quality_scores.completeness,\n    sales_readiness: entry.quality_scores.sales_readiness,\n    missing_intel: entry.quality_scores.missing_intel || []\n  },\n  \n  // Source and generation info\n  source_info: {\n    research_url: entry.metadata?.research_url || entry.metadata?.source_url || $json.validated_url || 'Not available',\n    generated_at: new Date().toISOString(),\n    ai_generation_count: 1\n  },\n  \n  // Optional: Keep original workflow metadata\n  workflow_metadata: entry.metadata || {}\n};\n\nreturn {\n  json: {\n    ...entry,\n    title: entry.title,\n    summary: entry.summary,\n    markdown_content: markdown,  // Clean content without quality/metadata\n    quality_metadata: metadata,  // Separate metadata object\n    ready_to_save: true\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -256
+      ],
+      "id": "cc05975e-8eea-48a9-b961-e483fb38fc50",
+      "name": "Generate Markdown"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare final data for Supabase\nconst data = $json;\n\n// Build complete metadata structure matching the expected format\nconst metadata = {\n  source_info: {\n    research_url: data.quality_metadata?.source_info?.research_url ||\n                  data.quality_metadata?.workflow_metadata?.research_url ||\n                  data.metadata?.research_url,\n    generated_at: data.quality_metadata?.source_info?.generated_at || new Date().toISOString(),\n    last_ai_review: data.quality_metadata?.source_info?.last_ai_review || new Date().toISOString(),\n    ai_generation_count: data.quality_metadata?.source_info?.ai_generation_count || 1\n  },\n  approval_info: data.quality_metadata?.approval_info || {},\n  workflow_metadata: {\n    approved: data.quality_metadata?.workflow_metadata?.approved || false,\n    production_ready: data.quality_metadata?.workflow_metadata?.production_ready || false,\n    keywords: data.quality_metadata?.workflow_metadata?.keywords || [],\n    research_url: data.quality_metadata?.workflow_metadata?.research_url ||\n                  data.quality_metadata?.source_info?.research_url ||\n                  data.metadata?.research_url,\n    research_date: data.quality_metadata?.workflow_metadata?.research_date ||\n                   new Date().toISOString().split('T')[0],\n    buying_urgency: data.quality_metadata?.workflow_metadata?.buying_urgency,\n    product_category: data.quality_metadata?.workflow_metadata?.product_category,\n    typical_sales_cycle: data.quality_metadata?.workflow_metadata?.typical_sales_cycle\n  },\n  quality_assessment: data.quality_metadata?.quality_assessment || {}\n};\n\nreturn {\n  json: {\n    entry_id: data.entry_id || data.knowledge_entry?.entry_id || $node[\"Universal URL Validation\"].json.data.entry_id,\n    title: data.title,\n    summary: data.summary,\n    content: Buffer.from(data.markdown_content).toString('base64'),\n\n    // Encode the complete metadata structure as base64\n    metadata: Buffer.from(JSON.stringify(metadata)).toString('base64'),\n\n    workflow_status: data.workflow_status,\n    workflow_metadata: {\n      processed_at: new Date().toISOString(),\n      needs_enrichment: data.needs_enrichment,\n      // Store research_url here too for easy access\n      research_url: data.quality_metadata?.workflow_metadata?.research_url ||\n                    data.quality_metadata?.source_info?.research_url,\n      keywords: data.quality_metadata?.workflow_metadata?.keywords || []\n    }\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        -256
+      ],
+      "id": "dc84d87c-a0a7-4aad-b080-9548c338bf3d",
+      "name": "Prepare for Supabase"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1,\n  status = $3\nWHERE id = $2 ",
+        "options": {
+          "queryReplacement": "={{ true }}, {{ $('When Executed by Another Workflow').item.json.log_id }}, {{  'completed' }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3136,
+        -256
+      ],
+      "id": "18e91a83-02c0-40ca-95b7-ec49a5686a7e",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5d219cee-43a5-4121-9d67-4b5158662e22",
+              "leftValue": "={{ $json.workflow_status }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        512
+      ],
+      "id": "49ff42b5-0925-4ed5-9671-5bb03c58f9d5",
+      "name": "Live Entry?"
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n## INCOMPLETE\nWiki activities are an upcoming feature for paid users.",
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        640
+      ],
+      "typeVersion": 1,
+      "id": "f41c6c90-bbe0-4740-aa14-86511e8114d0",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## <-- INCOMPLETE\nUsing a form in the front end, users can add links and text for products/services (free users + all), company information and webpages (paid users), and even add case studies for their product success stories (paid users).\nWill also require a **Firecrawl** API request.\n## <--",
+        "width": 544
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1872,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "5fe8ff2f-b7ae-4a1a-ab34-add86d6e5daf",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## DEPRECATED?\nCurrently being handled by the \"Knowledge \nReview User Edits\" n8n workflow. Probably\n works better there.",
+        "width": 896
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1008,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "df1a0dc3-cb06-486d-947d-9ddf19180edd",
+      "name": "Sticky Note3"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+          "email": "philipsmith96@btinternet.com",
+          "onboarding_step": 6,
+          "onboarding_completed": true,
+          "job_title": "CTO",
+          "company_name": "Cold AI",
+          "linkedin_url": "",
+          "team_id": null,
+          "team_role": null,
+          "can_manage_knowledge_base": null,
+          "can_invite_members": null,
+          "can_manage_company_profile": null,
+          "can_manage_icps": null,
+          "team_name": null,
+          "monthly_message_limit": null,
+          "monthly_messages_used": null,
+          "recent_kb_entries": "1",
+          "total_active_entries": "1",
+          "active_entries_of_type": "1",
+          "action": "add_entry",
+          "title": "fill_with_ai",
+          "content": "fill_with_ai",
+          "entry_id": "10",
+          "timestamp": "2025-09-02T11:01:54.580Z",
+          "metadata": "{}",
+          "plan_type": "free",
+          "knowledge_type": "product",
+          "data": {
+            "title": "fill_with_ai",
+            "content": "fill_with_ai",
+            "description": "fill_with_ai",
+            "knowledge_type": "product",
+            "productLink": "coldai.uk",
+            "targetMarket": "fill_with_ai",
+            "aiFieldsRequested": [
+              "title",
+              "targetMarket",
+              "content"
+            ],
+            "timestamp": "2025-09-02T11:01:54.580Z",
+            "entry_id": 10,
+            "database_entry": {
+              "id": 10,
+              "team_id": null,
+              "knowledge_type": "product",
+              "title": "AI Generated - 2025-09-02T11:01:54.581Z",
+              "content": "Generating content...",
+              "metadata": {},
+              "embedding": null,
+              "created_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "created_at": "2025-09-02T11:01:54.662351+00:00",
+              "updated_at": "2025-09-02T11:01:54.662351+00:00",
+              "deleted_at": null,
+              "can_restore_until": null,
+              "ai_generation_count": 0,
+              "last_ai_generation": null,
+              "workflow_status": "active",
+              "workflow_metadata": null,
+              "last_enhanced_at": null,
+              "review_status": null,
+              "review_notes": null,
+              "reviewed_by": null,
+              "reviewed_at": null
+            }
+          }
+        }
+      }
+    ],
+    "Product Scrape": [
+      {
+        "json": {
+          "success": true,
+          "data": {
+            "markdown": "![Cold AI](https://coldai.uk/Cold_AI_Logo_Rectangle_Transparent.png)\n\nComing Soon • Join the Revolution\n\nCold AI\n\n**Sends LinkedIn Messages People Reply To**\n\n**Writes & Sends LinkedIn Messages That Work**\n\n**Personalises Messages People Actually Answer**\n\nColdAIAgentsendspersonalisedoutreachthatsparksconversationsandwinsmeetings.\n\nRequest Access\n\nNo Credit Card Required\n\nJoin The Beta\n\n[Explore](https://coldai.uk/#features)\n\nStrategicAdvantage\n\nEveryMoveCalculatedforSuccess\n\nColdAIcombinescutting-edgeartificialintelligencewithbattle-testedsalesstrategiestodeliveroutreachthatconverts.\n\n### AI-Powered Intelligence\n\nAdvanced algorithms analyse profiles to craft messages that resonate with each prospect's unique background and interests.\n\n### Precision Targeting\n\nIdentify and reach the right decision-makers with laser-focused accuracy. No more spray and pray.\n\n### Lightning Fast\n\nGenerate hundreds of personalised messages quickly. Scale your outreach without losing the personal touch.\n\n### Compliance First\n\nBuilt-in safeguards ensure your messages comply with LinkedIn's terms and GDPR regulations.\n\n### Team Collaboration\n\nShare templates, track performance, and maintain consistent messaging across your entire sales team.\n\n### Analytics Dashboard\n\nTrack open rates, response rates, and conversions. Optimise your approach with data-driven insights.\n\nLimitedEarlyAccess\n\n**Claim Your Advantage**\n\nBeamongthefirsttorevolutioniseyourLinkedInoutreach.Jointheexclusiveearlyaccessprogramme.\n\nRequest Access\n\nWe respect your privacy. No spam, ever.",
+            "metadata": {
+              "language": "en",
+              "og:url": "https://coldai.uk",
+              "og:title": "Cold AI - Transform Your LinkedIn Outreach",
+              "viewport": "width=device-width, initial-scale=1.0",
+              "og:description": "Stop wasting time on generic LinkedIn messages. Cold AI crafts personalised outreach that actually gets responses.",
+              "ogDescription": "Stop wasting time on generic LinkedIn messages. Cold AI crafts personalised outreach that actually gets responses.",
+              "og:type": "website",
+              "title": "Cold AI - Transform Your LinkedIn Outreach",
+              "favicon": "https://coldai.uk/favicon.svg",
+              "ogUrl": "https://coldai.uk",
+              "description": "Stop wasting time on generic LinkedIn messages. Cold AI crafts personalised outreach that actually gets responses.",
+              "ogTitle": "Cold AI - Transform Your LinkedIn Outreach",
+              "scrapeId": "85a8ba04-88b4-4d36-9c3a-31c544417e7c",
+              "sourceURL": "https://coldai.uk",
+              "url": "https://coldai.uk/",
+              "statusCode": 200,
+              "contentType": "text/html; charset=utf-8",
+              "proxyUsed": "basic",
+              "creditsUsed": 1
+            }
+          }
+        }
+      }
+    ],
+    "Create Product Entry": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "```json\n{\n  \"entry_type\": \"product\",\n  \"title\": \"Cold AI - LinkedIn Messages That Get Replies\",\n  \"slug\": \"cold-ai\",\n  \"summary\": \"AI-powered LinkedIn outreach tool that crafts personalised messages to spark conversations and win meetings for sales teams.\",\n  \"content\": {\n    \"problem_statement\": {\n      \"text\": \"Sales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\",\n      \"pain_points\": [\"Generic messages that don't resonate\", \"Poor LinkedIn response rates\", \"Time-consuming manual personalisation\", \"Spray and pray approach to outreach\"]\n    },\n    \"solution_overview\": {\n      \"text\": \"AI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\",\n      \"key_features\": [\"AI profile analysis for personalisation\", \"Compliance with LinkedIn terms and GDPR\", \"Team collaboration and template sharing\", \"Analytics dashboard for performance tracking\"]\n    },\n    \"target_buyer\": {\n      \"text\": \"Sales professionals and teams who rely on LinkedIn for prospecting and lead generation\",\n      \"titles\": [\"Sales Development Representative\", \"Account Executive\", \"Business Development Manager\", \"Sales Manager\"],\n      \"industries\": [\"B2B SaaS\", \"Professional Services\", \"Technology\", \"Consulting\"],\n      \"company_characteristics\": [\"Companies using LinkedIn for prospecting\", \"Sales teams needing to scale outreach\", \"Organisations focused on personalised messaging\"]\n    },\n    \"value_proposition\": {\n      \"text\": \"Transform LinkedIn outreach from generic spam to personalised conversations that actually get responses\",\n      \"outcomes\": [\"Higher LinkedIn response rates\", \"More qualified meetings booked\", \"Faster message generation\", \"Improved team collaboration\"]\n    },\n    \"differentiators\": {\n      \"text\": \"Combines AI intelligence with battle-tested sales strategies whilst maintaining compliance\",\n      \"competitive_advantages\": [\"Advanced profile analysis algorithms\", \"Built-in compliance safeguards\", \"Lightning-fast message generation\"]\n    },\n    \"objection_handlers\": {\n      \"common_objections\": [\n        {\"objection\": \"LinkedIn automation might get us banned\", \"response\": \"Built-in safeguards ensure compliance with LinkedIn's terms and GDPR regulations\"},\n        {\"objection\": \"AI messages sound robotic\", \"response\": \"Advanced algorithms analyse each prospect's unique background to craft messages that resonate personally\"}\n      ]\n    }\n  },\n  \"sales_intelligence\": {\n    \"hook_angles\": [\n      \"Angle 1: Are your LinkedIn messages getting ignored? Here's why...\",\n      \"Angle 2: What if you could 10x your LinkedIn response rates overnight?\",\n      \"Angle 3: Stop wasting hours on LinkedIn messages that don't work\"\n    ],\n    \"trigger_events\": [\"Low LinkedIn response rates\", \"Scaling sales team\", \"New LinkedIn prospecting initiatives\"],\n    \"qualifying_questions\": [\"What's your current LinkedIn response rate?\", \"How much time does your team spend on LinkedIn outreach daily?\"],\n    \"proof_points\": [\"AI-powered personalisation technology\", \"Compliance-first approach\", \"Early access programme exclusivity\"],\n    \"talk_tracks\": {\n      \"elevator_pitch\": \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\",\n      \"problem_agitation\": \"Generic LinkedIn messages are killing your response rates. Your prospects can spot template messages from miles away, and they're hitting delete faster than you can say 'connection request'.\",\n      \"value_statement\": \"Transform your LinkedIn outreach from ignored spam to conversations that convert into qualified meetings.\"\n    }\n  },\n  \"metadata\": {\n    \"keywords\": [\"LinkedIn outreach\", \"AI personalisation\", \"sales automation\", \"cold messaging\"],\n    \"typical_sales_cycle\": \"2-4 weeks\",\n    \"buying_urgency\": \"medium\",\n    \"product_category\": \"Sales Automation\",\n    \"research_url\": \"https://coldai.uk\",\n    \"research_date\": \"2025-09-03\"\n  },\n  \"quality_score\": {\n    \"completeness\": 65,\n    \"sales_readiness\": 70,\n    \"missing_intel\": [\"Pricing information\", \"Specific ROI metrics\", \"Customer testimonials\", \"Integration capabilities\", \"Competitor comparisons\"]\n  }\n}\n```"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Entry Type": {
+      "main": [
+        [
+          {
+            "node": "Product Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Company Entry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Case Study Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Product Entry": {
+      "main": [
+        [
+          {
+            "node": "Extract and Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Entry": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entry Action Switch": {
+      "main": [
+        [
+          {
+            "node": "Universal URL Validation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Entry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Soft Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Entry Action Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Case Study Entry": {
+      "main": [
+        []
+      ]
+    },
+    "Check Soft Delete": {
+      "main": [
+        [
+          {
+            "node": "Live Entry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Variables": {
+      "main": [
+        [
+          {
+            "node": "Remove From KB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Variables": {
+      "main": [
+        [
+          {
+            "node": "Add To KB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Variables": {
+      "main": [
+        [
+          {
+            "node": "Add To KB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Company Entry": {
+      "main": [
+        [
+          {
+            "node": "Add Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Universal URL Validation": {
+      "main": [
+        [
+          {
+            "node": "Validated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validated": {
+      "main": [
+        [
+          {
+            "node": "Entry Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Scrape": {
+      "main": [
+        [
+          {
+            "node": "Process Scraped Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Scraped Content": {
+      "main": [
+        [
+          {
+            "node": "Create Product Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract and Structure": {
+      "main": [
+        [
+          {
+            "node": "Generate Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Markdown": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Supabase": {
+      "main": [
+        [
+          {
+            "node": "Save Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live Entry?": {
+      "main": [
+        [
+          {
+            "node": "Delete Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a4d4105b-02d8-42dc-a3f3-0b1d4de21a12",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "6nUnCKW3324kAwpm",
+  "tags": [
+    {
+      "createdAt": "2025-07-03T14:41:16.741Z",
+      "updatedAt": "2025-07-03T14:41:16.741Z",
+      "id": "AfErn6zbWY41qrY9",
+      "name": "nudge cold"
+    },
+    {
+      "createdAt": "2025-07-22T15:09:00.765Z",
+      "updatedAt": "2025-07-22T15:09:00.765Z",
+      "id": "yrfp10HbhjmoX07s",
+      "name": "web-app"
+    }
+  ]
+}

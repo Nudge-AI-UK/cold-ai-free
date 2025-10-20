@@ -3,7 +3,7 @@ import { Wrench } from 'lucide-react';
 
 export function MaintenanceBlocker() {
   // Set to true to enable maintenance mode
-  const isMaintenanceMode = true;
+  const isMaintenanceMode = false;
 
   if (!isMaintenanceMode) return null;
 

@@ -1,0 +1,2006 @@
+{
+  "name": "Cold: Sub: Message Worker 1",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/{{ $json.provider_id }}/posts?limit=20&account_id={{ $('LinkedIn Fields').first().json.account_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        160
+      ],
+      "id": "7b5dc5cf-94cf-4834-a062-06194cb6cc7f",
+      "name": "Get Prospect Posts",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO research_cache (\n  profile_url,\n  profile_picture_url,\n  profile_type,\n  research_data,\n  research_depth,\n  last_researched_at,\n  created_at\n) VALUES (\n  $1, $2, $3, $4, $5, $6, NOW()\n)\nON CONFLICT (profile_url, profile_type)\nDO UPDATE SET\n  research_data = EXCLUDED.research_data,\n  research_depth = EXCLUDED.research_depth,\n  last_researched_at = EXCLUDED.last_researched_at,\n  research_version = research_cache.research_version + 1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.json.prospect_research.profile_url }}, {{ $json.json.prospect_research.profile_picture_url }},{{ 'personal_prospect' }}, {{ JSON.stringify($json.json.prospect_research.research_data) }}, {{ $json.json.prospect_research.research_depth }}, {{ $json.json.prospect_research.last_researched_at }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1216,
+        144
+      ],
+      "id": "598900a4-610a-45fd-9e4b-37ea36a3ecd4",
+      "name": "Save Prospect Research",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/{{ $('LinkedIn Fields').item.json.prospect_identifier }}?account_id={{ $('LinkedIn Fields').item.json.account_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        80
+      ],
+      "id": "8a83a12b-6423-443b-9847-d69018d72425",
+      "name": "Get Prospect LinkedIn",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        16
+      ],
+      "id": "5513ebfb-46ed-44b1-965a-33a2bf195553",
+      "name": "Prospect Data Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInputs = $input.all();\nconst profileData = allInputs[0].json;  // First item = profile\nconst postsData = allInputs[1].json;    // Second item = posts\n\n// Extract actual data (handle array wrapping)\nconst profile = Array.isArray(profileData) ? profileData[0] : profileData;\nconst posts = Array.isArray(postsData) ? postsData[0] : postsData;\n\n// Clean posts and filter for original content only\nconst allCleanedPosts = (posts.items || []).map(post => ({\n  date: post.date,\n  text: post.text,\n  engagement: {\n    reactions: post.reaction_counter || 0,\n    comments: post.comment_counter || 0,\n    impressions: post.impressions_counter || 0\n  },\n  is_repost: post.is_repost || false,\n  author: post.is_repost ? post.reposted_by?.name : post.author?.name\n}));\n\n// Filter to get only original posts, then take top 5\nconst originalPosts = allCleanedPosts\n  .filter(post => !post.is_repost)\n  .slice(0, 5);\n\n// Build final research data - ENHANCED PROFILE DATA\nconst researchData = {\n  // Basic profile info\n  name: `${profile.first_name} ${profile.last_name}`,\n  headline: profile.headline,  // \"CEO | AI Engineer | Behavioural Scientist\"\n  location: profile.location,\n  public_identifier: profile.public_identifier,\n\n  // Network & social proof\n  follower_count: profile.follower_count,\n  connections_count: profile.connections_count,\n  shared_connections_count: profile.shared_connections_count,\n  network_distance: profile.network_distance,\n\n  // Profile insights\n  is_premium: profile.is_premium,\n  is_creator: profile.is_creator,\n  is_influencer: profile.is_influencer,\n\n  // Business/interests  \n  creator_website: profile.creator_website,\n  hashtags: profile.hashtags,\n\n  // Posts data - only original posts\n  recent_posts: originalPosts,\n  post_count: originalPosts.length,\n  research_metadata: {\n    timestamp: new Date().toISOString(),\n    total_posts_fetched: posts.items?.length || 0,\n    original_posts_found: originalPosts.length,\n    reposts_filtered_out: allCleanedPosts.filter(post => post.is_repost).length,\n    research_depth: \"standard\"\n  }\n};\n\n// URL-encode the public_identifier to preserve emojis as %XX format\nconst encodedIdentifier = encodeURIComponent(profile.public_identifier || '');\n\n// Output ready for PostgreSQL save\nreturn [{\n  json: {\n    json: {\n      prospect_research: {\n        profile_url: `https://linkedin.com/in/${encodedIdentifier}/`,\n        profile_picture_url: profile.profile_picture_url || null,\n        profile_type: \"personal_prospect\",\n        research_data: researchData,\n        research_depth: \"standard\",\n        last_researched_at: new Date().toISOString()\n      }\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        16
+      ],
+      "id": "27da274f-f41d-445f-8768-0e12e9d882f5",
+      "name": "Clean Prospect Data"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "icps",
+          "mode": "list",
+          "cachedResultName": "icps"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $('LinkedIn Fields').first().json.icp_id }}"
+            },
+            {
+              "column": "created_by",
+              "value": "={{ $('LinkedIn Fields').first().json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        2944,
+        64
+      ],
+      "id": "f64b1ea3-5ac1-491e-9ecf-6be30c93c50a",
+      "name": "Fetch ICP",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH target_url AS (\nSELECT $1::text as url\n)\nSELECT\njson_build_object(\n  'prospect_research', json_build_object(\n    'profile_url', (SELECT url FROM target_url),\n    'profile_type', COALESCE(profile_type, 'personal_prospect'),\n    'research_data', research_data,\n    'research_depth', research_depth,\n    'last_researched_at', last_researched_at,\n    'cache_id', id\n  )\n) as json,\nCASE\n  WHEN last_researched_at IS NULL THEN 'never'\n  WHEN last_researched_at < NOW() - INTERVAL '30 days' THEN 'outdated'\n  ELSE 'current'\nEND as research_freshness\nFROM research_cache, target_url\nWHERE (profile_url = target_url.url OR profile_url LIKE '%/' || target_url.url || '/%' OR profile_url LIKE '%/' || target_url.url)\nAND profile_type = 'personal_prospect'\nUNION ALL\nSELECT\njson_build_object(\n  'prospect_research', json_build_object(\n    'profile_url', (SELECT url FROM target_url),\n    'profile_type', 'personal_prospect',\n    'research_data', NULL,\n    'research_depth', NULL,\n    'last_researched_at', NULL\n  )\n) as json,\n'never' as research_freshness\nFROM target_url\nWHERE NOT EXISTS (\nSELECT 1 FROM research_cache, target_url t2\nWHERE (profile_url = t2.url OR profile_url LIKE '%/' || t2.url || '/%' OR profile_url LIKE '%/' || t2.url)\n  AND profile_type = 'personal_prospect'\n); \n",
+        "options": {
+          "queryReplacement": "={{ $('Standardise URL').first().json.normalized_linkedin_url }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "5ecf1322-928f-4c52-9ac8-87d926f12979",
+      "name": "Check Research Cache",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0a29f22c-ee60-4109-ace8-882393f6aceb",
+              "leftValue": "={{ $json.research_freshness }}",
+              "rightValue": "current",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        96,
+        16
+      ],
+      "id": "91ae22d8-c742-4675-8ed2-d2c1213768d8",
+      "name": "Prospect in Database?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.prospect_url;\n\n// Clean and normalize URL\nconst cleanUrl = url\n  .replace(/https?:\\/\\/www\\./, 'https://')           // Remove www\n  .replace(/https?:\\/\\/[^\\/]+/, 'https://linkedin.com') // Standardize domain\n  .replace(/\\/$/, '') + '/';                          // Ensure single trailing slash\n\nreturn [{\n  json: {\n    normalized_linkedin_url: cleanUrl\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        16
+      ],
+      "id": "319a13f1-665d-4699-a949-7cdc68e6be00",
+      "name": "Standardise URL"
+    },
+    {
+      "parameters": {
+        "description": "Call this tool to read the Josh Braun Golden Rules you must use for message generation.",
+        "jsCode": "const braunGuidelines = {\n  \"title\": \"Josh Braun's Golden Rules for LinkedIn DMs\",\n  \"rules\": [    \n    {\n      \"ruleNumber\": 1,\n      \"title\": \"Start in the prospect's world\",\n      \"principles\": [\n        {\n          \"principle\": \"Lead with relevance\",\n          \"details\": \"Open with something specific about the person or their company rather than introducing yourself. Research a prospect's situation and use that as the opening line.\",\n          \"example\": \"How closely are you tracking unused or underutilised software seats at ACME?\",\n          \"rationale\": \"Shows that you know why you are reaching out and makes them feel uniquely qualified to respond.\"\n        },\n        {\n          \"principle\": \"Avoid generic pleasantries or intros\",\n          \"details\": \"Phrases like 'Hello Josh! My name is...' or 'Hope you're doing well' are fluff and make you sound like every other seller.\",\n          \"recommendation\": \"Move your name to the end and cut these filler phrases.\"\n        }\n      ]\n    },\n      {\n      \"ruleNumber\": 2,\n      \"title\": \"Poke the bear with a neutral question\",\n      \"principles\": [\n        {\n          \"principle\": \"Use illumination questions instead of leading questions\",\n          \"details\": \"Leading questions ('If I could show you how to 10X your revenue, would you be interested?') make prospects smell 'commission breath'.\",\n          \"recommendation\": \"Ask a neutral question that exposes a problem or risk the prospect might not be aware of.\",\n          \"example\": \"How do you know good interviews won't turn into bad sales hires?\"\n        },\n        {\n          \"principle\": \"Lower the zone of resistance\",\n          \"details\": \"Precede your question with a softener like 'Not sure about your situation...' to avoid assuming they have a problem.\",\n          \"benefit\": \"This tone prevents defensiveness and keeps the conversation respectful.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 3,\n      \"title\": \"Show specific proof and expertise\",\n      \"principles\": [\n        {\n          \"principle\": \"Give a concrete proof point\",\n          \"details\": \"After highlighting the problem, share a succinct example of how you helped someone similar achieve a desirable outcome.\",\n          \"example\": \"ModMed (~4k employees) saved $1.4M by reclaiming 2,800 licences\",\n          \"keyElements\": [\"names\", \"numbers\", \"time frames\"],\n          \"benefit\": \"Specificity makes the claim believable and leverages the bandwagon effect.\"\n        },\n        {\n          \"principle\": \"Be meaningfully different\",\n          \"details\": \"Highlight how your approach differs from what they're currently doing.\",\n          \"recommendation\": \"Clearly show the contrast between before and after, or between current pain and future possibility.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 4,\n      \"title\": \"Keep it crispy (concise and clear)\",\n      \"principles\": [\n        {\n          \"principle\": \"Five lines or less\",\n          \"details\": \"Prospects are inundated with emails, calls, chats and notifications. Every word has a 'calorie count' – cut any that don't add value.\",\n          \"format\": \"Braun's 'crispy' emails use five lines or fewer.\"\n        },\n        {\n          \"principle\": \"DMs should be short, succinct and clear\",\n          \"details\": \"A great DM reads like a text message: one or two sentences that get to the point.\",\n          \"example\": \"Hi [Name], not sure if this is relevant, but we built AI that helps with outbound, ads and retargeting. If you're curious I can share a bit more. If not, no worries at all.\",\n          \"warning\": \"Messages that ramble or include multiple paragraphs are far more likely to be ignored.\"\n        },\n        {\n          \"principle\": \"Make one chess move per message\",\n          \"details\": \"Don't cram multiple benefits or asks into a single DM.\",\n          \"recommendation\": \"Focus on one problem and one way you can help; follow up later with another 'chess move' rather than 'bumping' the same message.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 5,\n      \"title\": \"Focus on the outcome the prospect wants\",\n      \"principles\": [\n        {\n          \"principle\": \"Speak to results, not features\",\n          \"details\": \"Frame the proof point around a result the prospect desires but doesn't yet have.\",\n          \"example\": \"Saving money on unused software licences is an outcome that CFOs care about.\"\n        },\n        {\n          \"principle\": \"Use future pacing or 'what-if' questions\",\n          \"details\": \"Help prospects imagine a better tomorrow.\",\n          \"example\": \"What if you could calculate and run commissions for 100+ reps in one-third the time without any manual data entry or errors?\",\n          \"benefit\": \"Future pacing taps into the desire to improve their situation and contrasts current and potential outcomes.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 6,\n      \"title\": \"End with a low-friction invitation\",\n      \"principles\": [\n        {\n          \"principle\": \"Gently gauge interest\",\n          \"details\": \"Replace pushy meeting requests with light asks.\",\n          \"goodExamples\": [\"Worth a look?\", \"Opposed to learning how?\", \"Would it make sense to...\"],\n          \"badExample\": \"I'd love to schedule a 30-minute call\",\n          \"benefit\": \"Prospects feel in control.\"\n        },\n        {\n          \"principle\": \"Keep the ask about them, not you\",\n          \"details\": \"People care about what they want, not what you want.\",\n          \"example\": \"Would you be open to investing 20 minutes to hear a different perspective on improving forecast accuracy?\"\n        },\n        {\n          \"principle\": \"Reduce pressure\",\n          \"details\": \"Clarify that you're inviting them to explore options 'should a need arise in the future'.\",\n          \"benefit\": \"This reduces the immediate pressure to buy and keeps defences down.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 7,\n      \"title\": \"Avoid door-slammer phrases\",\n      \"phrasesToAvoid\": [\n        {\n          \"phrase\": \"I'd love to...\",\n          \"reason\": \"Signals self-interest and can make prospects defensive.\",\n          \"alternative\": \"Would it make sense to...\"\n        },\n        {\n          \"phrases\": [\n            \"Hello, my name is...\",\n            \"Hope you're doing well.\",\n            \"I know you're busy so I'll keep it brief.\"\n          ],\n          \"reason\": \"These generic phrases add no value and must be omitted.\"\n        },\n        {\n          \"phrase\": \"Just bumping this to the top of your inbox.\",\n          \"alternative\": \"Instead of nagging, provide another way you can help.\"\n        }\n      ]\n    },\n        {\n      \"ruleNumber\": 8,\n      \"title\": \"Mindset: spark curiosity without pressure\",\n      \"philosophy\": \"Josh Braun stresses that cold outreach should spark curiosity without pressuring the prospect.\",\n      \"keyPrinciples\": [\n        \"The aim is not to persuade or pitch but to help people think differently about a problem.\",\n        \"Detach from the outcome and focus on being helpful.\",\n        \"Prospects are more likely to engage when they feel safe, respected and intrigued.\"\n      ],\n      \"implementation\": \"Adopting this mindset will keep Cold AI's DMs aligned with Braun's philosophy.\"\n    }\n  ],\n  \"finalGuidance\": \"Use these rules collectively to craft LinkedIn DMs that respect your prospect's world, illuminate problems, provide evidence, and invite a low-pressure conversation. Cold AI must internalise these principles, and thus create messages that feel thoughtful and human – just like Josh Braun.\"\n};\n\nreturn JSON.stringify(braunGuidelines, null, 2);"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3872,
+        -160
+      ],
+      "id": "8b0ff9ef-7a7d-49c5-9f9e-03b6020946b7",
+      "name": "Josh Braun Guidelines"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO research_cache (\n  profile_url,\n  profile_type,\n  research_data,\n  research_depth,\n  last_researched_at,\n  created_at\n) VALUES (\n  $1, $2, $3, $4, $5, NOW()\n)\nON CONFLICT (profile_url, profile_type)\nDO UPDATE SET\n  research_data = EXCLUDED.research_data,\n  research_depth = EXCLUDED.research_depth,\n  last_researched_at = EXCLUDED.last_researched_at,\n  research_version = research_cache.research_version + 1;\n\nUPDATE user_profiles\nSET\n  linkedin_profile_data = $6,\n  linkedin_profile_scraped_at = NOW(),\n  updated_at = NOW(),\n  linkedin_premium = $7\nWHERE user_id = $8;",
+        "options": {
+          "queryReplacement": "={{ $json.research_cache_user_data.profile_url }}, {{ $json.research_cache_user_data.profile_type }}, {{ $json.research_cache_user_data.research_data }}, {{ $json.research_cache_user_data.research_depth }}, {{ $json.research_cache_user_data.last_researched_at }}, {{ $json.user_profile_data }}, {{ $json.user_linkedin_premium }},{{ $('LinkedIn Fields').first().json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1216,
+        -144
+      ],
+      "id": "3f427238-0329-4444-bc19-bf6a0ed6993c",
+      "name": "Save User LinkedIn URL & Data",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze this ICP data and extract the key insights needed for personalized outreach:\n\nICP Data:\nUse the Fetch ICP Tool to obtain ICP data from the database.\n\nProvide a focused summary (200-300 words) covering:\n1. **Target Profile**: Who they are (role, company size, industry)\n2. **Key Pain Points**: Primary challenges they face\n3. **Goals & Motivations**: What they're trying to achieve\n4. **Communication Preferences**: How they prefer to be approached\n5. **Decision Factors**: What influences their buying decisions\n\nFocus on actionable insights that will help craft compelling, relevant outreach messages.\n\nAlso provide a score out of 100% for how well the propect matches the users ICP."
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are an expert ideal customer profile (ICP) analyst for sales and marketing teams. Your job is to extract the most relevant customer characteristics, pain points, and targeting criteria from ICP data to enable highly personalised outreach messaging.\n\nFocus on:\n  - Key demographics and firmographics\n  - Primary pain points and challenges\n  - Goals and desired outcomes\n  - Preferred communication styles and channels\n  - Decision-making criteria and processes\n  - Budget and authority indicators\n\nOutput a concise, actionable summary that enables sales teams to craft messages that resonate with the target customer's specific needs and context.",
+          "maxTokens": 800,
+          "temperature": 0.2,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        -160
+      ],
+      "id": "7ceb07e3-5374-46a0-aa0f-061755738846",
+      "name": "ICP",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "communication_preferences",
+          "mode": "list",
+          "cachedResultName": "communication_preferences"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "user_id",
+              "value": "={{ $('LinkedIn Fields').first().json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        3648,
+        -160
+      ],
+      "id": "e292f2c3-6679-4a98-9d3e-53109ced6f95",
+      "name": "Fetch User Preferences",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4347000-ece5-4725-9fa5-07515308b9b5",
+              "name": "account_id",
+              "value": "={{ $json.account_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ce20fbc7-1808-40cc-936e-8919e7b0a2f6",
+              "name": "user_linkedin_identifier",
+              "value": "={{ $json.user_linkedin_identifier }}",
+              "type": "string"
+            },
+            {
+              "id": "28a99511-8f13-49f6-bc62-ede47c267131",
+              "name": "user_linkedin",
+              "value": "={{ $json.user_linkedin }}",
+              "type": "string"
+            },
+            {
+              "id": "c4697f7a-1814-41f6-949d-0d96270ac89c",
+              "name": "profile_freshness",
+              "value": "={{ $json.profile_freshness }}",
+              "type": "string"
+            },
+            {
+              "id": "675c9920-d466-4995-ad7d-9d109e20b0f7",
+              "name": "prospect_identifier",
+              "value": "={{ $json.prospect_identifier }}",
+              "type": "string"
+            },
+            {
+              "id": "973243ee-f399-46b0-9672-a1dde117873e",
+              "name": "prospect_url",
+              "value": "={{ $json.prospect_url }}",
+              "type": "string"
+            },
+            {
+              "id": "5853b07c-9500-46f0-b2c4-ef9ea02c29a1",
+              "name": "message_type",
+              "value": "={{ $json.message_type }}",
+              "type": "string"
+            },
+            {
+              "id": "8f7fd98b-29aa-4151-a06e-15b08b3d619e",
+              "name": "icp_id",
+              "value": "={{ $json.icp_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ea801354-a21c-47dd-afdf-fe79445e30ef",
+              "name": "product_id",
+              "value": "={{ $json.product_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ba49e83c-f74b-4eb2-abcf-977681f8d49a",
+              "name": "user_id",
+              "value": "={{ $json.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "05a0ea06-9146-487f-b50c-7f768edc567b",
+              "name": "timestamp",
+              "value": "={{ $json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "7ca09b19-9c94-4d6c-b6fc-ede1b7ae37b8",
+              "name": "request_id",
+              "value": "={{ $json.request_id }}",
+              "type": "string"
+            },
+            {
+              "id": "d0052eff-fc9d-4eb1-bfb9-52e4cfcf8050",
+              "name": "log_id",
+              "value": "={{ $json.log_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -576,
+        -208
+      ],
+      "id": "5219b722-b810-439c-9f51-76fc0fd1a567",
+      "name": "LinkedIn Fields"
+    },
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/{{ $json.provider_id }}/posts?limit=20&account_id={{ $('LinkedIn Fields').first().json.account_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        -256
+      ],
+      "id": "1ee4091c-5b0e-45eb-8bbd-b14a2679b6cb",
+      "name": "Get User Posts",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/me?account_id={{ $json.account_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        -336
+      ],
+      "id": "0c76f7f7-aac1-4911-8c39-5e281ef2914f",
+      "name": "Get User LinkedIn URL",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInputs = $input.all();\nconst profileData = allInputs[0].json;  // First item = profile\nconst postsData = allInputs[1].json;    // Second item = posts\n\n// Extract actual data (handle array wrapping)\nconst profile = Array.isArray(profileData) ? profileData[0] : profileData;\nconst posts = Array.isArray(postsData) ? postsData[0] : postsData;\n\n// Clean posts and filter for original content only\nconst allCleanedPosts = (posts.items || []).map(post => ({\n  date: post.date,\n  text: post.text,\n  engagement: {\n    reactions: post.reaction_counter || 0,\n    comments: post.comment_counter || 0,\n    impressions: post.impressions_counter || 0\n  },\n  is_repost: post.is_repost || false,\n  author: post.is_repost ? post.reposted_by?.name : post.author?.name\n}));\n\n// Filter to get only original posts, then take top 5\nconst originalPosts = allCleanedPosts\n  .filter(post => !post.is_repost)\n  .slice(0, 5);\n\n// Build rich research data for research_cache table\nconst researchData = {\n  // Basic profile info\n  name: `${profile.first_name} ${profile.last_name}`,\n  occupation: profile.occupation,\n  location: profile.location,\n  email: profile.email,\n  public_identifier: profile.public_identifier,\n\n  // User-specific fields\n  organizations: profile.organizations,\n  premium: profile.premium,\n  profile_picture_url: profile.profile_picture_url,\n\n  // Posts data - only original posts\n  recent_posts: originalPosts,\n  post_count: originalPosts.length,\n  research_metadata: {\n    timestamp: new Date().toISOString(),\n    total_posts_fetched: posts.items?.length || 0,\n    original_posts_found: originalPosts.length,\n    reposts_filtered_out: allCleanedPosts.filter(post => post.is_repost).length,\n    research_depth: \"standard\"\n  }\n};\n\n// Build basic profile data for user_profiles.linkedin_profile_data column\n// This matches what unipileService.checkLinkedInStatus() expects\nconst basicProfileData = {\n  first_name: profile.first_name,\n  last_name: profile.last_name,\n  occupation: profile.occupation,\n  location: profile.location,\n  profile_picture_url: profile.profile_picture_url,\n  public_identifier: profile.public_identifier,\n  organizations: profile.organizations, // For organization display in widget\n  email: profile.email\n};\n\n// Output both datasets\nreturn [\n  {\n    json: {\n      json: {\n        // For research_cache table\n        research_cache_user_data: {\n          profile_url: `https://linkedin.com/in/${profile.public_identifier}/`,\n          profile_type: \"personal_user\",\n          research_data: researchData,\n          research_depth: \"standard\",\n          last_researched_at: new Date().toISOString()\n        },\n        // For user_profiles.linkedin_profile_data column\n        user_profile_data: basicProfileData,\n        // For messaging capability validation\n        user_linkedin_premium: profile.premium || false\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -272
+      ],
+      "id": "aeffe044-12e4-4413-b037-b4f161fd1cd2",
+      "name": "Clean User Data"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        -400
+      ],
+      "id": "36f2fa5a-7957-4803-ab5e-cb8fd05c1cb4",
+      "name": "User Research Merge"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Write a 300 character or less LinkedIn message (and nothing else) for {{ JSON.stringify($('Merge').first().json.json.research_cache_user_data.research_data.name) }} (the sender) and {{ JSON.stringify($('Merge').all()[1].json.json.prospect_research.research_data.name) }} (the recipient) using the data below.\n\n  PRODUCT INFORMATION - the user's product capabilities and value propositions:\n  {{ JSON.stringify($json.USERS_PRODUCT_CAPABILITIES) }}\n\n  RELATIONSHIP & PROSPECT RESEARCH - Insights about the prospect's activities, interests, and relationship with sender (do not use as examples of the user's product success):\n  {{ JSON.stringify($json.LINKEDIN_RELATIONSHIP_RESEARCH) }}\n\n  TARGET CUSTOMER ANALYSIS - General ICP insights and pain points the user is hoping their product will address and the same ICP match score should be used directly with your reasoning applied:\n  {{ JSON.stringify($json.TARGET_CUSTOMER_PROFILE_ANALYSIS) }}\n\n  DATA WARNING - Must read:\n  {{ $json.DATA_SOURCE_WARNING }}\n\nHOW TO USE THIS DATA:\n  - Use PRODUCT INFORMATION to understand what the user's product does and its benefits\n  - Use RELATIONSHIP & PROSPECT RESEARCH to personalise the opener and find connection points\n  - Use TARGET CUSTOMER ANALYSIS to understand relevant pain points and motivations\n  - NEVER use the prospect's personal activities (like their training work, events attended) as Cold AI success stories\n  - Create relevant examples based on the user's actual capabilities, not fictional case studies\n\nYou must find User Communication Preferences with the \"Fetch User Preferences\" tool. If there are \"phrases_to_avoid\", do not use those phrases.\n\nYou must read Josh Braun's Golden Rules with the \"Josh Braun Guidelines\" tool only once at the beginning. Follow the framework, structure, and phrase examples as outlined or use them to create brand new phrases, softeners and door-slammer alternatives that fit the guidelines. However, do not use the specific case study examples (like\nModMed) - instead use real customer data when available and never fabricate examples or statistics. Where statistics do not exist, point towards the product benefits based on the product research provided, avoiding statistics and applying the Josh Braun template guide.\n\nUse the Find Message Variation tool to find previous generations for this user-prospect relationship and avoid repetition with previous messages if any exist.\n\nGenerate a response in this EXACT JSON format:\n{\n  \"message\": \"The LinkedIn message text only\",\n  \"icp_analysis\": {\n    \"match_score\": 85,\n    \"match_reasoning\": \"Brief explanation of why this score\",\n    \"key_alignment_points\": [\"Point 1\", \"Point 2\", \"Point 3\"],\n    \"potential_objections\": [\"Objection 1\", \"Objection 2\"],\n    \"recommended_follow_up\": \"Suggested next step if they respond positively\"\n  },\n  \"message_metadata\": {\n    \"personalization_elements\": [\"Element 1\", \"Element 2\"],\n    \"josh_braun_principles_used\": [\"Principle 1\", \"Principle 2\"],\n    \"prospect_pain_points_addressed\": [\"Pain point 1\", \"Pain point 2\"]\n  }\n}\n\nReturn ONLY this JSON structure, no other text."
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are an expert LinkedIn message writer following Josh Braun's proven methodology for cold outreach. Your messages spark curiosity without pressure, focusing on the prospect's world rather than selling.\n\nCore Principles:\n1. START IN THEIR WORLD - Lead with specific relevance, avoid generic intros (\"My name is...\")\n2. POKE THE BEAR - Ask neutral illumination questions that expose problems\n3. SHOW PROOF - Give concrete examples with names, numbers, timeframes (if available in the research data [COLD_AI_PRODUCT_CAPABILITIES])\n4. KEEP IT CRISPY - Maximum 5 lines, one chess move per message\n5. FOCUS ON OUTCOMES - Speak to results they want, not features\n6. LOW-FRICTION ASK - End with \"Worth a look?\" not pushy meeting requests\n7. AVOID DOOR-SLAMMERS - Never use \"I'd love to\", \"Hope you're well\", \"Just bumping\"\n8. SPARK CURIOSITY - Help them think differently, detach from outcome\n\nMessage Structure:\n- Beginning Line 1: Quick hello based on communication tone (consultative, friendly etc.), for example \"Hey {first name (if available)}, \")\n- Line 1 continued: Specific opener about their situation (no sender name/intro), priortise recent posts for conversation starters\n- Lines 2-3: Neutral question that illuminates a problem\n- Line 4: Concrete proof point with specifics or value proposition if statistics aren't available\n- Line 5: Low-pressure invitation\n\nMessage MUST be less than or equal to 300 characters.\n\nYou must use the Fetch User Preferences tool to understand the user communication_style (Professional/Consultative/Friendly), if there any specific phrases they want you to avoid, and what their aims for outreach are (cta_preference). You must use the Josh Braun Guidelines tool and Find Message Variations tool. If you discover other messages, avoid using the same data for messaging if possible\n\nNEVER FABRICATE ANY DATA, STATISTICS OR PERCENTAGES.\n\nWhen providing value propositions in the absence of concrete proof points:\n  - Reference general product capabilities without specific numbers\n  - Focus on the approach/methodology rather than fabricated metrics\n  - If no real customer data exists, describe the value proposition instead\n\nWrite messages in British English that feel thoughtful, human, and respectful while following these principles exactly.",
+          "maxTokens": 1800,
+          "temperature": 0.6,
+          "topP": 0.9,
+          "maxToolsIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        -384
+      ],
+      "id": "a34fc02a-cdb3-44ab-ab5d-8a5b00fdc656",
+      "name": "Generator",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1216,
+        -400
+      ],
+      "id": "77a2361f-407f-447c-82c2-d0af5cb998a2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyse this LinkedIn research data for {{ JSON.stringify($json.json.research_cache_user_data.research_data.name) }} (the sender) and {{ JSON.stringify($input.all()[1].json.json.prospect_research.research_data.name) }} (the recipient).\n\nIdentify:\n1. **Connection Points**: Shared experiences, industries, interests, or mutual connections\n2. **Recent Activity**: Notable posts, achievements, or career moves worth acknowledging\n3. **Conversation Starters**: Specific topics that could lead to meaningful dialogue\n4. **Personality Insights**: Communication style, values, and interests based on their content\n5. **Outreach Opportunities**: How the sender can provide value or find common ground\n\nData:\n{{ $json }}\n\nProvide a focused summary (400-600 words) that enables authentic, personalised outreach in British English."
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are an expert LinkedIn profile researcher for warming cold outreach leads. Your job as a relationship intelligence summariser is to analyse LinkedIn research data for our user {{ JSON.stringify($json.json.research_cache_user_data) }} and a profile they have identified as a prospect for outreach {{ JSON.stringify($input.all()[1].json.json.prospect_research) }}. Extract key connection points, shared interests, and conversation starters for warm personalised outreach.\n\nIMPORTANT: When analyzing LinkedIn posts, always identify if the prospect is quoting statistics, reports, or data from other sources vs. their own original content. Attribute sources correctly (e.g., \"sharing findings from {Their own/A different Person's/A Company's/etc.} report/post/article/etc.\"). Don't assume partnerships or collaborations for data/statistics in posts unless the post specifically states so, prefer to quote sources exactly.\n\nFocus on:\n- Professional overlaps and shared experiences\n- Recent activities and achievements worth acknowledging\n- Mutual interests that could spark genuine conversation\n- Personality insights from post content and engagement patterns\n- Specific details that show you've done your research\n- Identifying whether recent posts are creating original content or curating/sharing others' work\n\nOutput a concise but actionable summary that enables highly personalised, authentic and warm outreach messages.",
+          "maxTokens": 1000,
+          "temperature": 0.3,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        -400
+      ],
+      "id": "628e1af8-17bf-4a47-b337-050ecd894361",
+      "name": "LinkedIn Summariser",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInputs = $input.all();\n\n// Safely extract content with fallbacks\nconst getContent = (index) => {\n  const item = allInputs[index];\n  if (item && item.json && item.json.content && item.json.content[0] && item.json.content[0].text) {\n    return item.json.content[0].text;\n  }\n  return `Content not available for item ${index}`;\n};\n\n// Categorize content based on patterns/headers in the text\nconst categorizeContent = (text) => {\n  if (text.includes('Product Summary') || text.includes('Product Overview')) {\n    return 'product';\n  } else if (text.includes('LinkedIn Relationship Intelligence') || text.includes('LinkedIn Research Summary')) {\n    return 'linkedin';\n  } else if (text.includes('ICP Analysis')) {\n    return 'icp';\n  }\n  return 'other';\n};\n\n// Extract and categorize all content\nconst productSummaries = [];\nconst linkedinSummaries = [];\nconst icpAnalyses = [];\nconst otherContent = [];\n\nfor (let i = 0; i < allInputs.length; i++) {\n  const content = getContent(i);\n  const category = categorizeContent(content);\n\n  switch(category) {\n    case 'product':\n      productSummaries.push(content);\n      break;\n    case 'linkedin':\n      linkedinSummaries.push(content);\n      break;\n    case 'icp':\n      icpAnalyses.push(content);\n      break;\n    default:\n      otherContent.push(content);\n  }\n}\n\nreturn [{\n  json: {\n    USERS_PRODUCT_CAPABILITIES: productSummaries.join('\\n\\n---\\n\\n'),\n\n    LINKEDIN_RELATIONSHIP_RESEARCH: linkedinSummaries.join('\\n\\n---\\n\\n'),\n\n    TARGET_CUSTOMER_PROFILE_ANALYSIS: icpAnalyses.join('\\n\\n---\\n\\n'),\n\n    ADDITIONAL_CONTEXT: otherContent.length > 0 ? otherContent.join('\\n\\n---\\n\\n') : 'No additional context',\n\n    DATA_SOURCE_WARNING: \"IMPORTANT: LinkedIn activities mentioned in LINKEDIN_RELATIONSHIP_RESEARCH are for both the USER (sender) and PROSPECT'S personal activities and achievements. Make sure to check whose name is attributed to an achievement and never use the prospect's achievements as an example of the user's product success.\",\n\n    item_count: allInputs.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3408,
+        -528
+      ],
+      "id": "63a06bae-4a00-4788-8805-697466195c53",
+      "name": "Combine1"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2960,
+        -416
+      ],
+      "id": "00a00d41-7e54-438c-86cb-13b3b8bc19d1",
+      "name": "Message Data Merge"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d5b4376d-eb9a-45c0-bcdb-5e4d14028def",
+              "leftValue": "={{ $json.profile_freshness }}",
+              "rightValue": "current",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        96,
+        -432
+      ],
+      "id": "f14086bf-7230-423e-87b4-940a7dda00a6",
+      "name": "User Profile Ready"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $('LinkedIn Fields').first().json.product_id }}"
+            },
+            {
+              "column": "created_by",
+              "value": "={{ $('LinkedIn Fields').first().json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        2688,
+        -528
+      ],
+      "id": "56e57b7c-1adb-4050-ae3e-356f2a28ac3e",
+      "name": "Fetch Product",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  json_build_object(\n    'research_cache_user_data', json_build_object(\n      'profile_url', profile_url,\n      'profile_type', profile_type,\n      'research_data', research_data,\n      'research_depth', research_depth,\n      'last_researched_at', last_researched_at\n    )\n  ) as json\nFROM research_cache\nWHERE profile_url = $1\n  AND profile_type = 'personal_user';",
+        "options": {
+          "queryReplacement": "={{ $json.normalized_linkedin_url }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        992,
+        -576
+      ],
+      "id": "e22f6da8-4f92-486c-b82c-37e9b5e24342",
+      "name": "Fetch User Linkedin Data",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze this user LinkedIn comparison {{ JSON.stringify($json) }} with their outreach prospect and prepare a product summary by extracting the key insights needed for personalised outreach for the specific prospect and their needs:\n\nProduct Data:\nUse the Fetch Product tool to obtain product data from the database.\n\nProvide a focused summary (<500 words) covering:\n1. **Product Overview**: Core features and capabilities\n2. **Key Value Propositions**: Primary benefits and outcomes delivered\n3. **Target Use Cases**: Most relevant applications and scenarios\n4. **Competitive Advantages**: What sets this product apart\n5. **Implementation Details**: Ease of setup, time to value, support provided\n6. **ROI Indicators**: Cost savings, efficiency gains, or revenue impact\n\nFocus on actionable selling points that will help craft compelling, value-driven outreach messages that address specific prospect needs."
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are an expert product marketing analyst specializing in value proposition extraction for sales outreach. Your job is to analyze product and prospect data and extract the most compelling features, benefits, and value propositions that resonate with the target customer.\n\nFocus on:\n- Core product features and capabilities\n- Key benefits and value propositions\n- Target use cases and applications\n- Competitive advantages and differentiators\n- Pricing and ROI considerations\n- Implementation and onboarding process\n\nOutput a concise, sales-focused summary that enables personalized outreach highlighting the most relevant product value for each prospect.",
+          "maxTokens": 800,
+          "temperature": 0.2,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        -752
+      ],
+      "id": "c8a1f73d-1f67-46fd-9098-8952ca39adc0",
+      "name": "Product",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "2c80109f-d026-4d31-8df0-ad6de6a9d2bc",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -784,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Saving\nSaving the more detailed AI summaries to the message_generation_logs table. As this is specific summaries between the relationship of the user and prospect, ICP and product.\n\nThe prospect's row id in the resarch_cache becomes research_cache_id in the message_generation_logs table.",
+        "height": 224,
+        "width": 496,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4416,
+        -800
+      ],
+      "typeVersion": 1,
+      "id": "f82e32da-ab8b-4afb-a3c4-1017dc9fc463",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Saving\nresearch_cache table has the more general LinkedIn data. The unipile scrape is set occur if no data for the prospect URL currently exists or was last scraped over 30 days ago. \n\nresearch_cache.research_data contains the persons linkedin profile and the their recent post history (not including reposts).\n",
+        "height": 208,
+        "width": 576,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "6b77ba4b-6d8f-4e4b-954b-56c211b4d9d7",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Saving\nProspect LinkedIn research is also saved to the research_cache table. The looping here is to make sure that the prospect research can be linked from the research_cache table to the message_generation_log by the row id, which becomes named \"cache_id\".",
+        "height": 208,
+        "width": 576,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1392,
+        224
+      ],
+      "typeVersion": 1,
+      "id": "b1d884e8-6d74-48e2-98f2-7cb71995445d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Connection Error \nAre my workflows equiped to deal with connection errors?\nConnection refused\n18.169.28.97:6543"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2864,
+        208
+      ],
+      "typeVersion": 1,
+      "id": "f933c51e-9159-4978-8e83-197c8f35d46d",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response\nconst textContent = $json.content[0].text;\n\nlet parsedData;\n\ntry {\n  // Try parsing directly first (most common case)\n  parsedData = JSON.parse(textContent);\n} catch (e) {\n  // If that fails, try extracting from code block\n  const jsonMatch = textContent.match(/```json\\n([\\s\\S]*?)\\n```/);\n  if (jsonMatch) {\n    parsedData = JSON.parse(jsonMatch[1]);\n  } else {\n    // Try to find JSON object anywhere in the text\n    const directJsonMatch = textContent.match(/\\{[\\s\\S]*\\}/);\n    if (directJsonMatch) {\n      parsedData = JSON.parse(directJsonMatch[0]);\n    } else {\n      throw new Error('No valid JSON found in AI response: ' + textContent.substring(0, 500));\n    }\n  }\n}\n\n// Validate the parsed data has the expected structure\nif (!parsedData.message) {\n  throw new Error('Parsed data missing required \"message\" field');\n}\n\n// Return the separated data\nreturn {\n  generated_message: parsedData.message,\n  message_metadata: JSON.stringify({\n    icp_analysis: parsedData.icp_analysis || null,\n    message_metadata: parsedData.message_metadata || null\n  })\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3984,
+        -384
+      ],
+      "id": "d056535b-0d8d-472e-93c5-d475ff441de3",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4272,
+        -512
+      ],
+      "id": "83213707-7527-4248-911f-d23a03c55ca0",
+      "name": "Prepare Save"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.message_generation_logs\nSET message_status = $1,\n    updated_at = $2,\n    ai_context = convert_from(decode($3, 'base64'), 'UTF8')::jsonb,\n    generated_message = $4,\n    message_metadata = convert_from(decode($5, 'base64'), 'UTF8')::jsonb\nWHERE id = $6;",
+        "options": {
+          "queryReplacement": "={{ 'generated' }}, {{ $now }}, {{ $json.ai_context }},{{ JSON.stringify($json.generated_message) }},{{ $json.message_metadata }}, {{ $('Start').first().json.message_log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4720,
+        -512
+      ],
+      "id": "caeac39c-9e6a-46f6-9bae-1be266db72d1",
+      "name": "Save AI Data Summaries and Message",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  // Get all items from the merge node\n  const items = $input.all();\n\n  // Find the item with generated_message and the item with context\n  const messageItem = items.find(item => item.json.generated_message);\n  const contextItem = items.find(item => item.json.USERS_PRODUCT_CAPABILITIES);\n  const startItem = items.find(item => item.json.user_id || item.json.prospect_url || item.json.icp_id);\n\n  if (!messageItem) {\n    throw new Error('No generated_message found in input items');\n  }\n\n  // Safe parsing with null checks\n  let messageMetadata = null;\n  if (messageItem.json.message_metadata) {\n    if (typeof messageItem.json.message_metadata === 'string') {\n      try {\n        messageMetadata = JSON.parse(messageItem.json.message_metadata);\n      } catch (e) {\n        console.error('Failed to parse message_metadata:', e);\n        messageMetadata = null;\n      }\n    } else {\n      messageMetadata = messageItem.json.message_metadata;\n    }\n  }\n\n  // Build AI context separately (all the research/context data)\n  const aiContext = {\n    product_capabilities: contextItem?.json.USERS_PRODUCT_CAPABILITIES || '',\n    linkedin_research: contextItem?.json.LINKEDIN_RELATIONSHIP_RESEARCH || '',\n    icp_profile: contextItem?.json.TARGET_CUSTOMER_PROFILE_ANALYSIS || '',\n    additional_context: contextItem?.json.ADDITIONAL_CONTEXT || ''\n  };\n\n  // Build message metadata separately (ICP analysis and message metadata only)\n  const messageMetadataOnly = {\n    icp_analysis: messageMetadata?.icp_analysis || null,\n    message_metadata: messageMetadata?.message_metadata || null,\n    source_info: {\n      generated_at: new Date().toISOString(),\n      generation_method: 'ai_personalized'\n    }\n  };\n\n  return {\n    json: {\n      user_id: startItem?.json.user_id || messageItem.json.user_id,\n      prospect_url: startItem?.json.prospect_url || messageItem.json.prospect_url,\n      icp_id: startItem?.json.icp_id || messageItem.json.icp_id,\n      generated_message: messageItem.json.generated_message,\n      ai_context: Buffer.from(JSON.stringify(aiContext)).toString('base64'),\n      message_metadata: Buffer.from(JSON.stringify(messageMetadataOnly)).toString('base64'),\n      generated_at: new Date().toISOString()\n    }\n  };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        -512
+      ],
+      "id": "08a92ad8-6a88-45b1-93ca-4a3fd960fe05",
+      "name": "Encode for Supabase"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1,\n  status = $2\nWHERE id = $3 ",
+        "options": {
+          "queryReplacement": "={{ true }}, {{ 'completed' }}, {{ $('Start').first().json.log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4928,
+        -512
+      ],
+      "id": "7048ba02-8490-4372-a387-7510f4db6ab7",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2400,
+        -160
+      ],
+      "id": "ae0dcbb5-9142-4a35-b886-4db2b878736d",
+      "name": "Pause",
+      "webhookId": "80c86b62-19bb-45ba-acb2-68264250a7b2"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        -752
+      ],
+      "id": "0c686fc7-52fa-469a-b562-2c4e069efb64",
+      "name": "Wait",
+      "webhookId": "dcb58790-01c9-4864-b64e-5b8167d74a03"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.message_generation_logs\nSET message_status = 'analysing_prospect',\n    updated_at = NOW(),\n    research_cache_id = $2\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Start').first().json.message_log_id }}, {{ $('Check Research Cache').first().json.json.prospect_research.cache_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1968,
+        -608
+      ],
+      "id": "7b59fbc4-0b16-4ba3-a18f-f5f4b84ce7a8",
+      "name": "Message Status LinkedIn Update",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.message_generation_logs\nSET message_status = 'researching_product',\n    updated_at = NOW()\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Start').first().json.message_log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2656,
+        -944
+      ],
+      "id": "d3e4981c-d737-4624-8668-7015decbc9a6",
+      "name": "Message Status Product Update",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.message_generation_logs\nSET message_status = 'analysing_icp',\n    updated_at = NOW()\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Start').first().json.message_log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        -336
+      ],
+      "id": "467691c1-b5e6-4a3b-aea9-8e607811b14f",
+      "name": "Message Status ICP Update",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.message_generation_logs\nSET message_status = 'generating_message',\n    updated_at = NOW()\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Start').first().json.message_log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3664,
+        -656
+      ],
+      "id": "c8e46b78-f14d-418d-a813-7466ca812367",
+      "name": "Message Status Generating Update",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO usage_tracking (user_id, usage_date, messages_generated, research_performed, created_at)\nVALUES ($1, CURRENT_DATE, 1, 3, CURRENT_TIMESTAMP)\nON CONFLICT (user_id, usage_date)\nDO UPDATE SET\n  messages_generated = usage_tracking.messages_generated + 1,\n  research_performed = usage_tracking.research_performed + 3;",
+        "options": {
+          "queryReplacement": "={{ $('Start').first().json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5136,
+        -512
+      ],
+      "id": "eb537bb7-3d53-4903-a67f-1ca25d8fc46b",
+      "name": "Usage Tracking",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.user_linkedin;\n\n// Clean and normalize URL\nconst cleanUrl = url\n  .replace(/https?:\\/\\/www\\./, 'https://')           // Remove www\n  .replace(/https?:\\/\\/[^\\/]+/, 'https://linkedin.com') // Standardize domain\n  .replace(/\\/$/, '') + '/';                          // Ensure single trailing slash\n\nreturn [{\n  json: {\n    normalized_linkedin_url: cleanUrl\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -576
+      ],
+      "id": "7c6e17e5-35fd-4463-b15a-a9163334845f",
+      "name": "Standardise User URL"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH messages AS (\n  SELECT\n    COALESCE(edited_message, generated_message) as message_variation,\n    created_at\n  FROM message_generation_logs\n  WHERE user_id = $1\n    AND research_cache_id = $2\n    AND (edited_message IS NOT NULL OR generated_message IS NOT NULL)\n    AND message_status IN ('generated', 'sent', 'archived')\n  ORDER BY created_at DESC\n  LIMIT 5\n)\nSELECT\n  COALESCE(\n    string_agg(message_variation, E'\\n---\\n' ORDER BY created_at DESC),\n    'No previous messages for this prospect'\n  ) as previous_messages\nFROM messages;\n",
+        "options": {
+          "queryReplacement": "={{ $('LinkedIn Fields').first().json.user_id }}, {{ $('Check Research Cache').first().json.json.prospect_research.cache_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        3776,
+        16
+      ],
+      "id": "e053432c-0f69-49d6-933a-482ce66ecd47",
+      "name": "Find Message Variations",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Clean Prospect Data": [
+      {
+        "json": {
+          "prospect_research": {
+            "profile_url": "https://linkedin.com/in/tom-palmer-gmbpss/",
+            "profile_type": "personal_prospect",
+            "research_data": {
+              "name": "Tom Palmer GMBPsS",
+              "headline": "CEO | AI Engineer | Behavioural Scientist",
+              "location": "Cambridge, England, United Kingdom",
+              "public_identifier": "tom-palmer-gmbpss",
+              "follower_count": 7755,
+              "connections_count": 7678,
+              "shared_connections_count": 21,
+              "network_distance": "FIRST_DEGREE",
+              "is_premium": true,
+              "is_creator": true,
+              "is_influencer": false,
+              "creator_website": {
+                "url": "https://coldai.uk",
+                "description": "Cold AI  "
+              },
+              "hashtags": [
+                "#martech",
+                "#psychology",
+                "#revenuegrowth",
+                "#saas",
+                "#sales"
+              ],
+              "recent_posts": [
+                {
+                  "date": "3h",
+                  "text": "ever notice how “playing it safe” is often the riskiest move you can make?\n\nAlex Becker points out in his book how even if you earn a great salary and save diligently… you'll almost certainly still need 20+ years to become a millionaire\n\nnot because you’re lazy...\n\nbut because the math just doesn’t work fast enough\n\nthe uncomfortable truth is: avoiding risk is a risk...\n\nit’s just the slowest and least visible kind\n\nwhen you play it safe you guarantee average outcomes\n\nwhereas taking calculated risks can give yourself a shot at asymmetric ones\n\nas Becker put it: “the biggest risk is taking none at all.”",
+                  "engagement": {
+                    "reactions": 9,
+                    "comments": 6,
+                    "impressions": 0
+                  },
+                  "is_repost": false,
+                  "author": "Tom Palmer GMBPsS"
+                },
+                {
+                  "date": "2d",
+                  "text": "Your next purchase could happen inside ChatGPT…",
+                  "engagement": {
+                    "reactions": 8,
+                    "comments": 0,
+                    "impressions": 0
+                  },
+                  "is_repost": false,
+                  "author": "Tom Palmer GMBPsS"
+                },
+                {
+                  "date": "6d",
+                  "text": "did anyone else see Swan AI's pivot?\n\nI caught up with Swan's CEO, Amos Bar-Joseph last week.\n\nHe explained how Swan has pivoted from being a single AI agent to now being “the Lovable for GTM” at getswan.com.\n\nInstead of one agent, they are now the infrastructure on which many, many agents and automations can be built on.\n\nThe analogy he gave stuck with me. Amos said that in a gold rush, the winners didn't dig for gold... they sold shovels. \n\nSo... for founders and AI engineers in the space, here's something we all need to consider...\n \nShould we be building singular agents?\n\nOr should we be building the infrastructure for a specific vertical? \n\nWell... in the words of Amos.. \"it depends what size of company you're trying to build\"...",
+                  "engagement": {
+                    "reactions": 72,
+                    "comments": 18,
+                    "impressions": 0
+                  },
+                  "is_repost": false,
+                  "author": "Tom Palmer GMBPsS"
+                }
+              ],
+              "post_count": 3,
+              "research_metadata": {
+                "timestamp": "2025-10-02T15:37:05.992Z",
+                "total_posts_fetched": 20,
+                "original_posts_found": 3,
+                "reposts_filtered_out": 17,
+                "research_depth": "standard"
+              }
+            },
+            "research_depth": "standard",
+            "last_researched_at": "2025-10-02T15:37:05.992Z"
+          }
+        }
+      }
+    ],
+    "Start": [
+      {
+        "json": {
+          "account_id": "xXqAZqvLREqIqgKACS-2sA",
+          "user_linkedin_identifier": "philip-m-smith",
+          "user_linkedin": "https://linkedin.com/in/philip-m-smith/",
+          "profile_freshness": "current",
+          "prospect_identifier": "tom-palmer-gmbpss",
+          "prospect_url": "https://www.linkedin.com/in/tom-palmer-gmbpss/",
+          "message_type": "first_message",
+          "icp_id": "4",
+          "product_id": "10",
+          "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+          "timestamp": "2025-09-30T13:18:47.844Z",
+          "request_id": "258bae40-67e4-4545-8400-c57e28655776",
+          "log_id": 58
+        }
+      }
+    ],
+    "LinkedIn Summariser": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# LinkedIn Research Summary: Phil Smith → Tom Palmer GMBPsS\n\n## Key Connection Points\n\n**Direct Professional Relationship**: Phil is currently working as a freelance AI Engineer for Tom's company, **Nudge AI**, as evidenced by Phil's recent post thanking Tom and the team. This existing relationship provides the strongest foundation for outreach.\n\n**Shared AI Engineering Focus**: Both are deeply involved in conversational AI and automation. Phil is building sophisticated Slack AI agents for Google Ads, whilst Tom positions himself as \"CEO | AI Engineer | Behavioural Scientist\" - indicating parallel technical expertise and business acumen.\n\n**Mutual Network**: They share 21 connections, suggesting overlapping professional circles in the AI/tech space around Bristol-Cambridge corridor.\n\n## Recent Activity Analysis\n\n**Phil's Current Project**: Phil's most recent post (3 months ago) showcases impressive technical work on a three-phase conversational AI system for Google Ads, built with n8n, GPT-4, Claude Opus-4, and PostgreSQL. This demonstrates advanced technical capabilities and successful project delivery.\n\n**Tom's Market Insights**: Tom's recent posts reveal strategic thinking about AI infrastructure vs. singular agents (Swan AI pivot discussion), risk-taking philosophy, and emerging trends like ChatGPT commerce integration. His content shows thought leadership and industry awareness.\n\n**Career Transition**: Phil recently completed his Physics PhD in nuclear materials and transitioned into AI engineering - showing adaptability and cross-disciplinary expertise that Tom likely values.\n\n## Conversation Starters\n\n1. **Project Collaboration**: Reference the successful Nudge AI project and discuss potential expansion or new applications\n2. **Infrastructure vs. Agents Debate**: Engage with Tom's recent Swan AI pivot post - Phil's experience building complex multi-phase systems offers valuable perspective\n3. **Technical Architecture**: Discuss Phil's sophisticated conversation state management and how it might apply to other verticals\n4. **Risk-Taking Philosophy**: Connect Phil's career pivot from nuclear physics to AI with Tom's recent post about calculated risks vs. playing it safe\n\n## Personality Insights\n\n**Phil**: Demonstrates humility (\"Big thank you to Tom Palmer\"), technical depth, and genuine enthusiasm for AI applications. His academic background suggests methodical thinking, whilst his career transition shows entrepreneurial spirit. Values collaboration and giving credit to others.\n\n**Tom**: Shows strategic thinking, enjoys philosophical business concepts, and maintains an active thought leadership presence. His posts suggest he values bold moves and unconventional thinking. Uses conversational, accessible language despite technical expertise.\n\n## Outreach Opportunities\n\n**Value Proposition**: Phil can offer:\n- Proven delivery capability (evidenced by Nudge AI project)\n- Cross-disciplinary expertise (physics + AI engineering)\n- Technical depth in conversation AI and automation\n- Fresh perspective from academic-to-industry transition\n\n**Common Ground**:\n- Both are building at the intersection of AI and practical business applications\n- Shared interest in making complex technology accessible\n- Similar views on the transformative potential of conversational AI\n- Both operate in the UK AI ecosystem\n\n**Recommended Approach**: Leverage the existing working relationship to explore expanded collaboration, reference specific technical achievements, and engage with Tom's recent strategic thinking about AI infrastructure. The warm relationship foundation allows for direct, authentic communication about mutual interests and potential opportunities.\n\nThis research reveals a strong foundation for meaningful professional dialogue built on proven collaboration, shared technical interests, and complementary perspectives on AI's commercial applications."
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# LinkedIn Research Summary: Tom Palmer GMBPsS\n\n## Connection Points\n- **First-degree connection** with 21 shared connections, indicating strong potential for warm referrals\n- **AI/Tech overlap**: Tom's role as \"AI Engineer\" and CEO suggests deep technical expertise that could align with AI-focused business discussions\n- **Cambridge location**: UK-based, making timezone alignment and potential face-to-face meetings feasible\n- **Premium LinkedIn user** and content creator (7,755 followers) showing commitment to professional networking and thought leadership\n\n## Recent Activity & Achievements\n**High-engagement content creator** with notable recent posts:\n- **Risk-taking philosophy** (3h ago): Shared insights from Alex Becker's book about \"playing it safe\" being risky, garnering 9 reactions and 6 comments\n- **AI commerce prediction** (2d ago): Brief but intriguing post about purchases happening \"inside ChatGPT\"\n- **Swan AI pivot analysis** (6d ago): Detailed breakdown of Swan AI's strategic shift from single agent to infrastructure provider, showing 72 reactions and 18 comments - his most engaging content\n\n## Conversation Starters\n1. **Swan AI infrastructure discussion**: His detailed analysis of the \"shovels vs gold\" analogy in AI agent development\n2. **Risk-taking in business**: His recent post about calculated risks vs playing it safe\n3. **AI commerce evolution**: His prediction about ChatGPT becoming a purchase platform\n4. **Martech and psychology intersection**: His hashtag usage suggests interest in behavioural aspects of marketing technology\n\n## Personality Insights\n- **Analytical thinker**: Posts demonstrate strategic thinking and ability to distill complex business pivots into clear insights\n- **Risk-aware entrepreneur**: Values calculated risk-taking over conservative approaches\n- **Industry connector**: Actively engages with other founders and shares their stories (Swan AI CEO interview)\n- **Concise communicator**: Posts are punchy and thought-provoking rather than lengthy\n- **Forward-thinking**: Focuses on emerging trends in AI and commerce\n\n## Outreach Opportunities\n\n**Value-add approaches:**\n1. **Industry insights sharing**: Given his interest in AI infrastructure, sharing relevant case studies or market analysis could be valuable\n2. **Founder network introductions**: His engagement with other CEOs suggests he values peer connections\n3. **Behavioural science applications**: His GMBPsS qualification and psychology hashtag indicate interest in behavioural applications in business\n4. **Revenue growth strategies**: His hashtags suggest focus on practical business growth, not just technology\n\n**Conversation hooks:**\n- Reference his Swan AI analysis and share thoughts on the infrastructure vs application debate\n- Discuss the risk-taking philosophy from his recent post with specific business examples\n- Explore the intersection of psychology and AI in driving revenue growth\n- Share insights about AI commerce trends building on his ChatGPT prediction\n\n**Recommended approach:** Lead with genuine appreciation for his Swan AI analysis, then pivot to sharing a relevant insight or asking a thoughtful question about AI infrastructure strategy. His high engagement rates suggest he's responsive to quality professional dialogue.\n\n**Timing consideration:** Recent posting activity shows he's actively engaged on LinkedIn, making this an optimal time for outreach."
+            }
+          ]
+        }
+      }
+    ],
+    "Product": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# Product Summary for Tom Palmer (Nudge AI CEO) Outreach\n\n## Product Overview: Cold AI\n**Core Capabilities**: AI-powered LinkedIn outreach platform that analyzes prospect profiles to generate highly personalized messages at scale, helping sales teams achieve significantly higher response rates while maintaining compliance with LinkedIn terms and GDPR.\n\n**Key Features**:\n- Advanced AI profile analysis for deep personalization\n- Automated message generation at scale\n- Team collaboration and template sharing\n- Performance analytics dashboard\n- Full LinkedIn/GDPR compliance\n\n## Key Value Propositions for Tom Palmer\n\n**1. Technical Sophistication Alignment**: Given Tom's background as \"CEO | AI Engineer | Behavioural Scientist,\" Cold AI's advanced AI profile analysis resonates with his technical expertise while solving a practical business challenge.\n\n**2. Behavioral Science Integration**: The platform leverages behavioral insights to craft messages that trigger responses - directly aligning with Tom's behavioral science background and his understanding of human psychology in business contexts.\n\n**3. Scalable AI Infrastructure**: Addresses Tom's recent strategic thinking about AI infrastructure vs. singular agents by providing a robust, scalable solution for systematic outreach rather than one-off messaging.\n\n## Target Use Cases Most Relevant to Tom\n\n**1. Nudge AI Business Development**: Scale client acquisition for his AI consultancy through personalized outreach to potential enterprise clients\n**2. Thought Leadership Amplification**: Convert his LinkedIn thought leadership content into meaningful business conversations\n**3. Partnership Development**: Systematically reach out to potential collaborators in the AI ecosystem he's actively building\n\n## Competitive Advantages\n\n**1. AI-First Approach**: Unlike generic outreach tools, Cold AI uses sophisticated AI analysis - appealing to Tom's technical standards\n**2. Compliance-First Design**: Built with GDPR and LinkedIn compliance from the ground up - crucial for UK-based operations\n**3. Behavioral Psychology Foundation**: Incorporates behavioral science principles that Tom would appreciate and validate\n\n## Implementation Details\n\n**Ease of Setup**: Quick integration with existing LinkedIn workflows\n**Time to Value**: Immediate improvement in response rates from first use\n**Team Collaboration**: Supports Tom's growing team at Nudge AI with shared templates and analytics\n**Support**: Technical support that matches the sophistication level Tom expects\n\n## ROI Indicators for Tom's Context\n\n**Efficiency Gains**: \n- Reduce time spent on manual LinkedIn outreach by 80%\n- Increase response rates from typical 2-5% to 15-25%\n\n**Revenue Impact**:\n- Convert thought leadership presence into qualified business conversations\n- Scale Nudge AI's client acquisition without proportional increase in business development time\n- Enable systematic partnership development in the AI ecosystem\n\n**Strategic Value**:\n- Aligns with Tom's philosophy of calculated risks vs. playing it safe\n- Provides data-driven insights into what messaging resonates with different prospect segments\n- Supports his transition from individual contributor to scaling CEO\n\n## Personalized Outreach Angle\n\n**Connection Point**: Leverage the existing relationship with Phil Smith as social proof - \"Phil mentioned the sophisticated AI work you're doing at Nudge AI, and I thought you'd appreciate our approach to behavioral psychology in AI-powered outreach...\"\n\n**Technical Hook**: Position as infrastructure for systematic relationship building rather than just another messaging tool - appealing to his recent strategic thinking about AI infrastructure.\n\n**Behavioral Science Angle**: Emphasize how the platform applies behavioral psychology principles to increase response rates - directly connecting to his expertise and interests.\n\nThis summary positions Cold AI not just as a sales tool, but as a strategic AI infrastructure component that aligns with Tom's technical sophistication, behavioral science background, and current"
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# Product Summary for Tom Palmer GMBPsS Outreach\n\n## Product Overview: Cold AI\n**Core Capabilities**: AI-powered LinkedIn outreach platform that analyzes prospect profiles to generate highly personalized messages at scale, helping sales teams achieve significantly higher response rates while maintaining compliance.\n\n## Key Value Propositions Aligned to Tom's Profile\n\n### 1. **AI-Driven Personalization at Scale**\n- **Tom's Connection**: As an AI Engineer and CEO, Tom understands the technical sophistication behind effective AI implementation\n- **Value**: Advanced profile analysis creates genuinely personalized messages, not generic templates\n- **Outcome**: 10x improvement in LinkedIn response rates through intelligent personalization\n\n### 2. **Strategic Risk Mitigation**\n- **Tom's Connection**: His recent post about \"playing it safe being risky\" aligns with calculated business risks\n- **Value**: GDPR compliant and LinkedIn ToS adherent - taking smart risks while avoiding platform penalties\n- **Outcome**: Aggressive outreach without compliance concerns\n\n### 3. **Behavioral Psychology Integration**\n- **Tom's Connection**: His GMBPsS qualification and psychology hashtag usage indicate deep interest in behavioral applications\n- **Value**: AI analyzes psychological triggers and communication patterns in prospect profiles\n- **Outcome**: Messages that resonate on a psychological level, driving higher engagement\n\n## Target Use Cases Most Relevant to Tom\n\n### **AI Infrastructure Sales & Partnerships**\n- Reaching other AI company founders and CTOs for strategic partnerships\n- Connecting with potential enterprise clients for AI consulting services\n- Building relationships with investors and advisors in the AI space\n\n### **Thought Leadership Amplification**\n- Converting his 7,755 LinkedIn followers into business opportunities\n- Engaging with commenters on his high-performing posts (like the Swan AI analysis with 72 reactions)\n- Scaling his network of first-degree connections beyond current 21 shared connections\n\n## Competitive Advantages\n\n### **Technical Sophistication Tom Would Appreciate**\n- Advanced NLP algorithms that understand context, not just keywords\n- Machine learning models that improve message performance over time\n- API-first architecture allowing custom integrations (appealing to his technical background)\n\n### **Strategic Business Focus**\n- Moves beyond \"spray and pray\" to strategic relationship building\n- Aligns with his focus on revenue growth and practical business applications\n- Supports his role as both technical expert and business leader\n\n## Implementation Details\n\n### **Quick Time to Value**\n- **Setup**: 15-minute onboarding process\n- **First Results**: Personalized messages within 24 hours\n- **Team Collaboration**: Template sharing and performance analytics dashboard\n- **Integration**: Works within existing LinkedIn workflow\n\n### **Support Structure**\n- Compliance guidance to avoid LinkedIn restrictions\n- Best practice templates based on high-performing campaigns\n- Analytics to track engagement and optimize approach\n\n## ROI Indicators Relevant to Tom's Business\n\n### **Efficiency Gains**\n- **Time Savings**: Reduces manual message crafting from hours to minutes\n- **Response Rate**: 10x improvement over generic outreach\n- **Meeting Conversion**: Higher quality conversations lead to more strategic partnerships\n\n### **Revenue Impact**\n- **Pipeline Acceleration**: Faster relationship building with key prospects\n- **Network Expansion**: Systematic approach to growing valuable connections\n- **Thought Leadership ROI**: Convert content engagement into business opportunities\n\n## Outreach Angle for Tom\n\n**Primary Hook**: \"Tom, your Swan AI infrastructure analysis was brilliant - the 'shovels vs gold' analogy perfectly captures the current market dynamics. As someone building AI infrastructure yourself, you'd appreciate how we're applying similar"
+            }
+          ]
+        }
+      }
+    ],
+    "ICP": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# ICP Analysis: B2B Sales Teams Using LinkedIn for Lead Generation\n\n## **Target Profile**\nGrowth-stage B2B companies (50-500 employees, £2M-£50M revenue) with dedicated sales teams across SaaS, Technology Services, Professional Services, and Financial Services. Key contacts include Sales Development Representatives, Account Executives, Sales Managers, VP Sales, and Revenue Operations Managers. These organisations have moved beyond basic cold calling and actively use LinkedIn Sales Navigator but struggle with scaling personalised outreach.\n\n## **Key Pain Points**\n- **Performance Crisis**: LinkedIn response rates below 5% with poor conversion to meetings\n- **Time Inefficiency**: Hours wasted crafting individual messages with generic, robotic templates\n- **Compliance Fears**: Risk of LinkedIn account restrictions limiting outreach capabilities\n- **Scaling Challenges**: Inability to personalise at scale while maintaining message quality and team consistency\n- **Visibility Gaps**: Lack of performance analytics and ROI measurement on LinkedIn activities\n\n## **Goals & Motivations**\nPrimary objectives include dramatically improving LinkedIn response rates, saving 5+ hours per week per sales rep, and achieving scalable personalisation while maintaining compliance. They seek competitive advantage in crowded markets, better ROI on existing LinkedIn Sales Navigator investments, and measurable improvements in meetings booked and pipeline generation.\n\n## **Communication Preferences**\nPrefer direct, results-focused communication through LinkedIn, email, and sales-focused webinars. They respond well to peer referrals, industry conferences, and sales community forums. Messaging should emphasise specific metrics (response rates, time savings, ROI) while avoiding terms like \"spam,\" \"mass messaging,\" or \"magic bullet.\"\n\n## **Decision Factors**\nDecision-making involves 2-4 stakeholders over 30-60 days, typically starting with Sales Managers who evaluate with RevOps, trial with small teams, then present ROI to VP Sales/CRO. Key concerns include LinkedIn compliance, message authenticity, CRM integration, and team adoption. Budget ranges £200-£2,000 monthly per sales team.\n\n**ICP Match Score: 88%** - This is a highly qualified, sales-ready profile with clear pain points, defined decision processes, and specific budget parameters that enable targeted, effective outreach campaigns."
+            }
+          ]
+        }
+      },
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# ICP Analysis: B2B Sales Teams Using LinkedIn for Lead Generation\n\n## **Target Profile**\nGrowth-stage B2B companies (50-500 employees, £2M-£50M revenue) with dedicated sales teams across SaaS, Technology Services, Professional Services, and Financial Services. Key roles include Sales Development Representatives, Account Executives, Sales Managers, and VP Sales. These companies have moved beyond basic cold calling and actively use LinkedIn Sales Navigator but struggle with scaling personalised outreach.\n\n## **Key Pain Points**\n- **Performance Crisis**: LinkedIn response rates below 5% with poor conversion to meetings\n- **Time Inefficiency**: Hours wasted crafting individual messages with generic, robotic templates\n- **Compliance Fears**: Anxiety about LinkedIn account restrictions and safety\n- **Scaling Challenges**: Inability to personalise outreach at scale while maintaining quality\n- **Team Inconsistency**: Lack of visibility into message performance and inconsistent messaging quality\n\n## **Goals & Motivations**\nPrimary objectives include increasing meeting bookings from LinkedIn, achieving significant time savings (5+ hours per week per rep), and improving response rates while maintaining compliance. They seek scalable personalisation solutions, better ROI on their LinkedIn Sales Navigator investment, and competitive advantage in crowded markets. Success is measured by response rate improvements, meetings booked per rep, and pipeline generation.\n\n## **Communication Preferences**\nPrefer professional channels including LinkedIn, email, sales-focused webinars, and industry conferences. They value peer referrals and engage in sales community forums. Messaging should emphasise \"personalisation,\" \"response rates,\" \"compliance,\" and \"ROI\" while avoiding terms like \"spam,\" \"mass messaging,\" or \"magic bullet.\"\n\n## **Decision Factors**\nDecision-making involves 2-4 stakeholders over 30-60 days, typically starting with Sales Managers who evaluate with RevOps, trial with small teams, then present ROI to VP Sales/CRO. Key concerns include LinkedIn compliance, message authenticity, CRM integration, ROI measurement, and team adoption. Budget range: £200-£2,000 per month per sales team.\n\n**ICP Match Score: 88%** - This is a highly qualified, sales-ready profile with clear pain points, defined decision processes, and specific budget parameters that enable targeted, effective outreach campaigns."
+            }
+          ]
+        }
+      }
+    ],
+    "Generator": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "```json\n{\n  \"message\": \"Tom, your Swan AI infrastructure analysis was spot on - the 'shovels vs gold' shift is exactly what we're seeing across AI outreach tools. How are you currently scaling personalised LinkedIn outreach for Nudge AI without burning hours crafting individual messages? We've built AI that analyses prospect profiles to generate genuinely personal messages at scale. Worth a look?\",\n  \"icp_analysis\": {\n    \"match_score\": 92,\n    \"match_reasoning\": \"Tom is a perfect ICP match - AI company CEO with technical background, actively using LinkedIn for thought leadership, and likely needs scalable outreach for business development. His behavioral science expertise aligns perfectly with our psychology-based approach.\",\n    \"key_alignment_points\": [\"AI company CEO needing business development\", \"Technical sophistication to appreciate our AI approach\", \"Behavioral science background aligns with our methodology\", \"Active LinkedIn user with 7,755 followers\"],\n    \"potential_objections\": [\"May prefer building in-house solution\", \"Compliance concerns about LinkedIn automation\", \"Budget prioritisation for core AI infrastructure\"],\n    \"recommended_follow_up\": \"Share specific behavioral psychology principles we use in message analysis and offer to show how it applies to his target market\"\n  },\n  \"message_metadata\": {\n    \"personalization_elements\": [\"Referenced his specific Swan AI analysis post\", \"Mentioned his company Nudge AI\", \"Connected to his infrastructure vs application thinking\"],\n    \"josh_braun_principles_used\": [\"Started in his world with specific reference\", \"Neutral illumination question about scaling\", \"Concrete value proposition without fabricated stats\", \"Low-friction 'Worth a look?' ending\"],\n    \"prospect_pain_points_addressed\": [\"Time inefficiency in manual outreach\", \"Scaling personalisation challenges\", \"Need for systematic business development\"]\n  }\n}\n```"
+            }
+          ]
+        }
+      }
+    ],
+    "Parse AI Response": [
+      {
+        "json": {
+          "generated_message": "Tom, your Swan AI infrastructure analysis was spot on - the 'shovels vs gold' shift is exactly what we're seeing across AI outreach tools. How are you currently scaling personalised LinkedIn outreach for Nudge AI without burning hours crafting individual messages? We've built AI that analyses prospect profiles to generate genuinely personal messages at scale. Worth a look?",
+          "message_metadata": "{\"icp_analysis\":{\"match_score\":92,\"match_reasoning\":\"Tom is a perfect ICP match - AI company CEO with technical background, actively using LinkedIn for thought leadership, and likely needs scalable outreach for business development. His behavioral science expertise aligns perfectly with our psychology-based approach.\",\"key_alignment_points\":[\"AI company CEO needing business development\",\"Technical sophistication to appreciate our AI approach\",\"Behavioral science background aligns with our methodology\",\"Active LinkedIn user with 7,755 followers\"],\"potential_objections\":[\"May prefer building in-house solution\",\"Compliance concerns about LinkedIn automation\",\"Budget prioritisation for core AI infrastructure\"],\"recommended_follow_up\":\"Share specific behavioral psychology principles we use in message analysis and offer to show how it applies to his target market\"},\"message_metadata\":{\"personalization_elements\":[\"Referenced his specific Swan AI analysis post\",\"Mentioned his company Nudge AI\",\"Connected to his infrastructure vs application thinking\"],\"josh_braun_principles_used\":[\"Started in his world with specific reference\",\"Neutral illumination question about scaling\",\"Concrete value proposition without fabricated stats\",\"Low-friction 'Worth a look?' ending\"],\"prospect_pain_points_addressed\":[\"Time inefficiency in manual outreach\",\"Scaling personalisation challenges\",\"Need for systematic business development\"]}}"
+        }
+      }
+    ],
+    "Combine1": [
+      {
+        "json": {
+          "USERS_PRODUCT_CAPABILITIES": "# Product Summary for Tom Palmer (Nudge AI CEO) Outreach\n\n## Product Overview: Cold AI - LinkedIn Messages That Get Replies\n\n**Core Capabilities:**\n- AI-powered LinkedIn profile analysis for deep personalisation\n- Automated message generation at scale with precision targeting\n- Built-in compliance safeguards (LinkedIn TOS & GDPR compliant)\n- Decision-maker identification and targeting system\n\n## Key Value Propositions Aligned to Tom's Needs\n\n**1. Infrastructure-First Approach**: Unlike single-purpose tools, Cold AI provides scalable messaging infrastructure that aligns with Tom's recent focus on \"infrastructure vs. single agents\" - perfect for GTM automation at Nudge AI.\n\n**2. AI Engineering Excellence**: The platform's sophisticated profile analysis mirrors the multi-phase conversational AI systems Phil has built for Tom, demonstrating technical depth that resonates with their AI engineering background.\n\n**3. Risk Mitigation**: Built-in compliance features address Tom's strategic mindset around calculated risks, ensuring LinkedIn outreach doesn't jeopardize business relationships.\n\n## Target Use Cases Most Relevant to Tom\n\n**GTM Automation**: Direct alignment with Tom's current focus on automating go-to-market processes. Cold AI can systematically identify and engage prospects for Nudge AI's services.\n\n**Scaling AI Consulting Outreach**: As Nudge AI grows, Cold AI enables systematic prospecting for AI automation clients without the manual overhead Tom likely faces.\n\n**Network Leverage**: With Tom's 21 shared connections with Phil, Cold AI can help identify warm introduction opportunities within their mutual network.\n\n## Competitive Advantages\n\n**Technical Sophistication**: Advanced AI analysis goes beyond basic template filling - matches the technical standards Tom expects as an AI Engineer himself.\n\n**Compliance-First Design**: Unlike \"spray and pray\" tools, Cold AI's built-in safeguards protect professional reputation - crucial for a CEO building industry relationships.\n\n**Scalable Architecture**: Infrastructure approach supports growth from individual use to team deployment as Nudge AI scales.\n\n## Implementation Details\n\n**Rapid Deployment**: Quick setup aligns with Tom's preference for infrastructure solutions over lengthy implementations.\n\n**Technical Integration**: Platform designed for AI-savvy users who understand automation workflows - perfect fit for Tom's technical background.\n\n**Immediate Value**: Generate personalized messages within minutes, not hours of manual research.\n\n## ROI Indicators for Nudge AI\n\n**Time Savings**: Eliminate 80%+ of manual message personalization time, freeing Tom to focus on strategic AI infrastructure decisions.\n\n**Response Rate Improvement**: Typical 3-5x increase in LinkedIn response rates translates directly to more qualified prospects for AI automation services.\n\n**Scalability ROI**: Infrastructure approach means marginal cost per additional message approaches zero as volume increases.\n\n**Strategic Alignment**: Supports Tom's \"risk-taking vs. playing it safe\" philosophy by providing systematic, scalable prospecting that reduces dependence on referrals alone.\n\n**Perfect Conversation Starter**: Phil can position this as a natural extension of the AI automation work he's already doing for Tom, demonstrating how the same technical principles apply to sales outreach infrastructure.\n\n---\n\n# Product-Prospect Analysis: Cold AI for Tom Palmer\n\n## Prospect Profile Summary\n**Tom Palmer** is a CEO/AI Engineer with deep martech expertise, behavioral science background, and strong LinkedIn presence (7,755 followers). He's a strategic thinker who values calculated risk-taking, infrastructure solutions over single features, and authentic business relationships. His recent content shows active engagement with AI industry trends and revenue growth strategies.\n\n## Product-Prospect Alignment\n\n### 1. **Product Overview - Perfect Strategic Fit**\nCold AI's AI-powered LinkedIn personalization platform aligns perfectly with Tom's dual expertise in AI engineering and marketing psychology. The solution analyzes prospect profiles to generate personalized LinkedIn messages that drive responses - combining his technical AI knowledge with his behavioral science background.\n\n### 2. **Key Value Propositions for Tom**\n- **AI Infrastructure Play**: Unlike single-feature tools, Cold AI represents the infrastructure approach Tom values (referenced in his Swan AI analysis)\n- **Behavioral Science Application**: Leverages psychological principles in message crafting - directly relevant to his GMBPsS background\n- **Revenue Growth Catalyst**: Addresses his hashtag focus on #revenuegrowth and #SaaS scaling\n- **Strategic Efficiency**: Eliminates \"spray and pray\" approaches he'd likely critique as poor risk management\n\n### 3. **Target Use Cases - High Relevance**\nGiven Tom's CEO role and network focus:\n- **Executive-level prospecting** for strategic partnerships\n- **Investor/advisor outreach** leveraging his Cambridge network\n- **Talent acquisition** for AI engineering roles\n- **Industry thought leadership** amplification through targeted networking\n\n### 4. **Competitive Advantages - Resonates with Tom's Values**\n- **AI-first approach**: Appeals to his technical background and forward-thinking mindset\n- **Compliance-built**: Addresses his likely concern for professional standards\n- **Personalization at scale**: Solves the authenticity vs. efficiency paradox he'd appreciate\n- **Data-driven insights**: Aligns with his analytical approach to business decisions\n\n### 5. **Implementation Details - Low Friction**\n- **Quick setup**: Respects his time as a busy CEO\n- **LinkedIn-native**: Works within his existing high-engagement platform\n- **Scalable solution**: Grows with his expanding network and business needs\n- **Compliance safeguards**: GDPR/LinkedIn compliant - important for UK-based operations\n\n### 6. **ROI Indicators - Compelling for Tom**\n- **Response rate improvement**: From typical 2-5% to 15-25%+ with personalized messaging\n- **Time efficiency**: Reduces manual personalization from hours to minutes\n- **Network leverage**: Maximizes value from his 21 shared connections and 7,755 followers\n- **Strategic relationship building**: Converts cold outreach into warm conversations\n\n## Personalized Outreach Strategy\n\n**Opening Hook**: Reference his Swan AI infrastructure analysis and connect it to Cold AI's platform approach to LinkedIn personalization.\n\n**Value Proposition**: Position as the \"infrastructure for authentic relationship building\" that combines his AI expertise with behavioral psychology for measurable business outcomes.\n\n**Conversation Starter**: Discuss how AI can solve the authenticity vs. scale paradox in professional networking - a topic that bridges his technical and psychological expertise.\n\n**Call to Action**: Invite him to explore how behavioral science principles can be embedded in AI-driven outreach systems, potentially leading to strategic partnership discussions given his industry connections.\n\nThis approach respects Tom's preference for strategic, insight-driven conversations while positioning Cold AI as a solution that leverages his unique expertise intersection",
+          "LINKEDIN_RELATIONSHIP_RESEARCH": "# LinkedIn Relationship Intelligence Summary\n\n## Key Connection Points\n\n**Direct Professional Relationship**: Phil and Tom have a **direct working relationship** - Phil is currently freelancing as an AI Engineer for Tom's company, Nudge AI. This existing collaboration provides the strongest foundation for outreach, moving beyond cold contact to warm relationship building.\n\n**Shared AI Engineering Focus**: Both are deeply embedded in the AI engineering space, with Phil building conversational AI systems and Tom positioning himself as both CEO and AI Engineer. Their technical overlap in AI automation and infrastructure creates natural talking points.\n\n**Mutual Network**: With 21 shared connections, they operate in similar professional circles, suggesting aligned industry relationships and potential for broader network collaboration.\n\n## Recent Activity Analysis\n\n**Tom's Current Mindset** (Past week):\n- Actively discussing risk-taking vs. playing it safe in business\n- Exploring AI infrastructure pivots (Swan AI case study)\n- Focused on GTM (Go-To-Market) automation and agent infrastructure\n- Engaging with strategic business pivots and scaling decisions\n\n**Phil's Recent Achievements** (Past 4 months):\n- Successfully transitioned from Physics PhD to AI Engineering\n- Built sophisticated multi-phase conversational AI system for Nudge AI\n- Demonstrated technical expertise in n8n, OpenAI GPT-4, Claude, PostgreSQL\n- Previously recognised as one of Bristol University's \"50 Most Influential\"\n\n## Conversation Starters\n\n1. **Infrastructure vs. Single Agents**: Tom's recent post about Swan AI's pivot from single agent to infrastructure platform directly relates to Phil's work building complex multi-phase systems. Phil could share insights on when to build singular vs. infrastructure solutions.\n\n2. **Risk-Taking in Career Transitions**: Tom's \"playing it safe is risky\" philosophy aligns with Phil's bold career pivot from nuclear physics PhD to AI engineering - a perfect discussion point about calculated risks.\n\n3. **Technical Architecture Decisions**: Phil's experience with conversation state management and scalable database architecture could provide valuable insights for Tom's infrastructure-focused thinking.\n\n4. **GTM Automation**: Both are working on automating go-to-market processes - Phil with Google Ads campaign creation, Tom with broader GTM infrastructure.\n\n## Personality Insights\n\n**Tom Palmer**:\n- **Communication Style**: Conversational, thought-provoking, uses lowercase for casual tone\n- **Values**: Risk-taking, strategic thinking, infrastructure over quick wins\n- **Interests**: Business strategy, AI infrastructure, behavioural science applications\n- **Engagement Pattern**: Generates meaningful discussions (18 comments on Swan AI post)\n\n**Phil Smith**:\n- **Communication Style**: Professional yet approachable, detail-oriented, achievement-focused\n- **Values**: Innovation, social impact, technical excellence, community representation\n- **Interests**: Cutting-edge AI applications, social equity, interdisciplinary collaboration\n- **Background**: Strong academic foundation with practical application focus\n\n## Outreach Opportunities\n\n**Value Phil Can Provide**:\n1. **Technical Insights**: Share learnings from building complex conversational AI systems that could inform Nudge AI's infrastructure decisions\n2. **Implementation Experience**: Offer practical insights on scaling AI automation systems\n3. **Academic-to-Industry Perspective**: Provide unique viewpoint on applying research-level thinking to commercial AI solutions\n\n**Common Ground for Relationship Building**:\n- Both are building AI infrastructure for business automation\n- Shared interest in the strategic direction of AI agent development\n- Similar risk-taking mindset in career and business decisions\n- Mutual focus on practical AI applications rather than theoretical concepts\n\n**Recommended Approach**: Leverage the existing working relationship to deepen strategic discussions about AI infrastructure decisions, sharing insights from Phil's technical implementation experience while engaging with Tom's strategic business thinking around agent vs. infrastructure approaches.\n\n---\n\n# LinkedIn Research Summary: Tom Palmer GMBPsS\n\n## Connection Points\n- **First-degree connection** with 21 shared connections, indicating strong network overlap\n- **AI/Tech intersection**: Both operating in AI space - Tom as CEO/AI Engineer, likely shared understanding of technical challenges\n- **Cambridge location**: UK-based, suggesting potential for local business connections or face-to-face meetings\n- **Premium LinkedIn user**: Indicates serious professional networking approach\n\n## Recent Activity & Achievements\n**High-engagement content creator** with 7,755 followers and consistent posting:\n\n1. **Risk-taking philosophy post** (3h ago) - Referenced Alex Becker's book on calculated risks vs. \"playing it safe,\" showing entrepreneurial mindset\n2. **AI commerce prediction** (2d ago) - Brief but forward-thinking post about purchases happening within ChatGPT\n3. **Swan AI pivot analysis** (6d ago) - Detailed breakdown of Swan's strategic shift from single agent to infrastructure platform, showing deep industry knowledge and CEO network access\n\n## Conversation Starters\n- **Swan AI pivot discussion**: Tom's recent analysis of their \"Lovable for GTM\" pivot and infrastructure vs. single-agent debate\n- **AI commerce evolution**: His prediction about ChatGPT becoming a purchase platform\n- **Risk vs. safety paradox**: His thoughts on Alex Becker's philosophy around calculated risk-taking\n- **Martech psychology**: His unique combination of behavioural science and marketing technology\n- **Revenue growth strategies**: Particularly in SaaS contexts given his hashtag focus\n\n## Personality Insights\n**Communication style**: Conversational, thought-provoking, uses ellipses and questions to engage audience. Prefers shorter, punchy posts with philosophical angles.\n\n**Values**: \n- Embraces calculated risk-taking over \"safe\" approaches\n- Values strategic thinking and industry analysis\n- Appreciates direct, honest business conversations\n- Interested in infrastructure plays over feature-focused solutions\n\n**Interests**: Clear focus on martech, psychology, revenue growth, SaaS, and sales - suggesting a data-driven approach to business growth.\n\n## Outreach Opportunities\n\n**Immediate value propositions**:\n1. **Industry insights exchange**: Given his CEO network (Swan AI connection), he'd likely appreciate strategic discussions about AI market trends\n2. **Behavioural science applications**: His psychology background combined with AI engineering creates unique perspective worth exploring\n3. **Infrastructure vs. agent debate**: His Swan AI post shows he's actively thinking about platform strategies - perfect conversation starter\n4. **Revenue growth tactics**: His hashtag focus suggests this is a priority area\n\n**Approach recommendations**:\n- Reference his specific Swan AI analysis to show you've engaged with his content\n- Ask thoughtful questions about his risk-taking philosophy or AI commerce predictions\n- Leverage shared connections for warm introductions\n- Focus on strategic/philosophical discussions rather than direct sales pitches\n- Acknowledge his dual expertise in psychology and AI engineering\n\n**Timing**: Recent high-engagement post (72 reactions, 18 comments on Swan AI piece) suggests he's actively engaging with his network - good timing for outreach.\n\nTom appears to be a strategic thinker who values authentic business relationships and meaningful industry discussions. His content suggests he'd respond well to thoughtful, insight-driven outreach rather than generic sales messages.",
+          "TARGET_CUSTOMER_PROFILE_ANALYSIS": "# ICP Analysis: B2B Sales Teams Struggling with LinkedIn Outreach Performance\n\n## **Target Profile**\n**Who they are**: Sales Development Representatives, Account Executives, Sales Managers, and Heads of Sales at fast-growing B2B companies (50-500 employees, £5M-£100M revenue). Primary industries include B2B SaaS, Professional Services, Technology Consulting, Marketing Agencies, and Financial Services. These are typically venture-backed or profitable scale-ups with dedicated sales teams of 5-50 people actively using LinkedIn for prospecting.\n\n## **Key Pain Points**\n- **Poor Performance**: LinkedIn response rates below 5%, causing missed revenue targets\n- **Time Drain**: Sales teams spending 2-3 hours daily on manual message personalisation\n- **Brand Risk**: Generic outreach damaging company reputation with prospects\n- **Compliance Issues**: LinkedIn account restrictions due to non-compliant messaging practices\n- **Scaling Challenges**: Inability to maintain personalised outreach as teams grow\n\n## **Goals & Motivations**\nPrimary objectives include achieving LinkedIn response rates above 15%, reducing personalisation time by 50%, and increasing qualified meetings by 25%. They seek scalable solutions that support rapid team expansion while maintaining compliance and professional brand standards.\n\n## **Communication Preferences**\nPrefer LinkedIn direct outreach, email marketing, sales-focused webinars, and industry conferences. Decision-makers value ROI demonstrations through pilot programs and require compliance reviews involving IT/Legal teams.\n\n## **Decision Factors**\nKey considerations include LinkedIn compliance and account safety, CRM integration capabilities, message authenticity, and GDPR compliance. The sales cycle spans 4-8 weeks with board approval required for contracts above £10,000. Success metrics focus on response rates, time savings, and pipeline growth.\n\n---\n\n**ICP Match Score: 87/100**\n\nThis is a highly qualified prospect profile with strong pain points, clear success metrics, and defined budget parameters (£2,000-£15,000 annually). The 87% score reflects excellent specificity and actionability for targeted outreach campaigns.\n\n---\n\n# ICP Analysis: B2B Sales Teams Struggling with LinkedIn Outreach Performance\n\n## **Target Profile**\n**Who they are**: Sales Development Representatives, Account Executives, Sales Managers, and Heads of Sales at fast-growing B2B companies (50-500 employees, £5M-£100M revenue). Primary industries include B2B SaaS, Professional Services, Technology Consulting, Marketing Agencies, and Financial Services. These are typically venture-backed or profitable scale-ups with dedicated sales teams of 5-50 people actively using LinkedIn for prospecting.\n\n## **Key Pain Points**\n- **Poor Performance**: LinkedIn response rates below 5%, causing missed revenue targets\n- **Time Drain**: Sales teams spending 2-3 hours daily on manual message personalisation\n- **Brand Damage**: Generic outreach harming company reputation with prospects\n- **Compliance Risks**: LinkedIn account restrictions due to non-compliant messaging practices\n- **Scaling Challenges**: Inability to maintain personalised outreach as teams grow\n\n## **Goals & Motivations**\nPrimary objectives include achieving response rates above 15%, reducing personalisation time by 50%, and increasing qualified meetings by 25%. They seek scalable solutions that protect their LinkedIn accounts while maintaining authentic, professional messaging that drives pipeline growth of 30%+ from LinkedIn channels.\n\n## **Communication Preferences**\nPrefer LinkedIn direct outreach, email marketing, sales-focused webinars, and industry conferences. They value data-driven conversations with ROI demonstrations and pilot programs. Decision-makers need board approval for contracts above £10,000.\n\n## **Decision Factors**\nKey considerations include LinkedIn compliance and account safety, CRM integration capabilities, message authenticity, and GDPR compliance. The 4-8 week sales cycle involves sales leadership evaluation, IT/Legal review, and ROI proof through pilot programs.\n\n---\n\n**ICP Match Score: 87/100**\n\nThis is a highly qualified ICP with strong specificity and actionable insights. The profile provides clear targeting criteria, well-defined pain points, and specific success metrics that enable highly personalised outreach messaging.",
+          "ADDITIONAL_CONTEXT": "No additional context",
+          "DATA_SOURCE_WARNING": "IMPORTANT: LinkedIn activities mentioned in LINKEDIN_RELATIONSHIP_RESEARCH are for both the USER (sender) and PROSPECT'S personal activities and achievements. Make sure to check whose name is attributed to an achievement and never use the prospect's achievements as an example of the user's product success.",
+          "item_count": 6
+        }
+      }
+    ],
+    "Merge": [
+      {
+        "json": {
+          "research_cache_user_data": {
+            "profile_url": "https://linkedin.com/in/jake-pretty-967a09334/",
+            "profile_type": "personal_user",
+            "research_data": {
+              "name": "Jake Pretty",
+              "headline": "Need more sales meetings? We can help",
+              "location": "Chichester, England, United Kingdom",
+              "is_creator": false,
+              "is_premium": false,
+              "post_count": 5,
+              "recent_posts": [
+                {
+                  "date": "6h",
+                  "text": "Cold calling is dead.\n\nI see it every single week on LinkedIn.\n\nMeanwhile, my team is booking meetings with Fortune 500 companies.\n\nHere’s the truth:\nCold calling isn’t dead.\nYour approach is.\n\nMost reps fail because they:\n\nRead from rigid scripts\nSound like robots\nPanic when talking to execs\nQuit after 20 dials\n\nCold calling still works because most people don’t.\n\nBe human. Speak like one.\nCEOs are people too, laugh, connect, enjoy the conversation.\n\nCold calling = High volume + Real skill + Actual courage.\n\nThe ones calling it dead?\nThey’re just not doing it right.",
+                  "author": "Jake Pretty",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 4,
+                    "reactions": 8,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "5d",
+                  "text": "I was an Amazon delivery driver for 3 years.\n\nAnd it taught me a lot about success.\n\nDriving all day, music playing, on my own.\nHonestly, it wasn’t that bad.\n\nI was in the best shape of my life physically.\nBut mentally? I was stuck.\n\nNot because the job was terrible, because it was comfortable.\nComfortable enough that I stopped pushing.\n\nI kept telling myself I’d make it big with other ventures “someday.”\nBut I barely put in the work.\n\nThe problem wasn’t the job.\nIt was the environment.\n\nWhen you’re surrounded by people who are okay with average,\nyou slowly become okay with average too.\n\nThat’s what changed everything for me.\nNow I’m surrounded by high performers every day.\n\nMy four closest friends are all smashing it.\nAnd that competition? It naturally raises your level.\n\nIf you feel stuck right now:\nCheck your environment before you check your effort.\n\nYou can’t outwork a low-standard environment forever.",
+                  "author": "Jake Pretty",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 7,
+                    "reactions": 12,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "6d",
+                  "text": "Most reps avoid the hard calls. That’s why they miss the best ones.\n\nI was talking about this with one of my team members yesterday.\n\nYou know the feeling.\n The job title looks slightly off.\n The company seems like a stretch.\n It’s your last call of the day, and you’re drained.\n\nBut you say f**k it and dial anyway.\n\nAnd somehow…\n That’s the one that books.\n\nIt’s weird, right?\n\nBut it’s a pattern I’ve seen over and over again.\n\nThe calls you resist most usually become the best ones.\n\nSo next time that feeling hits \n\nTake it as a sign.",
+                  "author": "Jake Pretty",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 13,
+                    "reactions": 30,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "1w",
+                  "text": "One hungry SDR can change an entire team.\n\nTwo weeks ago, we brought in a new SDR.\nHe had zero experience.\n\nThey’re already smashing targets.\nBut the real impact isn’t just their own numbers.\n\nThe whole team feels it.\nSuddenly everyone’s pushing harder.\nNobody wants to be left behind.\n\nHunger is contagious.\nYou can’t fake it.\nYou can’t teach it.\n\nOne rep sets the pace.\nThe rest of the team keeps up.\n\nIf you want an SDR team that performs, don’t just hire for skills.\nHire for hunger",
+                  "author": "Jake Pretty",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 34,
+                    "reactions": 149,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "1w",
+                  "text": "Im looking for a new contact data provider for my cold calling team. Can anyone suggest some good reccomendations?",
+                  "author": "Jake Pretty",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 4,
+                    "reactions": 6,
+                    "impressions": 0
+                  }
+                }
+              ],
+              "is_influencer": false,
+              "follower_count": 779,
+              "network_distance": "FIRST_DEGREE",
+              "connections_count": 688,
+              "public_identifier": "jake-pretty-967a09334",
+              "research_metadata": {
+                "timestamp": "2025-10-13T14:53:42.871Z",
+                "research_depth": "standard",
+                "total_posts_fetched": 20,
+                "original_posts_found": 5,
+                "reposts_filtered_out": 8
+              },
+              "shared_connections_count": 62
+            },
+            "research_depth": "standard",
+            "last_researched_at": "2025-10-13T14:53:42.871+00:00"
+          }
+        }
+      },
+      {
+        "json": {
+          "prospect_research": {
+            "profile_url": "https://linkedin.com/in/marcosquarci/",
+            "profile_type": "personal_prospect",
+            "research_data": {
+              "name": "Marco Squarci",
+              "hashtags": [],
+              "headline": "Founder Specter 👻 | Investor ⌘N | Forbes U30",
+              "location": "London, England, United Kingdom",
+              "is_creator": true,
+              "is_premium": true,
+              "post_count": 5,
+              "recent_posts": [
+                {
+                  "date": "3d",
+                  "text": "🚀 Five years ago, AI startups were the outsiders. Now they’re the entire playbook.\n\nIn 2020, only true believers cared about AI companies.\n\nBy 2025, they’ve become the blueprint for building great ones.\n\nThat’s one of the clearest shifts captured in this year’s State of AI Report 2025 by Nathan Benaich and Air Street Capital — where the data shows just how fast the narrative flipped:\n\n📊 AI-first companies now make up 41% of the Top-100 global startups, up from 16% in 2022.\n 💬 Investor Interest towards AI has surged 40× since 2020, peaking post-ChatGPT.\n\nThis chart says it all: the outliers have become the archetype 👇\n\nAt Specter, we’ve seen this trend unfold in real time — across 55M+ companies and 30K investor interest signals. What was once “AI-powered” is now simply how the best companies are built.\n\nHuge thanks to Nathan and the Air Street Capital team for including our data and continuing to set the standard for clarity and insight in the AI ecosystem.\n\nFull report linked in the comments ✨",
+                  "author": "Marco Squarci",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 5,
+                    "reactions": 32,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "4d",
+                  "text": "🇨🇦 Where have all the Canadian startups gone?\n\nWe teamed up with Leaders Fund and Gideon Hayden to dig into a question that’s been quietly worrying Canada’s tech scene — and the numbers are hard to ignore 👇\n\n📉 Canada’s startup pipeline hasn’t bounced back since COVID\n 🇺🇸 The U.S. now outproduces Canada 45× in high-potential startups (vs. 10× in 2015)\n ✈️ Nearly half of Canadian founders who raise $1M+ now build from the U.S.\n 💵 Those founders raise ~2× more capital — faster\n\nThis isn’t about founders leaving home.\n\nIt’s about ecosystems competing — for talent, capital, and policy.\n\nIf Canada wants to keep its next generation of scale-ups, it needs to offer the better product — not just rely on patriotism.\n\nHuge thanks to Gideon and the Leaders Fund team for leading this important work, and for trusting Specter’s data to help quantify it.\n\nFull report linked in the comments 📊",
+                  "author": "Marco Squarci",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 4,
+                    "reactions": 35,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "1mo",
+                  "text": "⚡ From energy vision to profitable reality.\n\nIn just 8 months, Cloover (Jodok Betschart) scaled from €1M → €5M ARR (5x) — all while reaching profitability.\n\n With €1.2B in funding lines secured and hundreds of installers onboarded across 4 markets, they’re building the “Shopify of Energy.”\n\nBut what’s just as striking?\n 🌍 Europe is fast becoming the epicenter of climate-tech.\nFrom Berlin outward, a new wave of startups is scaling faster than ever — and Cloover is one of the clearest signals.\n\nProfitable growth + massive market tailwinds = a European powerhouse in the making.\n\n💡 For more real-time revenue updates like this, check out Specter.",
+                  "author": "Marco Squarci",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 7,
+                    "reactions": 68,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "1mo",
+                  "text": "🚀 From near-death to hypergrowth.\n\nReplit sprinted from $2M → $150M ARR in just 12 months, with Amjad Masad at the helm.\n\nIn fact, $100M of that came in only 6 months. \nThe fuel?\n\n💸 A hefty $222M raise to capture the AI coding wave.\n🔥 Usage that turned a 9-year grind into an “overnight success.”\n\nBut here’s the real debate:\n\n⚖️ Is this the next generational dev platform…\n \n…or a case of ARL (Annually Recurring Losses) if growth can’t outpace spend?\nEither way → it’s one of the fastest SaaS revenue climbs we’ve ever seen.\n\n💡 Want more real-time revenue updates like this? That’s what we track every day at Specter.",
+                  "author": "Marco Squarci",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 2,
+                    "reactions": 47,
+                    "impressions": 0
+                  }
+                },
+                {
+                  "date": "2mo",
+                  "text": "The Third Browser War has begun—fueled by AI.\n\n🥊 Round 1 (’90s): Microsoft vs Netscape\n⚡ Round 2 (’00s): Chrome vs Firefox\n🤖 Round 3 (Now): AI-native browsers—where the window thinks with you.\n\nA year ago, our Talent Signals at Specter spotted the first smoke:\n\nBen Goodger (Chrome founding engineer) → left Google → joined OpenAI\nDarin Fisher (another Chrome OG) → followed the same path\n\nThat’s when we knew: OpenAI isn’t “tweaking search”—it’s re-building the browser itself around intelligence.\n\n📝 History repeats:\n In 2005, a leaked email had Sergey Brin telling Google, “Steve is furious we’re poaching his browser guy.”\nJobs shot back: “Hire one more, and it’s war.”\nSame script, new weapons. Stakes? 10× higher.\n\n🔥 Comet by Perplexity just drew first blood. CEO Aravind Srinivas calls the browser “the primordial soup where agents evolve.”\n\nSpeed won the last war. Context will win this one. Your call? 👇",
+                  "author": "Marco Squarci",
+                  "is_repost": false,
+                  "engagement": {
+                    "comments": 5,
+                    "reactions": 31,
+                    "impressions": 0
+                  }
+                }
+              ],
+              "is_influencer": false,
+              "follower_count": 12891,
+              "network_distance": "FIRST_DEGREE",
+              "connections_count": 9013,
+              "public_identifier": "marcosquarci",
+              "research_metadata": {
+                "timestamp": "2025-10-13T14:45:55.941Z",
+                "research_depth": "standard",
+                "total_posts_fetched": 20,
+                "original_posts_found": 5,
+                "reposts_filtered_out": 13
+              },
+              "shared_connections_count": 4
+            },
+            "research_depth": "standard",
+            "last_researched_at": "2025-10-13T14:45:55.941+00:00",
+            "cache_id": 10
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "LinkedIn Fields": {
+      "main": [
+        [
+          {
+            "node": "User Profile Ready",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Standardise URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Prospect LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Get Prospect Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prospect Data Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Profile Ready": {
+      "main": [
+        [
+          {
+            "node": "Standardise User URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get User LinkedIn URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User LinkedIn URL": {
+      "main": [
+        [
+          {
+            "node": "Get User Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "User Research Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Posts": {
+      "main": [
+        [
+          {
+            "node": "User Research Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Clean User Data": {
+      "main": [
+        [
+          {
+            "node": "Save User LinkedIn URL & Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Research Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Prospect Posts": {
+      "main": [
+        [
+          {
+            "node": "Prospect Data Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prospect Data Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean Prospect Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Prospect Data": {
+      "main": [
+        [
+          {
+            "node": "Save Prospect Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Message Status LinkedIn Update",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LinkedIn Summariser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Research Cache": {
+      "main": [
+        [
+          {
+            "node": "Prospect in Database?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prospect in Database?": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Get Prospect LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Linkedin Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardise URL": {
+      "main": [
+        [
+          {
+            "node": "Check Research Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Summariser": {
+      "main": [
+        [
+          {
+            "node": "Message Data Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Pause",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch ICP": {
+      "ai_tool": [
+        [
+          {
+            "node": "ICP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product": {
+      "ai_tool": [
+        [
+          {
+            "node": "Product",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Data Merge": {
+      "main": [
+        [
+          {
+            "node": "Combine1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ICP": {
+      "main": [
+        [
+          {
+            "node": "Message Data Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Product": {
+      "main": [
+        [
+          {
+            "node": "Message Data Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Preferences": {
+      "ai_tool": [
+        [
+          {
+            "node": "Generator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Josh Braun Guidelines": {
+      "ai_tool": [
+        [
+          {
+            "node": "Generator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine1": {
+      "main": [
+        [
+          {
+            "node": "Generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Save",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Message Status Generating Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generator": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save User LinkedIn URL & Data": {
+      "main": [
+        []
+      ]
+    },
+    "Save Prospect Research": {
+      "main": [
+        [
+          {
+            "node": "Check Research Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Prepare Save",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Save": {
+      "main": [
+        [
+          {
+            "node": "Encode for Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save AI Data Summaries and Message": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode for Supabase": {
+      "main": [
+        [
+          {
+            "node": "Save AI Data Summaries and Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause": {
+      "main": [
+        [
+          {
+            "node": "ICP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Message Status ICP Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Product",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Message Status Product Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Status LinkedIn Update": {
+      "main": [
+        []
+      ]
+    },
+    "Log Response": {
+      "main": [
+        [
+          {
+            "node": "Usage Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardise User URL": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Linkedin Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Message Variations": {
+      "ai_tool": [
+        [
+          {
+            "node": "Generator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9fcfdbc2-eb88-4dab-9f06-9fbd2070d12c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "lzD4GGJThnJo7EWU",
+  "tags": []
+}

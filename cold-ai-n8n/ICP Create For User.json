@@ -1,0 +1,947 @@
+{
+  "name": "Cold: Create ICP",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ICP Request Validation\nconst headers = $input.first().json.headers;\nconst body = $input.first().json.body;\n\n// Validate API Key if configured\nconst API_KEY = $env.ICP_API_KEY || $env.N8N_API_KEY;\nif (API_KEY && headers['x-api-key'] !== API_KEY) {\n  return {\n    json: {\n      success: false,\n      error: 'Unauthorized: Invalid API key',\n      statusCode: 401,\n      router: 'icp'\n    }\n  };\n}\n\n// Validate required fields\nconst requiredFields = ['action', 'user_id'];\nconst missingFields = requiredFields.filter(field => !body[field]);\nif (missingFields.length > 0) {\n  return {\n    json: {\n      success: false,\n      error: `Missing required fields: ${missingFields.join(', ')}`,\n      statusCode: 400,\n      router: 'icp'\n    }\n  };\n}\n\n// Validate action is ICP related\nconst validActions = [\n  'create_icp',           // Create new ICP entry\n  'update_icp',           // Update existing ICP\n  'archive_icp',          // Soft delete ICP\n  'restore_icp',          // Restore archived ICP\n  'submit_for_review',    // Submit ICP for review\n  'approve_icp',          // Approve ICP (with optional content updates)\n  'reject_icp',           // Reject ICP (future)\n  'regenerate_icp',       // Regenerate failed ICP\n  'test_connection',      // Test webhook connection\n  'get_icp',              // Get single ICP\n  'list_icps',            // List ICPs\n  'duplicate_icp',        // Duplicate existing ICP (future)\n  'export_icp',           // Export ICP data (future)\n  'search',               // Search ICPs\n  'analytics'             // ICP analytics (future)\n];\n\nif (!validActions.includes(body.action)) {\n  return {\n    json: {\n      success: false,\n      error: `Invalid action for ICP router: ${body.action}`,\n      valid_actions: validActions,\n      statusCode: 400,\n      router: 'icp'\n    }\n  };\n}\n\n// Special validation for create_icp - check if ICP data exists\nif (body.action === 'create_icp' && body.data) {\n  // Check if we have an ICP ID (from database entry)\n  if (body.data.icp_id) {\n    // Add ICP ID to root level for easier access\n    body.icp_id = body.data.icp_id;\n  }\n  \n  // Check if AI generation is requested\n  if (body.data.metadata?.ai_generation_requested) {\n    body.requires_ai_generation = true;\n  }\n}\n\n// Special validation for actions that require ICP ID\nconst actionsRequiringId = [\n  'update_icp', 'archive_icp', 'restore_icp', \n  'submit_for_review', 'approve_icp', 'regenerate_icp'\n];\n\nif (actionsRequiringId.includes(body.action)) {\n  const icpId = body.data?.icp_id || body.icp_id;\n  if (!icpId) {\n    return {\n      json: {\n        success: false,\n        error: `Action '${body.action}' requires an ICP ID`,\n        statusCode: 400,\n        router: 'icp'\n      }\n    };\n  }\n  // Ensure ICP ID is at root level\n  body.icp_id = icpId;\n}\n\n// Add metadata\nconst validatedRequest = {\n  ...body,\n  metadata: {\n    ...body.metadata,\n    timestamp: new Date().toISOString(),\n    request_id: `icp_${Date.now()}_${Math.random().toString(36).substring(7)}`,\n    router: 'icp',\n    source: body.source || 'web_frontend',\n    api_version: '1.0',\n    workflow: 'icp-action-processor'\n  }\n};\n\n// Log for debugging\nconsole.log('ICP Request Validated:', {\n  action: validatedRequest.action,\n  user_id: validatedRequest.user_id,\n  icp_id: validatedRequest.icp_id,\n  requires_ai: validatedRequest.requires_ai_generation,\n  request_id: validatedRequest.metadata.request_id\n});\n\nreturn {\n  json: validatedRequest\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2144,
+        -800
+      ],
+      "id": "17530e12-0f98-4240-a0a8-5d3480b0f536",
+      "name": "Authentication"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO webhook_events (\n  event_type,\n  source,\n  payload,\n  processed\n) VALUES (\n    $1, \n    $2, \n    jsonb_build_object(\n      'action', $3, \n      'user_id', $4,\n      'icp_id', $5,\n      'database_icp_id', $6,\n      'timestamp', $7,\n      'workflow_status', $8,\n      'plan_type', $9\n    ),\n    $10\n)\nRETURNING id, created_at;",
+        "options": {
+          "queryReplacement": "={{ 'icp_' + $('ICP Action').item.json.body.action }},\n{{ 'icp' }},\n{{ $('ICP Action').item.json.body.action }},\n{{ $('ICP Action').item.json.body.user_id }},\n{{ $('ICP Action').item.json.body.data?.icp_id || $('ICP Action').item.json.body.icp_id }},\n{{ $('ICP Action').item.json.body.data?.database_entry?.id || $('ICP Action').item.json.body.data?.icp_id }},\n{{ $('ICP Action').item.json.body.data.timestamp }},\n{{ $('ICP Action').item.json.body.data?.database_entry?.workflow_status || 'unknown' }},\n{{ $('Check Limits').item.json.plan_type || 'free' }},\n{{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1248,
+        -896
+      ],
+      "id": "c175dfef-f89a-445e-a8b5-5a1ea620c02b",
+      "name": "Log Request",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  u.user_id,\n  u.email,\n  u.onboarding_step,\n  u.onboarding_completed,\n  up.job_title,\n  bp.company_name,\n  up.linkedin_url,\n  tm.team_id,\n  tm.role as team_role,\n  tm.can_manage_knowledge_base,\n  tm.can_invite_members,\n  tm.can_manage_company_profile,\n  tm.can_manage_icps,\n  t.team_name,\n  t.monthly_message_limit,\n  t.monthly_messages_used,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND created_at > NOW() - INTERVAL '30 days'),\n    0\n  ) as recent_icp_entries,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND deleted_at IS NULL\n     AND workflow_status NOT IN ('archived', 'failed')),\n    0\n  ) as total_active_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND workflow_status = 'approved'),\n    0\n  ) as approved_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND workflow_status = 'draft'),\n    0\n  ) as draft_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND workflow_status = 'generating'),\n    0\n  ) as generating_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND workflow_status = 'reviewing'),\n    0\n  ) as reviewing_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND workflow_status = 'failed'),\n    0\n  ) as failed_icps,\n  COALESCE(\n    (SELECT COUNT(*) FROM icps \n     WHERE created_by = $1::text\n     AND deleted_at IS NOT NULL\n     AND deleted_at > NOW() - INTERVAL '30 days'),\n    0\n  ) as restorable_icps,\n  COALESCE(\n    (SELECT json_agg(\n      json_build_object(\n        'id', id,\n        'name', icp_name,\n        'status', workflow_status\n      )\n    ) FROM (\n      SELECT id, icp_name, workflow_status \n      FROM icps \n      WHERE created_by = $1::text\n      AND deleted_at IS NULL\n      ORDER BY created_at DESC\n      LIMIT 5\n    ) recent),\n    '[]'::json\n  ) as recent_icps_list\nFROM users u\nLEFT JOIN user_profiles up ON u.user_id = up.user_id\nLEFT JOIN business_profiles bp ON u.user_id = bp.user_id\nLEFT JOIN team_memberships tm ON u.user_id = tm.user_id AND tm.status = 'active'\nLEFT JOIN teams t ON tm.team_id = t.team_id\nWHERE u.user_id = $1::text\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -800,
+        -896
+      ],
+      "id": "a8ef7cfc-791d-4b80-a211-9414d1dac4a6",
+      "name": "Add User Context",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH user_subscription AS (\n  SELECT \n    COALESCE(s.plan_type, 'free') as plan_type,\n    u.user_id,\n    CURRENT_TIMESTAMP as now\n  FROM users u\n  LEFT JOIN team_memberships tm ON u.user_id = tm.user_id\n  LEFT JOIN teams t ON tm.team_id = t.team_id\n  LEFT JOIN subscriptions s ON t.subscription_id = s.subscription_id\n  WHERE u.user_id = $1\n),\nactive_icps AS (\n  SELECT \n    COUNT(*) as active_icp_count,\n    COUNT(CASE WHEN workflow_status = 'generating' THEN 1 END) as generating_count,\n    COUNT(CASE WHEN workflow_status = 'draft' THEN 1 END) as draft_count,\n    COUNT(CASE WHEN workflow_status = 'reviewing' THEN 1 END) as reviewing_count,\n    COUNT(CASE WHEN workflow_status = 'approved' THEN 1 END) as approved_count,\n    COUNT(CASE WHEN workflow_status = 'failed' THEN 1 END) as failed_count\n  FROM icps\n  WHERE created_by = $1\n    AND (deleted_at IS NULL)\n    AND workflow_status NOT IN ('archived', 'failed')\n),\nmonthly_creations AS (\n  SELECT \n    COUNT(*) as monthly_icp_creations,\n    COUNT(CASE WHEN generation_attempts > 0 THEN 1 END) as monthly_regenerations\n  FROM icps\n  WHERE created_by = $1\n    AND created_at >= DATE_TRUNC('month', CURRENT_DATE)\n    AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'\n),\narchived_icps AS (\n  SELECT \n    COUNT(*) as archived_count,\n    COUNT(CASE WHEN deleted_at > CURRENT_TIMESTAMP - INTERVAL '30 days' THEN 1 END) as restorable_count\n  FROM icps\n  WHERE created_by = $1\n    AND deleted_at IS NOT NULL\n),\nlimits_config AS (\n  SELECT \n    us.plan_type,\n    CASE us.plan_type\n      WHEN 'free' THEN json_build_object(\n        'max_icps', 1,\n        'monthly_creates', 2,\n        'monthly_regenerations', 1,\n        'can_approve', false,\n        'can_archive', true,\n        'restore_window_days', 30\n      )\n      WHEN 'basic' THEN json_build_object(\n        'max_icps', 5,\n        'monthly_creates', 10,\n        'monthly_regenerations', 5,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 30\n      )\n      WHEN 'standard' THEN json_build_object(\n        'max_icps', 10,\n        'monthly_creates', 20,\n        'monthly_regenerations', 10,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 30\n      )\n      WHEN 'pro' THEN json_build_object(\n        'max_icps', 25,\n        'monthly_creates', 50,\n        'monthly_regenerations', 25,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 60\n      )\n      WHEN 'team' THEN json_build_object(\n        'max_icps', 100,\n        'monthly_creates', 200,\n        'monthly_regenerations', 100,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 90\n      )\n      WHEN 'team_basic' THEN json_build_object(\n        'max_icps', 50,\n        'monthly_creates', 100,\n        'monthly_regenerations', 50,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 60\n      )\n      WHEN 'team_xl' THEN json_build_object(\n        'max_icps', 100,\n        'monthly_creates', 200,\n        'monthly_regenerations', 100,\n        'can_approve', true,\n        'can_archive', true,\n        'restore_window_days', 90\n      )\n      ELSE json_build_object(\n        'max_icps', 1,\n        'monthly_creates', 2,\n        'monthly_regenerations', 1,\n        'can_approve', false,\n        'can_archive', true,\n        'restore_window_days', 30\n      )\n    END as limits\n  FROM user_subscription us\n)\nSELECT \n  us.plan_type,\n  ai.active_icp_count,\n  ai.generating_count,\n  ai.draft_count,\n  ai.reviewing_count,\n  ai.approved_count,\n  ai.failed_count,\n  mc.monthly_icp_creations,\n  mc.monthly_regenerations,\n  arc.archived_count,\n  arc.restorable_count,\n  lc.limits,\n  CASE \n    WHEN $2 = 'create_icp' THEN\n      json_build_object(\n        'can_proceed', \n          ai.active_icp_count < (lc.limits->>'max_icps')::int \n          AND mc.monthly_icp_creations < (lc.limits->>'monthly_creates')::int,\n        'active_used', ai.active_icp_count,\n        'active_limit', (lc.limits->>'max_icps')::int,\n        'monthly_used', mc.monthly_icp_creations,\n        'monthly_limit', (lc.limits->>'monthly_creates')::int,\n        'reason', \n          CASE \n            WHEN ai.active_icp_count >= (lc.limits->>'max_icps')::int \n              THEN format('ICP limit reached. Your %s plan allows %s ICPs.', us.plan_type, (lc.limits->>'max_icps'))\n            WHEN mc.monthly_icp_creations >= (lc.limits->>'monthly_creates')::int \n              THEN format('Monthly creation limit reached. Your %s plan allows %s ICPs per month.', us.plan_type, (lc.limits->>'monthly_creates'))\n            ELSE 'Can create ICP'\n          END\n      )\n    WHEN $2 = 'update_icp' THEN\n      json_build_object(\n        'can_proceed', true,\n        'message', 'Updates allowed for existing ICPs'\n      )\n    WHEN $2 = 'archive_icp' THEN\n      json_build_object(\n        'can_proceed', (lc.limits->>'can_archive')::boolean,\n        'has_restore_window', true,\n        'restore_days', (lc.limits->>'restore_window_days')::int\n      )\n    WHEN $2 = 'restore_icp' THEN\n      json_build_object(\n        'can_proceed', \n          arc.restorable_count > 0 \n          AND ai.active_icp_count < (lc.limits->>'max_icps')::int,\n        'restorable_count', arc.restorable_count,\n        'restore_window_days', (lc.limits->>'restore_window_days')::int,\n        'reason',\n          CASE\n            WHEN arc.restorable_count = 0 THEN 'No ICPs available to restore'\n            WHEN ai.active_icp_count >= (lc.limits->>'max_icps')::int \n              THEN format('Cannot restore: ICP limit reached (%s/%s)', ai.active_icp_count, (lc.limits->>'max_icps'))\n            ELSE 'Can restore ICP'\n          END\n      )\n    WHEN $2 = 'regenerate_icp' THEN\n      json_build_object(\n        'can_proceed', \n          mc.monthly_regenerations < (lc.limits->>'monthly_regenerations')::int,\n        'monthly_used', mc.monthly_regenerations,\n        'monthly_limit', (lc.limits->>'monthly_regenerations')::int,\n        'failed_icps', ai.failed_count\n      )\n    WHEN $2 = 'submit_for_review' THEN\n      json_build_object(\n        'can_proceed', true,\n        'draft_icps', ai.draft_count,\n        'message', 'Can submit draft ICPs for review'\n      )\n    WHEN $2 = 'approve_icp' THEN\n      json_build_object(\n        'can_proceed', (lc.limits->>'can_approve')::boolean,\n        'reviewing_icps', ai.reviewing_count,\n        'message', \n          CASE \n            WHEN (lc.limits->>'can_approve')::boolean \n              THEN 'Can approve ICPs'\n            ELSE 'Approval requires basic plan or higher'\n          END\n      )\n    WHEN $2 = 'test_connection' THEN\n      json_build_object(\n        'can_proceed', true,\n        'message', 'Connection test allowed'\n      )\n    ELSE \n      json_build_object(\n        'can_proceed', true,\n        'message', format('Action %s allowed', $2)\n      )\n  END as action_check,\n  json_build_object(\n    'summary', json_build_object(\n      'active_icps', format('%s / %s', ai.active_icp_count, (lc.limits->>'max_icps')),\n      'monthly_creates', format('%s / %s', mc.monthly_icp_creations, (lc.limits->>'monthly_creates')),\n      'status_breakdown', json_build_object(\n        'generating', ai.generating_count,\n        'draft', ai.draft_count,\n        'reviewing', ai.reviewing_count,\n        'approved', ai.approved_count,\n        'failed', ai.failed_count,\n        'archived', arc.archived_count \n      )\n    )\n  ) as usage_stats\nFROM user_subscription us\nCROSS JOIN active_icps ai\nCROSS JOIN monthly_creations mc\nCROSS JOIN archived_icps arc\nCROSS JOIN limits_config lc;",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }},\n{{ $json.action }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1920,
+        -800
+      ],
+      "id": "529217e0-4130-4ffb-a3a4-1d3005f69cc8",
+      "name": "Check Limits",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b3971e6-5424-4490-b8bf-6d9698fb4923",
+              "leftValue": "={{ $json.validation.can_proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1472,
+        -800
+      ],
+      "id": "d8572951-4b29-4230-951e-98c22167e226",
+      "name": "Under Limit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff2442db-e146-4ece-96e7-da76e995ea08",
+              "name": "success",
+              "value": "=false",
+              "type": "boolean"
+            },
+            {
+              "id": "6ccd415d-5f64-4eb1-bcdd-43a038d46b95",
+              "name": "error",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "ae0ada04-65dd-4bdf-b5bb-4dd973289082",
+              "name": "error_type",
+              "value": "={{ $json.validation.error.type }}",
+              "type": "string"
+            },
+            {
+              "id": "fa959460-81f1-4cff-9eeb-55173d81fae4",
+              "name": "message",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "70c55d65-08a7-4bf1-9e4d-1d149361d1a6",
+              "name": "details",
+              "value": "={   \n  \"plan_type\": \"{{ $json.plan_type }}\",   \n  \"action_attempted\": \"{{ $json.action }}\",   \n  \"knowledge_type\": \"{{ $json.data.knowledge_type }}\",   \n  \"limits\": {     \n    \"active_used\": {{ $json.validation.error.limits.active_used }},     \n    \"active_limit\": {{ $json.validation.error.limits.active_limit }},     \n    \"monthly_used\": {{ $json.validation.error.limits.monthly_used }},     \n    \"monthly_limit\": {{ $json.validation.error.limits.monthly_limit }}   \n  },   \n  \"suggestion\": \"{{ $json.validation.error.suggestion }}\",   \n  \"reset_date\": \"{{ new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0] }}\" \n}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1248,
+        -704
+      ],
+      "id": "3b3362fb-8039-4bd5-b751-8e53e46395fb",
+      "name": "Limit Reached"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ICP Limits Validator\nconst result = $input.first().json;\nconst action = result.action;\nconst actionCheck = result.action_check || {};\nconst planType = result.plan_type || 'free';\nconst usageStats = result.usage_stats || {};\n\n// Initialize response\nlet canProceed = false;\nlet errorMessage = '';\nlet errorType = null;\nlet requiresLimitCheck = false;\n\n// Define action categories for ICPs\nconst limitedActions = ['create_icp'];\nconst alwaysAllowedActions = [\n  'test_connection',\n  'get_icp',\n  'list_icps',\n  'search',\n  'analytics'\n];\nconst reviewActions = [\n  'submit_for_review',\n  'approve_icp',\n  'reject_icp'\n];\nconst managementActions = [\n  'update_icp',\n  'archive_icp',\n  'restore_icp'\n];\nconst regenerationActions = ['regenerate_icp'];\n\n// Process based on action type\nif (limitedActions.includes(action)) {\n  // These need full limit checking\n  requiresLimitCheck = true;\n  \n  if (actionCheck.can_proceed === false) {\n    // Determine specific error type\n    if (result.active_icp_count >= actionCheck.active_limit) {\n      errorType = 'ICP_LIMIT_EXCEEDED';\n      errorMessage = actionCheck.reason || \n        `You've reached your ${planType} plan limit of ${actionCheck.active_limit} ICPs. Please archive an existing ICP or upgrade your plan.`;\n    } else if (result.monthly_icp_creations >= actionCheck.monthly_limit) {\n      errorType = 'MONTHLY_CREATE_LIMIT_EXCEEDED';\n      errorMessage = actionCheck.reason || \n        `You've reached your monthly creation limit (${actionCheck.monthly_used}/${actionCheck.monthly_limit}) for ICPs. Limits reset on the 1st of each month.`;\n    }\n  } else {\n    canProceed = true;\n  }\n  \n} else if (alwaysAllowedActions.includes(action)) {\n  // These actions are always allowed\n  canProceed = true;\n  \n} else if (reviewActions.includes(action)) {\n  // Review actions - check plan capabilities\n  if (action === 'approve_icp') {\n    canProceed = actionCheck.can_proceed || false;\n    if (!canProceed) {\n      errorType = 'FEATURE_LOCKED';\n      errorMessage = actionCheck.message || 'ICP approval requires basic plan or higher';\n    }\n  } else if (action === 'submit_for_review') {\n    canProceed = actionCheck.can_proceed !== false;\n    if (!canProceed) {\n      errorType = 'NO_DRAFT_ICPS';\n      errorMessage = 'No draft ICPs available to submit for review';\n    }\n  } else {\n    canProceed = true;\n  }\n  \n} else if (managementActions.includes(action)) {\n  // Management actions\n  if (action === 'archive_icp') {\n    canProceed = actionCheck.can_proceed !== false;\n    \n  } else if (action === 'restore_icp') {\n    canProceed = actionCheck.can_proceed || false;\n    if (!canProceed) {\n      if (actionCheck.restorable_count === 0) {\n        errorType = 'NO_RESTORABLE_ICPS';\n        errorMessage = actionCheck.reason || 'No ICPs available to restore';\n      } else {\n        errorType = 'ICP_LIMIT_EXCEEDED';\n        errorMessage = actionCheck.reason || \n          `Cannot restore: You've reached your ${planType} plan limit of active ICPs`;\n      }\n    }\n    \n  } else if (action === 'update_icp') {\n    canProceed = actionCheck.can_proceed !== false;\n  }\n  \n} else if (regenerationActions.includes(action)) {\n  // Regeneration actions - check monthly limits\n  canProceed = actionCheck.can_proceed || false;\n  if (!canProceed) {\n    errorType = 'REGENERATION_LIMIT_EXCEEDED';\n    errorMessage = `You've reached your monthly regeneration limit (${actionCheck.monthly_used}/${actionCheck.monthly_limit}). Limits reset on the 1st of each month.`;\n  }\n  \n} else {\n  // Unknown action - let it through for validation at router\n  canProceed = true;\n}\n\n// Build comprehensive response\nconst response = {\n  ...result,\n  validation: {\n    can_proceed: canProceed,\n    requires_limit_check: requiresLimitCheck,\n    action_category: getActionCategory(action),\n    timestamp: new Date().toISOString()\n  }\n};\n\n// Add detailed information based on action\nif (actionCheck) {\n  response.validation.details = {\n    ...actionCheck,\n    plan_type: planType\n  };\n}\n\n// Add usage statistics\nif (usageStats.summary) {\n  response.validation.usage = usageStats.summary;\n}\n\n// Add error details if cannot proceed\nif (!canProceed) {\n  response.validation.error = {\n    type: errorType,\n    message: errorMessage,\n    limits: {\n      plan_type: planType,\n      active_icps: result.active_icp_count || 0,\n      active_limit: actionCheck.active_limit || 0,\n      monthly_creates: result.monthly_icp_creations || 0,\n      monthly_limit: actionCheck.monthly_limit || 0,\n      failed_icps: result.failed_count || 0,\n      archived_icps: result.archived_count || 0\n    },\n    suggestion: getSuggestion(errorType, planType)\n  };\n}\n\n// Add ICP-specific metadata\nresponse.validation.icp_stats = {\n  by_status: {\n    generating: result.generating_count || 0,\n    draft: result.draft_count || 0,\n    reviewing: result.reviewing_count || 0,\n    approved: result.approved_count || 0,\n    failed: result.failed_count || 0,\n    archived: result.archived_count || 0\n  },\n  restorable: result.restorable_count || 0,\n  monthly_regenerations: result.monthly_regenerations || 0\n};\n\n// Helper function to categorize actions\nfunction getActionCategory(action) {\n  if (limitedActions.includes(action)) return 'limited';\n  if (alwaysAllowedActions.includes(action)) return 'unrestricted';\n  if (reviewActions.includes(action)) return 'review';\n  if (managementActions.includes(action)) return 'management';\n  if (regenerationActions.includes(action)) return 'regeneration';\n  return 'unknown';\n}\n\n// Helper function to provide upgrade suggestions\nfunction getSuggestion(errorType, planType) {\n  const suggestions = {\n    'ICP_LIMIT_EXCEEDED': 'Archive unused ICPs or upgrade your plan for more ICPs',\n    'MONTHLY_CREATE_LIMIT_EXCEEDED': 'Wait for monthly reset or upgrade your plan',\n    'FEATURE_LOCKED': 'Upgrade to a paid plan to unlock this feature',\n    'REGENERATION_LIMIT_EXCEEDED': 'Upgrade for more regenerations or wait for monthly reset',\n    'NO_RESTORABLE_ICPS': 'No archived ICPs are available to restore',\n    'NO_DRAFT_ICPS': 'Create or edit an ICP to submit for review'\n  };\n  return suggestions[errorType] || 'Contact support for assistance';\n}\n\n// Log validation result for debugging\nconsole.log('ICP Validation Result:', {\n  action: action,\n  can_proceed: canProceed,\n  error_type: errorType,\n  plan: planType,\n  active_icps: `${result.active_icp_count || 0}/${actionCheck.active_limit || 'N/A'}`,\n  monthly_creates: `${result.monthly_icp_creations || 0}/${actionCheck.monthly_limit || 'N/A'}`\n});\n\n// Return the enhanced response\nreturn {\n  json: response\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1696,
+        -800
+      ],
+      "id": "aea923d7-69b2-4a0c-b913-6abedfd32100",
+      "name": "Limit Validator"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse ICP Request - Code Node\n// Get the webhook data from the ICP Action node\nconst webhookData = $('ICP Action').first().json;\n// Extract the body which contains our actual payload\nconst body = webhookData.body || {};\n// Extract the data object which varies by action type\nconst data = body.data || {};\n\n// Parse and route ICP requests - 4 groups\n// ICP Management Group - Route 0\nconst icpManagementActions = [\n  'create_icp',\n  'update_icp',\n  'archive_icp',\n  'restore_icp',\n  'get_icp',\n  'list_icps'\n];\n\n// Review Process Group - Route 1  \nconst reviewProcessActions = [\n  'submit_for_review',\n  'approve_icp',\n  'reject_icp'\n];\n\n// Regeneration Group - Route 2\nconst regenerationActions = [\n  'regenerate_icp'\n];\n\n// System Operations Group - Route 3\nconst systemOperations = [\n  'test_connection',\n  'search',\n  'analytics'\n];\n\n// Determine which group and set routing\nlet route_index = 99; // default for unknown\nlet group = 'Unknown';\nconst action = body.action || 'unknown';\n\nif (icpManagementActions.includes(action)) {\n  route_index = 0;\n  group = 'ICP Management';\n} else if (reviewProcessActions.includes(action)) {\n  route_index = 1;\n  group = 'Review Process';\n} else if (regenerationActions.includes(action)) {\n  route_index = 2;\n  group = 'Regeneration';\n} else if (systemOperations.includes(action)) {\n  route_index = 3;\n  group = 'System Operations';\n}\n\n// Extract ICP-specific fields from database_entry if present\nconst dbEntry = data.database_entry || {};\n\n// Return properly structured data\nreturn {\n  json: {\n    // Core identifiers from the actual request\n    \"user_id\": body.user_id || null,\n    \"action\": action,\n    \n    // ICP-specific identifiers\n    \"icp_id\": data.icp_id || body.icp_id || dbEntry.id || null,\n    \"timestamp\": data.timestamp || null,\n    \n    // ICP fields (from create/update actions)\n    \"icp_name\": data.icp_name || dbEntry.icp_name || null,\n    \"description\": data.description || dbEntry.description || null,\n    \"workflow_status\": dbEntry.workflow_status || data.workflow_status || null,\n    \"review_status\": dbEntry.review_status || data.review_status || null,\n    \n    // ICP characteristics (arrays and complex fields)\n    \"job_titles\": data.job_titles || dbEntry.job_titles || [],\n    \"pain_points\": data.pain_points || dbEntry.pain_points || [],\n    \"value_drivers\": data.value_drivers || dbEntry.value_drivers || [],\n    \"industry_focus\": data.industry_focus || dbEntry.industry_focus || [],\n    \"company_characteristics\": data.company_characteristics || dbEntry.company_characteristics || null,\n    \n    // Additional ICP fields\n    \"budget_range\": data.budget_range || dbEntry.budget_range || null,\n    \"decision_making_process\": data.decision_making_process || dbEntry.decision_making_process || null,\n    \"objections_and_concerns\": data.objections_and_concerns || dbEntry.objections_and_concerns || [],\n    \"success_metrics\": data.success_metrics || dbEntry.success_metrics || [],\n    \"preferred_communication_channels\": data.preferred_communication_channels || dbEntry.preferred_communication_channels || [],\n    \"competitive_alternatives\": data.competitive_alternatives || dbEntry.competitive_alternatives || [],\n    \n    // Product link and metadata\n    \"product_link_id\": data.product_link_id || dbEntry.product_link_id || null,\n    \"metadata\": data.metadata || dbEntry.metadata || {},\n    \"team_id\": data.team_id || body.team_id || null,\n    \n    // Review-specific fields\n    \"reviewer_id\": data.reviewerId || data.reviewer_id || null,\n    \"review_notes\": data.reviewNotes || data.review_notes || null,\n    \"updates\": data.updates || null, // For approve_icp with content updates\n    \n    // Generation tracking\n    \"generation_attempts\": dbEntry.generation_attempts || 0,\n    \"last_error\": dbEntry.last_error || null,\n    \"requires_ai_generation\": body.requires_ai_generation || false,\n    \n    // Keep the original data object intact\n    \"data\": data,\n    \"database_entry\": dbEntry,\n    \n    // Request metadata\n    \"request_metadata\": {\n      \"webhook_url\": webhookData.webhookUrl || null,\n      \"execution_mode\": webhookData.executionMode || null,\n      \"headers\": webhookData.headers || {},\n      \"original_body\": body\n    },\n    \n    // Routing information\n    \"routing\": {\n      \"route_index\": route_index,\n      \"group\": group,\n      \"action\": action,\n      \"has_icp_id\": !!(data.icp_id || body.icp_id || dbEntry.id),\n      \"has_ai_fields\": hasAIFields(data, dbEntry),\n      \"is_new_icp\": action === 'create_icp'\n    }\n  }\n};\n\n// Helper function to check if AI generation is needed\nfunction hasAIFields(data, dbEntry) {\n  const aiIndicators = ['FILL_WITH_AI', 'fill_with_ai'];\n  \n  // Check various fields for AI indicators\n  const fieldsToCheck = [\n    data.job_titles?.[0],\n    data.pain_points?.[0],\n    data.value_drivers?.[0],\n    dbEntry.job_titles?.[0],\n    dbEntry.pain_points?.[0],\n    dbEntry.value_drivers?.[0]\n  ];\n  \n  return fieldsToCheck.some(field => \n    aiIndicators.includes(field)\n  );\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        -896
+      ],
+      "id": "7df80fc1-7b05-4214-8fc5-33efcbb5bed2",
+      "name": "Parse ICP Request"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "icp-action",
+        "responseMode": "lastNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Router-Domain",
+                "value": "knowledge-base"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2368,
+        -800
+      ],
+      "id": "679fb2d0-c28b-46a5-8395-54c834dc6159",
+      "name": "ICP Action",
+      "webhookId": "d8f2e4ac-544e-45ff-a7d8-7490bd96bc2d"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.icps SET\n  icp_name = convert_from(decode($2, 'base64'), 'UTF8'),\n  description = convert_from(decode($3, 'base64'), 'UTF8'),\n  job_titles = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($4, 'base64'), 'UTF8')::jsonb)),\n  pain_points = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($5, 'base64'), 'UTF8')::jsonb)),\n  value_drivers = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($6, 'base64'), 'UTF8')::jsonb)),\n  industry_focus = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($7, 'base64'), 'UTF8')::jsonb)),\n  geographic_focus = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($8, 'base64'), 'UTF8')::jsonb)),\n  objections_and_concerns = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($9, 'base64'), 'UTF8')::jsonb)),\n  success_metrics = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($10, 'base64'), 'UTF8')::jsonb)),\n  preferred_communication_channels = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($11, 'base64'), 'UTF8')::jsonb)),\n  technology_stack = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($12, 'base64'), 'UTF8')::jsonb)),\n  competitive_alternatives = ARRAY(SELECT jsonb_array_elements_text(convert_from(decode($13, 'base64'), 'UTF8')::jsonb)),\n  company_characteristics = convert_from(decode($14, 'base64'), 'UTF8'),\n  company_size_range = convert_from(decode($15, 'base64'), 'UTF8'),\n  budget_range = convert_from(decode($16, 'base64'), 'UTF8'),\n  decision_making_process = convert_from(decode($17, 'base64'), 'UTF8'),\n  sales_cycle_length = convert_from(decode($18, 'base64'), 'UTF8'),\n  workflow_status = $19::icp_workflow_status,\n  generation_attempts = generation_attempts + 1,\n  metadata = convert_from(decode($20, 'base64'), 'UTF8')::jsonb,\n  last_error = NULL,\n  updated_at = CURRENT_TIMESTAMP\nWHERE id = $1\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ $json.icp_id }}\n{{ $json.icp_name_encoded }}\n{{ $json.description_encoded }}\n{{ $json.job_titles_encoded }}\n{{ $json.pain_points_encoded }}\n{{ $json.value_drivers_encoded }}\n{{ $json.industry_focus_encoded }}\n{{ $json.geographic_focus_encoded }}\n{{ $json.objections_encoded }}\n{{ $json.success_metrics_encoded }}\n{{ $json.channels_encoded }}\n{{ $json.tech_stack_encoded }}\n{{ $json.alternatives_encoded }}\n{{ $json.company_characteristics_encoded }}\n{{ $json.company_size_range_encoded }}\n{{ $json.budget_range_encoded }}\n{{ $json.decision_process_encoded }}\n{{ $json.sales_cycle_length_encoded }}\n{{ $json.workflow_status }}\n{{ $json.metadata_encoded }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        672,
+        -896
+      ],
+      "id": "2b11311c-3837-4e01-b0c7-86b17e181add",
+      "name": "Save Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and Structure ICP Entry\nconst aiResponse = $input.item.json.content?.[0]?.text || $input.item.json.output || $input.item.json;\nconst originalData = $input.all()[0].json;\n\ntry {\n  // Extract JSON from markdown code block or plain text\n  let parsed;\n  if (typeof aiResponse === 'string') {\n    const jsonMatch = aiResponse.match(/```json\\n?([\\s\\S]*?)\\n?```/) || \n                      aiResponse.match(/\\{[\\s\\S]*\\}$/);\n    \n    if (jsonMatch) {\n      parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    } else {\n      parsed = JSON.parse(aiResponse);\n    }\n  } else {\n    parsed = aiResponse;\n  }\n  \n  // Build structured output for database\n  const icpEntry = {\n    // Core fields for database\n    icp_id: originalData.icp_id,\n    user_id: originalData.user_id,\n    \n    // Main ICP fields\n    icp_name: parsed.icp_name,\n    description: parsed.description,\n    \n    // Target audience details\n    job_titles: parsed.job_titles || [],\n    industry_focus: parsed.industry_focus || [],\n    company_size_range: parsed.company_size_range,\n    geographic_focus: parsed.geographic_focus,\n    \n    // Business context\n    pain_points: parsed.pain_points || [],\n    value_drivers: parsed.value_drivers || [],\n    objections_and_concerns: parsed.objections_and_concerns || [],\n    success_metrics: parsed.success_metrics || [],\n    buying_triggers: parsed.buying_triggers || [],\n    \n    // Company characteristics\n    company_characteristics: parsed.company_characteristics,\n    budget_range: parsed.budget_range,\n    sales_cycle_length: parsed.sales_cycle_length,\n    \n    // Decision process\n    decision_making_process: parsed.decision_making_process,\n    \n    // Communication and competition\n    preferred_communication_channels: parsed.preferred_communication_channels || [],\n    competitive_alternatives: parsed.competitive_alternatives || [],\n    technology_stack: parsed.technology_stack || [],\n    \n    // Enhanced metadata for database\n    metadata: {\n      personas: parsed.metadata?.personas || [],\n      qualification_criteria: parsed.metadata?.qualification_criteria || {},\n      messaging_guidelines: parsed.metadata?.messaging_guidelines || {},\n      generated_at: new Date().toISOString(),\n      confidence_score: parsed.metadata?.confidence_score || 0,\n      source: 'ai_generated',\n      original_input_type: originalData.input_type || 'manual'\n    },\n    \n    // AI feedback - stored separately for user reference only\n    ai_feedback: {\n      quality_assessment: parsed.metadata?.quality_assessment || {},\n      improvement_priorities: parsed.metadata?.improvement_priorities || {},\n      summary: parsed.metadata?.ai_summary || '',\n      suggestions: {\n        top_gaps: parsed.metadata?.quality_assessment?.top_3_gaps || [],\n        critical: parsed.metadata?.improvement_priorities?.critical || [],\n        important: parsed.metadata?.improvement_priorities?.important || [],\n        optional: parsed.metadata?.improvement_priorities?.optional || []\n      }\n    },\n    \n    // Simple workflow status - just tracks where we are in the process\n    workflow_status: 'draft',  // Always draft after AI generation\n    \n    // Timestamps\n    created_at: new Date().toISOString(),\n    updated_at: new Date().toISOString()\n  };\n  \n  // Simple validation to ensure we have something to save\n  const hasBasicData = !!(icpEntry.icp_name && icpEntry.description);\n  \n  return {\n    json: {\n      success: true,\n      icp_entry: icpEntry,\n      has_basic_data: hasBasicData,\n      message: hasBasicData \n        ? `Draft ICP \"${icpEntry.icp_name}\" created successfully. Review and edit as needed.`\n        : 'Draft ICP created. Please add a name and description.',\n      ai_feedback_available: !!parsed.metadata?.quality_assessment\n    }\n  };\n  \n} catch (error) {\n  return {\n    json: {\n      success: false,\n      error: `Failed to parse AI response: ${error.message}`,\n      raw_response: aiResponse,\n      icp_id: originalData.icp_id,\n      user_id: originalData.user_id,\n      retry_recommended: true\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -896
+      ],
+      "id": "c301b60e-6600-4b11-84d7-873f86eb78e7",
+      "name": "Extract and Structure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare ICP for Database Update (Always UPDATE since frontend creates entry)\nconst icpData = $input.item.json.icp_entry;\nconst originalRequest = $node[\"Authentication\"].json;\n\n// Ensure we have the ICP ID from the frontend\nif (!originalRequest.icp_id) {\n  throw new Error('ICP ID is required - entry should be created by frontend first');\n}\n\ntry {\n  // Build the update record\n  const dbRecord = {\n    // ICP ID from frontend (required)\n    icp_id: originalRequest.icp_id,\n    \n    // Core ICP fields from AI\n    icp_name: icpData.icp_name,\n    description: icpData.description,\n    \n    // Array fields\n    job_titles: icpData.job_titles || [],\n    pain_points: icpData.pain_points || [],\n    value_drivers: icpData.value_drivers || [],\n    industry_focus: icpData.industry_focus || [],\n    geographic_focus: icpData.geographic_focus ? \n      (typeof icpData.geographic_focus === 'string' \n        ? icpData.geographic_focus.split(',').map(s => s.trim())\n        : icpData.geographic_focus) \n      : [],\n    objections_and_concerns: icpData.objections_and_concerns || [],\n    success_metrics: icpData.success_metrics || [],\n    preferred_communication_channels: icpData.preferred_communication_channels || [],\n    technology_stack: icpData.technology_stack || [],\n    competitive_alternatives: icpData.competitive_alternatives || [],\n    \n    // Text fields\n    company_characteristics: icpData.company_characteristics || null,\n    company_size_range: icpData.company_size_range || null,\n    budget_range: icpData.budget_range || null,\n    decision_making_process: icpData.decision_making_process || null,\n    sales_cycle_length: icpData.sales_cycle_length || null,\n    \n    // Update workflow status to draft (AI content ready for review)\n    workflow_status: 'draft',\n    \n    // JSONB metadata - combine all metadata and AI feedback\n    metadata: {\n      ...icpData.metadata,\n      ai_feedback: icpData.ai_feedback,\n      buying_triggers: icpData.buying_triggers || [],\n      original_request: {\n        input_type: originalRequest.input_type,\n        product_link_id: originalRequest.product_link_id,\n        generated_via: 'n8n_workflow',\n        workflow_run_id: $execution.id,\n        updated_at: new Date().toISOString()\n      }\n    }\n  };\n  \n  return {\n    json: {\n      success: true,\n      operation: 'update',\n      icp_id: originalRequest.icp_id,\n      record: dbRecord,\n      message: `ICP \"${dbRecord.icp_name}\" ready for database update`\n    }\n  };\n  \n} catch (error) {\n  // On error, we might want to update the ICP with error status\n  return {\n    json: {\n      success: false,\n      error: error.message,\n      icp_id: originalRequest.icp_id,\n      should_update_error: true,\n      error_record: {\n        icp_id: originalRequest.icp_id,\n        workflow_status: 'error',\n        last_error: error.message\n      }\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -896
+      ],
+      "id": "56693ee1-f692-4724-8f6c-ab2309057cd1",
+      "name": "Prepare for Supabase"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1,\n  status = $2\nWHERE id = $3 ",
+        "options": {
+          "queryReplacement": "={{ true }}, {{ 'completed' }},{{ $('Log Request').item.json.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        -896
+      ],
+      "id": "a74d9594-9422-4d27-ae6f-791f600043b1",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c6e9e50-a65e-42ae-a657-aa263e861619",
+              "name": "action",
+              "value": "={{ $('Parse ICP Request').item.json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "36a1400b-515a-4ea4-8b10-49067d9ff4bb",
+              "name": "icp_name",
+              "value": "={{ $('Parse ICP Request').item.json.icp_name }}",
+              "type": "string"
+            },
+            {
+              "id": "8d688e5d-6fb0-4e9e-a11a-68300afcdf4e",
+              "name": "description",
+              "value": "={{ $('Parse ICP Request').item.json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "7f634744-656d-4172-958f-b10d090c3892",
+              "name": "icp_id",
+              "value": "={{ $('Parse ICP Request').item.json.icp_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6b9d9b39-e0f0-4093-bb53-ba35b0a74ad9",
+              "name": "timestamp",
+              "value": "={{ $('Parse ICP Request').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "6a44f057-46ae-466c-8f91-6b2b9b882205",
+              "name": "team_id",
+              "value": "={{ $('Parse ICP Request').item.json.team_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cc73b85b-eb09-44a3-ae68-c64d05c75eeb",
+              "name": "metadata",
+              "value": "={{ $('Parse ICP Request').item.json.metadata }}",
+              "type": "object"
+            },
+            {
+              "id": "e37f3087-c6ed-4711-9ce6-54625dbc624f",
+              "name": "plan_type",
+              "value": "={{ $('Check Limits').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "f84e820b-3f7e-4d12-8e55-079eeb5633b1",
+              "name": "workflow_status",
+              "value": "={{ $('Parse ICP Request').item.json.workflow_status }}",
+              "type": "string"
+            },
+            {
+              "id": "ae8ac7f1-2640-4cb4-bb3e-2a13609a41e2",
+              "name": "data",
+              "value": "={{ $('Parse ICP Request').item.json.data }}",
+              "type": "object"
+            },
+            {
+              "id": "4e8c108a-8ad3-4726-8a17-8a1bd87e736e",
+              "name": "log_id",
+              "value": "={{ $('Log Request').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "name": "job_titles",
+              "value": "={{ $('Parse ICP Request').item.json.job_titles }}",
+              "type": "array"
+            },
+            {
+              "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+              "name": "pain_points",
+              "value": "={{ $('Parse ICP Request').item.json.pain_points }}",
+              "type": "array"
+            },
+            {
+              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+              "name": "value_drivers",
+              "value": "={{ $('Parse ICP Request').item.json.value_drivers }}",
+              "type": "array"
+            },
+            {
+              "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+              "name": "industry_focus",
+              "value": "={{ $('Parse ICP Request').item.json.industry_focus }}",
+              "type": "array"
+            },
+            {
+              "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+              "name": "company_characteristics",
+              "value": "={{ $('Parse ICP Request').item.json.company_characteristics }}",
+              "type": "string"
+            },
+            {
+              "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+              "name": "product_link_id",
+              "value": "={{ $('Parse ICP Request').item.json.product_link_id }}",
+              "type": "string"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+              "name": "database_entry",
+              "value": "={{ $('Parse ICP Request').item.json.database_entry }}",
+              "type": "object"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4567-bcde-678901234567",
+              "name": "requires_ai_generation",
+              "value": "={{ $('Parse ICP Request').item.json.requires_ai_generation }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c9d0e1f2-a3b4-5678-cdef-789012345678",
+              "name": "user_context",
+              "value": "={{ $('Add User Context').item.json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -576,
+        -896
+      ],
+      "id": "3759a342-c534-413b-a0ed-28aa3c173fba",
+      "name": "Global Variables"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyse this product knowledge to generate a comprehensive ICP (Ideal Customer Profile).\n\nProduct Name: {{$json.icp_name || 'AI Generated ICP'}}\nProduct Link ID: {{$json.product_link_id}}\nICP ID: {{$json.icp_id}}\n\nPRODUCT CONTEXT:\n{{JSON.stringify($json.metadata?.product_context || $json.data?.metadata?.product_context || {})}}\n\nCOMPANY CHARACTERISTICS:\n{{$json.company_characteristics || $json.data?.company_characteristics || 'Not specified'}}\n\nInstructions:\n1. Analyse the product context provided\n2. Generate a complete ICP based on who would benefit most from this product\n3. Fill all FILL_WITH_AI fields with relevant content\n4. Provide detailed quality scoring and improvement feedback\n5. Return ONLY the JSON structure specified\n6. Focus on actionable sales intelligence"
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are an expert ICP (Ideal Customer Profile) specialist who creates detailed buyer personas for B2B sales teams.\n\n## Your Task:\nGenerate a comprehensive ICP based on the product information provided. Replace all FILL_WITH_AI placeholders and user provided context with intelligent, sales-focused content. Then critically evaluate the ICP quality and provide specific improvement suggestions.\n\n## ICP Generation Focus:\n1. WHO experiences the pain points this product solves?\n2. WHAT are their specific challenges and goals?\n3. WHERE do they work (industry, company size)?\n4. WHEN do they typically buy (triggers, timing)?\n5. WHY would they choose this solution?\n6. HOW do they make purchasing decisions?\n\n## Output Format:\nReturn ONLY a JSON object with this exact structure:\n\n```json\n{\n  \"icp_name\": \"string - descriptive name for this ICP\",\n  \"description\": \"string - comprehensive description of this ideal customer\",\n  \"job_titles\": [\"array of up to 5 target job titles\"],\n  \"pain_points\": [\"array of up to 5 specific pain points they experience\"],\n  \"value_drivers\": [\"array of what drives value for them\"],\n  \"industry_focus\": [\"array of up to 5 target industries\"],\n  \"company_characteristics\": \"string - description of ideal company attributes\",\n  \"company_size_range\": \"string - employee count or revenue range\",\n  \"geographic_focus\": \"string - regions or countries\",\n  \"budget_range\": \"string - typical budget for this solution\",\n  \"decision_making_process\": \"string - how they make purchasing decisions\",\n  \"objections_and_concerns\": [\"array of common objections\"],\n  \"success_metrics\": [\"array of KPIs they care about\"],\n  \"preferred_communication_channels\": [\"array of channels like LinkedIn, Email, Phone\"],\n  \"competitive_alternatives\": [\"array of up to 3 alternatives they might consider\"],\n  \"buying_triggers\": [\"array of up to 3 events that trigger purchase decisions\"],\n  \"technology_stack\": [\"array of up to 4 complementary technologies they use\"],\n  \"sales_cycle_length\": \"string - typical time from first contact to close\",\n  \"metadata\": {\n    \"personas\": [\n      {\n        \"role\": \"Decision Maker\",\n        \"title\": \"specific title\",\n        \"motivations\": [\"what motivates them\"],\n        \"frustrations\": [\"what frustrates them\"]\n      },\n      {\n        \"role\": \"Influencer\",\n        \"title\": \"specific title\",\n        \"motivations\": [\"what motivates them\"],\n        \"frustrations\": [\"what frustrates them\"]\n      },\n      {\n        \"role\": \"End User\",\n        \"title\": \"specific title\",\n        \"motivations\": [\"what motivates them\"],\n        \"frustrations\": [\"what frustrates them\"]\n      }\n    ],\n    \"qualification_criteria\": {\n      \"must_haves\": [\"essential criteria\"],\n      \"nice_to_haves\": [\"preferred criteria\"],\n      \"red_flags\": [\"disqualifying factors\"]\n    },\n    \"messaging_guidelines\": {\n      \"value_props_that_resonate\": [\"key messages\"],\n      \"words_to_use\": [\"effective terminology\"],\n      \"words_to_avoid\": [\"ineffective terminology\"]\n    },\n    \"generated_at\": \"ISO timestamp\",\n    \"confidence_score\": 0-100,\n    \"quality_assessment\": {\n      \"scores\": {\n      \"overall\": 82,\n      \"completeness\": 90,\n      \"specificity\": 85,\n      \"actionability\": 88\n    },\n    \"top_3_gaps\": [\"Specific ROI data\", \"Competitive positioning\", \"Integration details\"]\n  },\n  \"improvement_priorities\": {\n    \"critical\": [\"Add budget tiers by company size\", \"Include success benchmarks\"],\n    \"important\": [\"Define geographic segments\", \"Create battle cards\"],\n    \"optional\": [\"Industry-specific messaging\"]\n  },\n  \"ai_summary\": \"85% sales-ready. Needs specific benchmarks and competitive positioning. 2-4 weeks to optimise.\"\n      }\n    }\n  }\n```\n\n## Quality Scoring Guidelines:\n- **Overall Score**: Weighted average of all sub-scores\n- **Completeness**: How many fields have substantial, useful content (not just placeholders)\n- **Specificity**: How specific vs generic the content is (e.g., \"technology companies\" = low, \"Series B SaaS companies in fintech\" = high)\n- **Actionability**: How immediately useful this is for sales outreach\n- **Accuracy**: Based on alignment with product context and market realities\n\n## Feedback Quality Standards:\n- Be constructively critical - identify real gaps\n- Provide specific, actionable recommendations\n- Prioritise feedback by sales impact\n- Suggest concrete data sources and methods\n- Avoid referencing how long it might take to optimise/implement/complete\n- Focus on what would most improve conversion rates\n\n## Important:\n- Replace ALL FILL_WITH_AI placeholders\n- Generate content even if product context is limited\n- Be honest about quality scores - don't inflate\n- Provide genuinely helpful improvement suggestions\n- Return ONLY the JSON - no markdown, no extra text\n- Use British English throughout",
+          "maxTokens": 2600,
+          "temperature": 0.4,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -896
+      ],
+      "id": "044b2750-0eb1-4f20-a8f9-1efb66a7c90f",
+      "name": "Create ICP Entry",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Base64 encode ALL fields to avoid comma issues\nconst record = $json.record;\n\n// Helper function to safely encode\nconst encode = (value) => {\n  if (value === null || value === undefined) {\n    return Buffer.from('').toString('base64');\n  }\n  if (typeof value === 'object') {\n    return Buffer.from(JSON.stringify(value)).toString('base64');\n  }\n  return Buffer.from(String(value)).toString('base64');\n};\n\nreturn {\n  icp_id: record.icp_id,  // Keep this as-is since it's the WHERE clause parameter\n  icp_name_encoded: encode(record.icp_name),\n  description_encoded: encode(record.description),\n  job_titles_encoded: encode(record.job_titles),\n  pain_points_encoded: encode(record.pain_points),\n  value_drivers_encoded: encode(record.value_drivers),\n  industry_focus_encoded: encode(record.industry_focus),\n  geographic_focus_encoded: encode(record.geographic_focus),\n  objections_encoded: encode(record.objections_and_concerns),\n  success_metrics_encoded: encode(record.success_metrics),\n  channels_encoded: encode(record.preferred_communication_channels),\n  tech_stack_encoded: encode(record.technology_stack),\n  alternatives_encoded: encode(record.competitive_alternatives),\n  company_characteristics_encoded: encode(record.company_characteristics),\n  company_size_range_encoded: encode(record.company_size_range),\n  budget_range_encoded: encode(record.budget_range),\n  decision_process_encoded: encode(record.decision_making_process),\n  sales_cycle_length_encoded: encode(record.sales_cycle_length),\n  workflow_status: 'draft',  // Keep this as plain text for the enum\n  metadata_encoded: encode(record.metadata)\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -896
+      ],
+      "id": "dba982a8-0fe0-4357-85c0-08f240387916",
+      "name": "Base64 Encoding"
+    }
+  ],
+  "pinData": {
+    "ICP Action": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.phillyte.xyz",
+            "user-agent": "Deno/2.1.4 (variant; SupabaseEdgeRuntime/1.69.4)",
+            "content-length": "5835",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "accept-language": "*",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "2a05:d01c:76e:7901:aa9d:8c7:1a9f:6f2b",
+            "cf-ipcountry": "GB",
+            "cf-ray": "97a65fb67ab693f2-LHR",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "f747e80d-05e6-44e0-bdda-ead3fa165a0f",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+            "x-api-key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1YzdmMDA0OC1jMGZiLTRlMTItYjE1Ny03YjFhOTg4NmY0OTAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzUzMTk1NjIzfQ.vDWoWl7AFSdIFfGgQjta0Rsl-3nhPLvcQr4GCNwVwRg",
+            "x-forwarded-for": "2a05:d01c:76e:7901:aa9d:8c7:1a9f:6f2b",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "action": "create_icp",
+            "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+            "data": {
+              "icp_name": "AI Generated ICP",
+              "description": "ICP for \"Cold AI - LinkedIn Messages That Get Replies\" targeting growth companies",
+              "product_link_id": "10",
+              "job_titles": [
+                "FILL_WITH_AI"
+              ],
+              "pain_points": [
+                "FILL_WITH_AI"
+              ],
+              "value_drivers": [
+                "FILL_WITH_AI"
+              ],
+              "industry_focus": [],
+              "company_characteristics": "Maturity: growth",
+              "decision_making_process": "FILL_WITH_AI",
+              "objections_and_concerns": [
+                "FILL_WITH_AI"
+              ],
+              "success_metrics": [
+                "FILL_WITH_AI"
+              ],
+              "preferred_communication_channels": [
+                "FILL_WITH_AI"
+              ],
+              "competitive_alternatives": [
+                "FILL_WITH_AI"
+              ],
+              "budget_range": "FILL_WITH_AI",
+              "metadata": {
+                "buying_triggers": "FILL_WITH_AI",
+                "target_company_maturity": "growth",
+                "ai_generation_requested": true,
+                "product_context": {
+                  "name": "\"Cold AI - LinkedIn Messages That Get Replies\"",
+                  "description": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**- Sales Development Representative- Account Executive- Business Development Manager- Sales Manager\n\n**Industries:**- B2B SaaS- Professional Services- Technology- Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n"
+                }
+              },
+              "timestamp": "2025-09-05T14:21:34.938Z",
+              "icp_id": 4,
+              "database_entry": {
+                "id": 4,
+                "team_id": null,
+                "icp_name": "AI Generated ICP",
+                "description": "ICP for \"Cold AI - LinkedIn Messages That Get Replies\" targeting growth companies",
+                "job_titles": [
+                  "FILL_WITH_AI"
+                ],
+                "company_characteristics": "Maturity: growth",
+                "pain_points": [
+                  "FILL_WITH_AI"
+                ],
+                "value_drivers": [
+                  "FILL_WITH_AI"
+                ],
+                "industry_focus": [],
+                "company_size_range": null,
+                "is_active": false,
+                "created_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "created_at": "2025-09-05T14:21:35.075777+00:00",
+                "updated_at": "2025-09-05T14:21:35.075777+00:00",
+                "geographic_focus": null,
+                "budget_range": null,
+                "decision_making_process": null,
+                "objections_and_concerns": null,
+                "success_metrics": null,
+                "sales_cycle_length": null,
+                "preferred_communication_channels": null,
+                "technology_stack": null,
+                "competitive_alternatives": null,
+                "product_link_id": 10,
+                "workflow_status": "generating",
+                "review_status": "pending",
+                "reviewed_at": null,
+                "reviewed_by": null,
+                "review_notes": null,
+                "metadata": {
+                  "original_input": {
+                    "icp_name": "AI Generated ICP",
+                    "metadata": {
+                      "buying_triggers": "FILL_WITH_AI",
+                      "product_context": {
+                        "name": "\"Cold AI - LinkedIn Messages That Get Replies\"",
+                        "description": "## Problem Solved\nSales professionals waste time sending generic LinkedIn messages that get ignored, resulting in poor response rates and missed opportunities\n\n### Pain Points:\n- Generic messages that don't resonate\n- Poor LinkedIn response rates\n- Time-consuming manual personalisation\n- Spray and pray approach to outreach\n\n## Solution\nAI-powered platform that analyses prospect profiles to generate personalised LinkedIn messages at scale\n\n### Key Features:\n- AI profile analysis for personalisation\n- Compliance with LinkedIn terms and GDPR\n- Team collaboration and template sharing\n- Analytics dashboard for performance tracking\n\n## Target Buyer\nSales professionals and teams who rely on LinkedIn for prospecting and lead generation\n\n**Ideal Titles:**- Sales Development Representative- Account Executive- Business Development Manager- Sales Manager\n\n**Industries:**- B2B SaaS- Professional Services- Technology- Consulting\n\n## Sales Intelligence\n\n### Hook Angles:\n- Angle 1: Are your LinkedIn messages getting ignored? Here's why...\n- Angle 2: What if you could 10x your LinkedIn response rates overnight?\n- Angle 3: Stop wasting hours on LinkedIn messages that don't work\n\n### Qualifying Questions:\n- What's your current LinkedIn response rate?\n- How much time does your team spend on LinkedIn outreach daily?\n\n### Elevator Pitch:\n> \"Cold AI uses advanced AI to analyse LinkedIn profiles and craft personalised messages that actually get responses, helping sales teams book more meetings whilst staying compliant.\"\n"
+                      },
+                      "ai_generation_requested": true,
+                      "target_company_maturity": "growth"
+                    },
+                    "job_titles": [
+                      "FILL_WITH_AI"
+                    ],
+                    "description": "ICP for \"Cold AI - LinkedIn Messages That Get Replies\" targeting growth companies",
+                    "pain_points": [
+                      "FILL_WITH_AI"
+                    ],
+                    "budget_range": "FILL_WITH_AI",
+                    "value_drivers": [
+                      "FILL_WITH_AI"
+                    ],
+                    "industry_focus": [],
+                    "product_link_id": "10",
+                    "success_metrics": [
+                      "FILL_WITH_AI"
+                    ],
+                    "company_characteristics": "Maturity: growth",
+                    "decision_making_process": "FILL_WITH_AI",
+                    "objections_and_concerns": [
+                      "FILL_WITH_AI"
+                    ],
+                    "competitive_alternatives": [
+                      "FILL_WITH_AI"
+                    ],
+                    "preferred_communication_channels": [
+                      "FILL_WITH_AI"
+                    ]
+                  },
+                  "generation_started_at": "2025-09-05T14:21:35.044Z"
+                },
+                "generation_attempts": 0,
+                "last_error": null,
+                "deleted_at": null
+              }
+            }
+          },
+          "webhookUrl": "https://n8n.phillyte.xyz/webhook/icp-action",
+          "executionMode": "production"
+        }
+      }
+    ],
+    "Check Limits": [
+      {
+        "json": {
+          "plan_type": "free",
+          "active_icp_count": "1",
+          "generating_count": "1",
+          "draft_count": "0",
+          "reviewing_count": "0",
+          "approved_count": "0",
+          "failed_count": "0",
+          "monthly_icp_creations": "3",
+          "monthly_regenerations": "0",
+          "archived_count": "0",
+          "restorable_count": "0",
+          "limits": {
+            "max_icps": 1,
+            "monthly_creates": 2,
+            "monthly_regenerations": 1,
+            "can_approve": false,
+            "can_archive": true,
+            "restore_window_days": 30
+          },
+          "action_check": {
+            "can_proceed": false,
+            "active_used": 1,
+            "active_limit": 1,
+            "monthly_used": 3,
+            "monthly_limit": 2,
+            "reason": "ICP limit reached. Your free plan allows 1 ICPs."
+          },
+          "usage_stats": {
+            "summary": {
+              "active_icps": "1 / 1",
+              "monthly_creates": "3 / 2",
+              "status_breakdown": {
+                "generating": 1,
+                "draft": 0,
+                "reviewing": 0,
+                "approved": 0,
+                "failed": 0,
+                "archived": 0
+              }
+            }
+          }
+        }
+      }
+    ],
+    "Log Request": [
+      {
+        "json": {
+          "id": 42,
+          "created_at": "2025-09-08T11:52:25.310Z"
+        }
+      }
+    ],
+    "Add User Context": [
+      {
+        "json": {
+          "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+          "email": "philipsmith96@btinternet.com",
+          "onboarding_step": 6,
+          "onboarding_completed": true,
+          "job_title": "CTO",
+          "company_name": "Cold AI",
+          "linkedin_url": "",
+          "team_id": null,
+          "team_role": null,
+          "can_manage_knowledge_base": null,
+          "can_invite_members": null,
+          "can_manage_company_profile": null,
+          "can_manage_icps": null,
+          "team_name": null,
+          "monthly_message_limit": null,
+          "monthly_messages_used": null,
+          "recent_icp_entries": "3",
+          "total_active_icps": "1",
+          "approved_icps": "0",
+          "draft_icps": "0",
+          "generating_icps": "1",
+          "reviewing_icps": "0",
+          "failed_icps": "2",
+          "restorable_icps": "0",
+          "recent_icps_list": [
+            {
+              "id": 4,
+              "name": "AI Generated ICP",
+              "status": "generating"
+            },
+            {
+              "id": 3,
+              "name": "AI Generated ICP",
+              "status": "failed"
+            },
+            {
+              "id": 2,
+              "name": "AI Generated ICP",
+              "status": "failed"
+            }
+          ]
+        }
+      }
+    ],
+    "Create ICP Entry": [
+      {
+        "json": {
+          "content": [
+            {
+              "type": "text",
+              "text": "```json\n{\n  \"icp_name\": \"B2B Sales Teams Using LinkedIn for Lead Generation\",\n  \"description\": \"High-growth B2B companies with dedicated sales teams who rely heavily on LinkedIn outreach for prospecting but struggle with low response rates due to generic messaging. These organisations have moved beyond basic cold calling and recognise LinkedIn as a primary channel, but lack the tools and expertise to personalise at scale whilst maintaining compliance.\",\n  \"job_titles\": [\"Sales Development Representative\", \"Account Executive\", \"Business Development Manager\", \"Sales Manager\", \"Head of Sales\", \"VP Sales\", \"Revenue Operations Manager\", \"Lead Generation Specialist\"],\n  \"pain_points\": [\"LinkedIn response rates below 5%\", \"Hours wasted crafting individual messages\", \"Generic templates that sound robotic\", \"Fear of LinkedIn account restrictions\", \"Inability to scale personalised outreach\", \"Poor conversion from LinkedIn connections to meetings\", \"Lack of visibility into message performance\", \"Team inconsistency in messaging quality\"],\n  \"value_drivers\": [\"Increased meeting bookings from LinkedIn\", \"Time savings on message creation\", \"Higher response rates and engagement\", \"Scalable personalisation\", \"Compliance and account safety\", \"Team productivity improvements\", \"Better ROI on LinkedIn Sales Navigator investment\", \"Competitive advantage in crowded markets\"],\n  \"industry_focus\": [\"B2B SaaS\", \"Technology Services\", \"Professional Services\", \"Management Consulting\", \"Digital Marketing Agencies\", \"Financial Services\", \"HR Technology\", \"Cybersecurity\"],\n  \"company_characteristics\": \"Growth-stage companies with 50-500 employees, established sales processes, active LinkedIn Sales Navigator subscriptions, and dedicated sales development teams. Companies experiencing rapid growth who need to scale outreach efficiently whilst maintaining quality.\",\n  \"company_size_range\": \"50-500 employees, £2M-£50M annual revenue\",\n  \"geographic_focus\": \"UK, Ireland, US, Canada, Australia, DACH region\",\n  \"budget_range\": \"£200-£2,000 per month per sales team\",\n  \"decision_making_process\": \"Sales Manager identifies need, evaluates with RevOps/Sales Ops, trials with small team, presents ROI to VP Sales/CRO for approval. Decision typically involves 2-4 stakeholders with 30-60 day evaluation period.\",\n  \"objections_and_concerns\": [\"LinkedIn compliance and account safety\", \"Message authenticity and brand voice\", \"Integration with existing sales stack\", \"ROI measurement and attribution\", \"Team adoption and training requirements\", \"Data privacy and GDPR compliance\", \"Cost per seat vs current tools\"],\n  \"success_metrics\": [\"LinkedIn response rate improvement\", \"Meetings booked per rep\", \"Time saved on outreach activities\", \"Cost per qualified lead\", \"LinkedIn connection acceptance rate\", \"Pipeline generated from LinkedIn\", \"Sales velocity improvements\"],\n  \"preferred_communication_channels\": [\"LinkedIn (ironically)\", \"Email\", \"Sales-focused webinars\", \"Industry conferences\", \"Peer referrals\", \"Sales community forums\"],\n  \"competitive_alternatives\": [\"Manual LinkedIn outreach\", \"Generic automation tools like Expandi\", \"Sales engagement platforms like Outreach/SalesLoft\", \"LinkedIn Sales Navigator alone\", \"VA services for message writing\", \"Internal sales development teams\"],\n  \"buying_triggers\": [\"Poor LinkedIn response rates\", \"Sales team expansion\", \"New LinkedIn Sales Navigator investment\", \"Competitive pressure\", \"Missing quarterly targets\", \"Sales productivity initiatives\", \"Compliance concerns with current tools\"],\n  \"technology_stack\": [\"LinkedIn Sales Navigator\", \"CRM systems (Salesforce, HubSpot, Pipedrive)\", \"Sales engagement platforms\", \"Email marketing tools\", \"Analytics platforms\", \"Slack/Teams for collaboration\"],\n  \"sales_cycle_length\": \"30-60 days from initial contact to signed contract\",\n  \"metadata\": {\n    \"personas\": [\n      {\n        \"role\": \"Decision Maker\",\n        \"title\": \"VP Sales / Head of Sales\",\n        \"motivations\": [\"Team productivity\", \"Revenue growth\", \"Competitive advantage\", \"Scalable processes\"],\n        \"frustrations\": [\"Poor LinkedIn ROI\", \"Team inconsistency\", \"Manual processes\", \"Compliance risks\"]\n      },\n      {\n        \"role\": \"Influencer\",\n        \"title\": \"Sales Operations Manager\",\n        \"motivations\": [\"Process efficiency\", \"Data accuracy\", \"Tool integration\", \"Measurable results\"],\n        \"frustrations\": [\"Fragmented tech stack\", \"Poor adoption rates\", \"Lack of analytics\", \"Manual reporting\"]\n      },\n      {\n        \"role\": \"End User\",\n        \"title\": \"Sales Development Representative\",\n        \"motivations\": [\"Meeting quota\", \"Time efficiency\", \"Better response rates\", \"Career advancement\"],\n        \"frustrations\": [\"Generic message templates\", \"Time-consuming personalisation\", \"Low response rates\", \"Account restrictions\"]\n      }\n    ],\n    \"qualification_criteria\": {\n      \"must_haves\": [\"Active LinkedIn Sales Navigator\", \"Dedicated sales team\", \"B2B sales model\", \"Growth mindset\"],\n      \"nice_to_haves\": [\"Existing sales engagement platform\", \"Sales ops function\", \"Previous automation experience\", \"Compliance requirements\"],\n      \"red_flags\": [\"B2C focus\", \"No LinkedIn presence\", \"Very small team (<5 people)\", \"Budget constraints\", \"Resistance to new technology\"]\n    },\n    \"messaging_guidelines\": {\n      \"value_props_that_resonate\": [\"10x your LinkedIn response rates\", \"Save 5+ hours per week per rep\", \"Stay LinkedIn compliant\", \"Scale personalisation\"],\n      \"words_to_use\": [\"Personalisation\", \"Response rates\", \"Compliance\", \"Efficiency\", \"Scale\", \"ROI\", \"Performance\"],\n      \"words_to_avoid\": [\"Spam\", \"Mass messaging\", \"Automation\", \"Cheap\", \"Easy\", \"Magic bullet\"]\n    },\n    \"generated_at\": \"2024-12-19T10:30:00Z\",\n    \"confidence_score\": 88,\n    \"quality_assessment\": {\n      \"scores\": {\n        \"overall\": 85,\n        \"completeness\": 92,\n        \"specificity\": 88,\n        \"actionability\": 90\n      },\n      \"top_3_gaps\": [\"Specific ROI benchmarks by industry\", \"Competitive battle cards\", \"Integration requirements detail\"]\n    },\n    \"improvement_priorities\": {\n      \"critical\": [\"Add specific response rate benchmarks by industry\", \"Create LinkedIn compliance guidelines\", \"Define integration requirements\"],\n      \"important\": [\"Develop competitive positioning against Outreach/SalesLoft\", \"Create industry-specific use cases\", \"Add team size recommendations\"],\n      \"optional\": [\"Regional messaging variations\", \"Seasonal buying patterns\", \"Partnership channel strategy\"]\n    },\n    \"ai_summary\": \"88% sales-ready. Strong foundation with clear personas and pain points. Needs specific benchmarks and competitive positioning. 3-4 weeks to optimise for maximum conversion.\"\n  }\n}\n```"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Authentication": {
+      "main": [
+        [
+          {
+            "node": "Check Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request": {
+      "main": [
+        [
+          {
+            "node": "Parse ICP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add User Context": {
+      "main": [
+        [
+          {
+            "node": "Global Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Limits": {
+      "main": [
+        [
+          {
+            "node": "Limit Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Under Limit": {
+      "main": [
+        [
+          {
+            "node": "Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Limit Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit Validator": {
+      "main": [
+        [
+          {
+            "node": "Under Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ICP Request": {
+      "main": [
+        [
+          {
+            "node": "Add User Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ICP Action": {
+      "main": [
+        [
+          {
+            "node": "Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Entry": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract and Structure": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Supabase": {
+      "main": [
+        [
+          {
+            "node": "Base64 Encoding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Variables": {
+      "main": [
+        [
+          {
+            "node": "Create ICP Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create ICP Entry": {
+      "main": [
+        [
+          {
+            "node": "Extract and Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 Encoding": {
+      "main": [
+        [
+          {
+            "node": "Save Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3b578f15-5a03-4f11-8a79-8fbe69b0501b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "qcsURCVTrdlpcYu7",
+  "tags": [
+    {
+      "createdAt": "2025-07-03T14:41:16.741Z",
+      "updatedAt": "2025-07-03T14:41:16.741Z",
+      "id": "AfErn6zbWY41qrY9",
+      "name": "nudge cold"
+    },
+    {
+      "createdAt": "2025-07-22T15:09:00.765Z",
+      "updatedAt": "2025-07-22T15:09:00.765Z",
+      "id": "yrfp10HbhjmoX07s",
+      "name": "web-app"
+    }
+  ]
+}
