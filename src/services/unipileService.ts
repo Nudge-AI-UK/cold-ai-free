@@ -45,7 +45,7 @@ class UnipileService {
         userId,
         success_url: `${window.location.origin}/auth/unipile/success`,
         failure_url: `${window.location.origin}/auth/unipile/failure`,
-        webhook_url: `https://n8n.phillyte.xyz/webhook/unipile-callback`
+        webhook_url: `https://hagtgdeyvogjkcjwacla.supabase.co/functions/v1/server-unipile-callback`
       };
 
       // Call Supabase Edge Function instead of Unipile directly
