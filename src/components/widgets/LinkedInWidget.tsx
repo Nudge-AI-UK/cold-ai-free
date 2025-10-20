@@ -76,16 +76,71 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
     setIsConnecting(true)
     const userId = user?.id || user?.user_id
 
+    // IMPORTANT: Open popup BEFORE async call to avoid popup blockers
+    // We'll set a loading page first, then redirect once we get the auth URL
+    const authWindow = window.open(
+      'about:blank',
+      'unipile-auth',
+      'width=600,height=700,scrollbars=yes,resizable=yes'
+    )
+
+    // Add loading message to the popup
+    if (authWindow) {
+      authWindow.document.write(`
+        <html>
+          <head>
+            <title>Connecting to LinkedIn...</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #0a0f1b 0%, #1a1f2e 100%);
+                color: white;
+              }
+              .loader {
+                text-align: center;
+              }
+              .spinner {
+                border: 4px solid rgba(251, 174, 28, 0.3);
+                border-top: 4px solid #FBAE1C;
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="loader">
+              <div class="spinner"></div>
+              <h2>Connecting to LinkedIn</h2>
+              <p>Please wait...</p>
+            </div>
+          </body>
+        </html>
+      `)
+    }
+
     try {
       const result = await unipileService.generateAuthLink(userId, 'create')
 
       if (result.success && result.data) {
-        // Open Unipile hosted auth in new window
-        const authWindow = window.open(
-          result.data.url,
-          'unipile-auth',
-          'width=600,height=700,scrollbars=yes,resizable=yes'
-        )
+        // Redirect the popup to the actual auth URL
+        if (authWindow && !authWindow.closed) {
+          authWindow.location.href = result.data.url
+        } else {
+          throw new Error('Popup was blocked. Please allow popups for this site.')
+        }
 
         // Listen for auth completion via postMessage
         const handleMessage = (event: MessageEvent) => {
@@ -129,12 +184,15 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
 
         toast.info('Complete LinkedIn connection in the popup window')
       } else {
+        // Close the popup if auth link generation failed
+        authWindow?.close()
         throw new Error(result.error || 'Failed to generate auth link')
       }
     } catch (error: any) {
       console.error('LinkedIn connection error:', error)
       toast.error(`Failed to connect: ${error.message}`)
-    } finally {
+      // Close popup on error
+      authWindow?.close()
       setIsConnecting(false)
     }
   }
