@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { ICPWidget } from '@/components/widgets/ICPWidget'
@@ -8,20 +7,9 @@ import { LinkedInWidget } from '@/components/widgets/LinkedInWidget'
 import { ProspectWidget } from '@/components/widgets/ProspectWidget'
 import { SettingsWidget } from '@/components/widgets/SettingsWidget'
 import { motion } from 'framer-motion'
-import { AlertTriangle, X } from 'lucide-react'
 
 export function WidgetDashboard() {
   const forceEmptyState = false  // TEST FLAG REMOVE WHEN NEEDED
-  const [showMaintenanceBanner, setShowMaintenanceBanner] = useState(() => {
-    // Check localStorage on mount
-    const dismissed = localStorage.getItem('maintenance_banner_dismissed')
-    return dismissed !== 'true'
-  })
-
-  const handleDismissBanner = () => {
-    localStorage.setItem('maintenance_banner_dismissed', 'true')
-    setShowMaintenanceBanner(false)
-  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -48,32 +36,6 @@ export function WidgetDashboard() {
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0C1725 0%, #1a1f36 100%)' }}>
       <Header />
-
-      {/* Scheduled Maintenance Banner */}
-      {showMaintenanceBanner && (
-        <div className="bg-orange-500/10 border-b border-orange-500/30 backdrop-blur-sm">
-          <div className="max-w-[1400px] mx-auto px-6 py-3">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-orange-400 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-orange-400 text-sm font-medium">
-                  Scheduled Maintenance
-                </p>
-                <p className="text-orange-300/80 text-xs">
-                  The site will be offline on Friday 17th October at 14:00 for scheduled maintenance. The service may not be back online until Monday 20th October. We apologise for any inconvenience.
-                </p>
-              </div>
-              <button
-                onClick={handleDismissBanner}
-                className="p-1 rounded-lg hover:bg-orange-500/20 text-orange-400 transition-colors"
-                aria-label="Dismiss banner"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <main className="px-6 py-6 max-w-[1400px] mx-auto">
         
