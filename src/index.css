@@ -250,12 +250,53 @@
 }
 
 @layer utilities {
+  /* Firefox compatibility fixes */
+  @supports not (backdrop-filter: blur(10px)) {
+    /* Fallback for Firefox - use solid backgrounds instead of blur */
+    .backdrop-blur-xl,
+    .backdrop-blur-sm,
+    .backdrop-blur-md,
+    .backdrop-blur-lg,
+    [class*="backdrop-blur"] {
+      backdrop-filter: none !important;
+      background-color: rgba(31, 41, 55, 0.95) !important; /* Solid dark background */
+    }
+
+    .widget-card {
+      backdrop-filter: none !important;
+      background: hsl(222 41% 11% / 0.98) !important;
+    }
+  }
+
+  /* Firefox-specific fixes using -moz prefix */
+  @-moz-document url-prefix() {
+    /* Ensure backgrounds render properly */
+    body {
+      background: #0a0f1b !important;
+      background: linear-gradient(135deg, #0a0f1b 0%, #1a1f2e 100%) !important;
+      background-attachment: fixed !important;
+    }
+
+    /* Fix backdrop-filter for Firefox */
+    .backdrop-blur-xl {
+      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(24px);
+      background-color: rgba(31, 41, 55, 0.85) !important;
+    }
+
+    .backdrop-blur-sm {
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      background-color: rgba(31, 41, 55, 0.85) !important;
+    }
+  }
+
   /* Animation keyframes */
   @keyframes subtle-glow {
-    0%, 100% { 
+    0%, 100% {
       opacity: 0.3;
     }
-    50% { 
+    50% {
       opacity: 0.6;
     }
   }

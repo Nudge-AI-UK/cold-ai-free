@@ -177,16 +177,24 @@ export const LoginPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-900 relative overflow-hidden flex items-center justify-center">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
+    <div className="min-h-screen relative flex items-center justify-center" style={{
+      background: 'linear-gradient(135deg, #0a0f1b 0%, #1a1f2e 100%)',
+      backgroundColor: '#0a0f1b'
+    }}>
+      {/* Animated Background - Properly Contained */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
         <motion.div
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, 90, 0],
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute top-0 -left-1/4 w-1/2 h-1/2 bg-orange-500/10 rounded-full blur-3xl"
+          className="absolute top-0 -left-1/4 w-1/2 h-1/2 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(251, 146, 60, 0.08) 0%, transparent 70%)',
+            filter: 'blur(80px)',
+            willChange: 'transform'
+          }}
         />
         <motion.div
           animate={{
@@ -194,7 +202,12 @@ export const LoginPage = () => {
             rotate: [0, -90, 0],
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-0 -right-1/4 w-1/2 h-1/2 bg-blue-500/10 rounded-full blur-3xl"
+          className="absolute bottom-0 -right-1/4 w-1/2 h-1/2 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)',
+            filter: 'blur(80px)',
+            willChange: 'transform'
+          }}
         />
         <motion.div
           animate={{
@@ -202,7 +215,12 @@ export const LoginPage = () => {
             x: [-50, 50, -50],
           }}
           transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-1/3 bg-purple-500/10 rounded-full blur-3xl"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-1/3 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%)',
+            filter: 'blur(80px)',
+            willChange: 'transform'
+          }}
         />
       </div>
 
@@ -217,7 +235,10 @@ export const LoginPage = () => {
           >
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 backdrop-blur-sm border border-orange-500/20">
+                <div className="p-3 rounded-2xl border border-orange-500/20" style={{
+                  background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.15), rgba(245, 158, 11, 0.15))',
+                  backgroundColor: 'rgba(251, 146, 60, 0.1)'
+                }}>
                   <img src="/Square_bishop.svg" alt="Cold AI" className="w-10 h-10" />
                 </div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
@@ -247,8 +268,10 @@ export const LoginPage = () => {
                     transition={{ delay: 0.2 + index * 0.1 }}
                     className="group relative"
                   >
-                    <div className={`absolute inset-0 bg-gradient-to-r ${feature.color} rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity`}></div>
-                    <div className="relative flex items-center gap-2 p-3 rounded-lg bg-gray-800/50 backdrop-blur-sm border border-gray-700 group-hover:border-gray-600 transition-colors">
+                    <div className={`absolute inset-0 bg-gradient-to-r ${feature.color} rounded-lg opacity-0 group-hover:opacity-30 transition-opacity`} style={{ filter: 'blur(12px)' }}></div>
+                    <div className="relative flex items-center gap-2 p-3 rounded-lg border border-gray-700 group-hover:border-gray-600 transition-colors" style={{
+                      backgroundColor: 'rgba(31, 41, 55, 0.7)'
+                    }}>
                       <feature.icon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-300">{feature.text}</span>
                     </div>
@@ -280,7 +303,11 @@ export const LoginPage = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Card className="bg-gray-800/50 backdrop-blur-xl border-gray-700 shadow-2xl">
+            <Card className="border-gray-700 shadow-2xl" style={{
+              backgroundColor: 'rgba(31, 41, 55, 0.85)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)'
+            }}>
               <CardHeader className="space-y-1 pb-6">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-2xl font-bold text-white">
@@ -479,12 +506,20 @@ export const LoginPage = () => {
 
       {/* Password Reset Modal */}
       {showPasswordReset && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+             style={{
+               backgroundColor: 'rgba(0, 0, 0, 0.7)',
+               backdropFilter: 'blur(4px)',
+               WebkitBackdropFilter: 'blur(4px)'
+             }}
              onClick={() => setShowPasswordReset(false)}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800/95 backdrop-blur-xl border border-gray-700 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            className="border border-gray-700 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            style={{
+              backgroundColor: 'rgba(31, 41, 55, 0.95)'
+            }}
             onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">Reset Password</h3>
             <p className="text-sm text-gray-400 mb-6">
