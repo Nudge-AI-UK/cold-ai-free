@@ -197,9 +197,39 @@
   .orb {
     animation: none;
   }
-  
+
   .animated-modal-background {
     animation: none;
     opacity: 1;
+  }
+}
+
+/* Force GPU acceleration and rendering fixes for all browsers */
+.animated-modal-background {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+}
+
+.bg-animation::before,
+.bg-animation::after {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.orb {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(2px)) {
+  .modal-overlay-backdrop {
+    background: rgba(10, 14, 27, 0.7);
   }
 }
