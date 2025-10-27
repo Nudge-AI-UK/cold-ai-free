@@ -55,6 +55,19 @@ interface KnowledgeDetailsModalProps {
   } | null;
 }
 
+// Helper function to clean escaped text from database
+const cleanText = (text: string | null | undefined): string => {
+  if (!text) return ''
+  // Remove all quotes (escaped and regular) and clean up the text
+  return text
+    .replace(/^["']+/, '') // Remove leading quotes
+    .replace(/["']+$/, '') // Remove trailing quotes
+    .replace(/\\"/g, '') // Remove escaped quotes entirely
+    .replace(/\\'/g, '') // Remove escaped single quotes
+    .replace(/\\n/g, '\n') // Replace escaped newlines
+    .trim()
+}
+
 // Helper function to ensure URLs have proper protocol
 const ensureProtocol = (url: string): string => {
   if (!url) return url;
@@ -280,8 +293,8 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
 
   // State for editing
   const [_isEditing, _setIsEditing] = useState(isDraftPending);
-  const [editedTitle, setEditedTitle] = useState(entry.title || '');
-  const [editedSummary, setEditedSummary] = useState(entry.summary || '');
+  const [editedTitle, setEditedTitle] = useState(cleanText(entry.title));
+  const [editedSummary, setEditedSummary] = useState(cleanText(entry.summary));
   const [isSaving, setIsSaving] = useState(false);
 
   // Parse content into structured data (for both draft and active modes)
@@ -596,7 +609,7 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
 
   return (
     <BaseModal
-      title={isDraftPending ? 'Review & Edit Product' : (entry.title ? entry.title.replace(/^["']|["']$/g, '') : 'Knowledge Entry')}
+      title={isDraftPending ? 'Review & Edit Product' : (entry.title ? cleanText(entry.title) : 'Knowledge Entry')}
       description={typeInfo.label}
       className="knowledge-modal-large !max-w-[95vw] !h-[90vh]"
     >

@@ -201,12 +201,13 @@ serve(async (req) => {
               })
               .eq('id', sequence.id)
 
-            // Update usage tracking
-            await supabase.rpc('increment_usage_tracking', {
+            // Update quota tracking using the new quota system
+            // This automatically handles legacy usage_tracking updates as well
+            const messageType = isConnectionRequest ? 'connection_request' : isInMail ? 'inmail' : 'direct_message'
+            await supabase.rpc('increment_message_quota', {
               p_user_id: sequence.user_id,
-              p_usage_date: today,
-              p_field: isConnectionRequest ? 'connection_requests_sent' : 'messages_sent',
-              p_increment: 1
+              p_message_type: messageType,
+              p_is_personalised: personalizedMessage.length > 0 // Consider any message with content as personalised
             })
 
             // Schedule next follow-up if applicable

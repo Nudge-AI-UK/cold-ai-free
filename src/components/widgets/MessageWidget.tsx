@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { unipileService } from '@/services/unipileService'
+import { useModalFlow } from '@/components/modals/ModalFlowManager'
+import { useProspectModal } from '@/components/modals/ProspectModalManager'
 
 interface MessageWidgetProps {
   forceEmpty?: boolean
@@ -35,8 +37,75 @@ const parseMessage = (message: string): string => {
   return message.replace(/\\n/g, '\n')
 }
 
+// Helper function to clean escaped text from database
+const cleanText = (text: string | null | undefined): string => {
+  if (!text) return ''
+  // Remove all quotes (escaped and regular) and clean up the text
+  return text
+    .replace(/^["']+/, '') // Remove leading quotes
+    .replace(/["']+$/, '') // Remove trailing quotes
+    .replace(/\\"/g, '') // Remove escaped quotes entirely
+    .replace(/\\'/g, '') // Remove escaped single quotes
+    .replace(/\\n/g, '\n') // Replace escaped newlines
+    .trim()
+}
+
+// Helper function to get character limits and message type info
+const getMessageLimits = (messageType: string | null) => {
+  if (!messageType) {
+    return {
+      limit: 600,
+      target: 600,
+      max: 1900,
+      type: 'unknown',
+      description: 'Default limit'
+    }
+  }
+
+  if (messageType === 'connection_request_200') {
+    return {
+      limit: 200,
+      target: 200,
+      max: 200,
+      type: 'connection_request',
+      description: 'Connection Request (Free Account)'
+    }
+  }
+
+  if (messageType === 'connection_request_300') {
+    return {
+      limit: 300,
+      target: 300,
+      max: 300,
+      type: 'connection_request',
+      description: 'Connection Request (Premium Account)'
+    }
+  }
+
+  if (messageType === 'inmail' || messageType === 'open_profile') {
+    return {
+      limit: 600,
+      target: 800,
+      max: 1900,
+      type: 'inmail',
+      description: messageType === 'inmail' ? 'InMail Message' : 'Open Profile Message'
+    }
+  }
+
+  // Default to InMail limits for unknown types
+  return {
+    limit: 600,
+    target: 800,
+    max: 1900,
+    type: 'unknown',
+    description: 'Message'
+  }
+}
+
 export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const { user } = useAuth()
+  const { openModal } = useModalFlow()
+  const { openProspectModal } = useProspectModal()
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [generatedMessage, setGeneratedMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -63,6 +132,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [isStuck, setIsStuck] = useState(false)
   const [environment, setEnvironment] = useState<'production' | 'testing'>('production')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [generatedMessageType, setGeneratedMessageType] = useState<string | null>(null)
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -115,7 +185,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message, created_at, updated_at')
+      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at')
       .eq('user_id', userId)
       .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
       .order('created_at', { ascending: false })
@@ -155,6 +225,9 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         setGeneratedMessage(parseMessage(existingLog.generated_message))
         if (existingLog.edited_message) {
           setEditedMessage(parseMessage(existingLog.edited_message))
+        }
+        if (existingLog.message_type) {
+          setGeneratedMessageType(existingLog.message_type)
         }
         setProgressStatus('generated')
         setIsGenerating(false)
@@ -330,6 +403,10 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             console.log('✅ Message generation complete!')
             setGeneratedMessage(parseMessage(newData.generated_message))
             setEditedMessage('') // Reset edited message for new generation
+            if (newData.message_type) {
+              setGeneratedMessageType(newData.message_type)
+              console.log('📊 Message type:', newData.message_type)
+            }
             setProgressStatus('generated')
             setIsGenerating(false)
           }
@@ -634,6 +711,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     setRecipientUrl('')
     setLastUpdateTime(null)
     setIsStuck(false)
+    setGeneratedMessageType(null)
   }
 
   const handleResetStuckGeneration = async () => {
@@ -675,6 +753,15 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     }
 
     toast.success('Message copied to clipboard!')
+  }
+
+  const handleViewResearch = () => {
+    if (!currentLogId) {
+      toast.error('No research data available')
+      return
+    }
+
+    openProspectModal(currentLogId)
   }
 
   const settingsCount = Object.values(setupStatus.settings).filter(Boolean).length
@@ -856,7 +943,182 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     )
   }
 
-  // Ready State
+  // Generated Message State - Full view with green glow
+  if (generatedMessage && progressStatus === 'generated') {
+    const limits = getMessageLimits(generatedMessageType)
+    const messageLength = (editedMessage || generatedMessage).length
+    const isOverLimit = messageLength > limits.max
+
+    return (
+      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden text-white ${className}`}
+           style={{
+             background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
+             backdropFilter: 'blur(10px)',
+             WebkitBackdropFilter: 'blur(10px)',
+             border: '2px solid rgba(34, 197, 94, 0.5)',
+             boxShadow: '0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1)'
+           }}>
+
+        {/* Success Badge */}
+        <div className="absolute top-4 right-4 z-30">
+          <div className="bg-green-500/20 text-green-400 border border-green-500/50 px-3 py-1 rounded-full text-xs flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span>Message Ready</span>
+          </div>
+        </div>
+
+        {/* Prospect Info Header */}
+        <div className="mb-6 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-green-600/20 flex items-center justify-center border border-green-500/30">
+              <span className="text-2xl">👤</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-white mb-1">Generated Message</h3>
+              <p className="text-sm text-gray-400">
+                {recipientUrl ? (
+                  <a href={recipientUrl} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 transition-colors">
+                    {recipientUrl}
+                  </a>
+                ) : 'LinkedIn Profile'}
+              </p>
+            </div>
+            {generatedMessageType && (
+              <div className="text-xs text-gray-400 bg-black/30 px-3 py-1 rounded-full">
+                {limits.description}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Message Textarea */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-white/70 uppercase tracking-wide mb-2">
+            Your Message
+          </label>
+          <textarea
+            value={editedMessage || generatedMessage}
+            onChange={(e) => setEditedMessage(e.target.value)}
+            className={`w-full min-h-[300px] bg-black/30 border rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-all duration-200 resize-none ${
+              isOverLimit
+                ? 'border-red-500 focus:border-red-500'
+                : 'border-white/10 focus:border-green-500/50'
+            }`}
+            placeholder="Your generated message will appear here..."
+          />
+        </div>
+
+        {/* Character Count */}
+        {(() => {
+          const isOverTarget = messageLength > limits.target && limits.type === 'inmail'
+
+          return (
+            <>
+              <div className="flex justify-between text-xs items-center mb-4">
+                <div className="flex flex-col gap-1">
+                  <span className={isOverLimit ? 'text-red-400 font-medium' : isOverTarget ? 'text-yellow-400' : 'text-gray-500'}>
+                    Character count: {messageLength}/{limits.max}
+                    {isOverLimit && ` (${messageLength - limits.max} over limit)`}
+                  </span>
+                  {limits.type === 'inmail' && messageLength < limits.limit && (
+                    <span className="text-yellow-400/60 text-[10px]">
+                      Target: {limits.limit}-{limits.target} chars for optimal engagement
+                    </span>
+                  )}
+                  {limits.type === 'inmail' && messageLength >= limits.limit && messageLength <= limits.target && (
+                    <span className="text-green-400 text-[10px]">
+                      ✓ Within target range ({limits.limit}-{limits.target})
+                    </span>
+                  )}
+                </div>
+                {editedMessage && editedMessage !== generatedMessage && (
+                  <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                )}
+              </div>
+
+              {isOverLimit && limits.type === 'connection_request' && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400 mb-4">
+                  ⚠️ LinkedIn connection requests are limited to {limits.max} characters. This message will be rejected.
+                </div>
+              )}
+
+              {isOverLimit && limits.type === 'inmail' && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400 mb-4">
+                  ⚠️ InMail messages have a hard limit of {limits.max} characters. This message will be truncated.
+                </div>
+              )}
+
+              {isOverTarget && !isOverLimit && limits.type === 'inmail' && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 text-xs text-yellow-400 mb-4">
+                  ℹ️ Message is longer than recommended ({limits.target} chars). Consider shortening for better engagement.
+                </div>
+              )}
+            </>
+          )
+        })()}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleViewResearch}
+            className="px-4 py-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all duration-200 text-sm font-medium flex items-center gap-2"
+          >
+            <span className="text-lg">🔍</span>
+            <span>View Research</span>
+          </button>
+
+          <button
+            onClick={copyToClipboard}
+            className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 transition-all duration-200"
+            title="Copy to clipboard"
+          >
+            <Copy className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={handleArchiveMessage}
+            disabled={isArchiving}
+            className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 transition-all duration-200"
+            title="Archive message"
+          >
+            {isArchiving ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              <Save className="w-5 h-5" />
+            )}
+          </button>
+
+          <button
+            onClick={handleSendMessage}
+            disabled={isSending || isOverLimit}
+            className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 ${
+              isOverLimit
+                ? 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:shadow-green-500/30'
+            }`}
+          >
+            {isSending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Sending...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                <span>Send Message</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Decorative green glow elements */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-full blur-2xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-green-600/10 to-transparent rounded-tr-full blur-2xl"></div>
+      </div>
+    )
+  }
+
+  // Ready State - Split into Idle and Generating views
   return (
     <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
          style={{
@@ -864,7 +1126,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
            backdropFilter: 'blur(10px)',
            WebkitBackdropFilter: 'blur(10px)'
          }}>
-      
+
       {/* Status Badge and Environment Selector */}
       <div className="absolute top-4 right-4 z-30 flex items-center gap-3">
         {/* Admin Environment Selector */}
@@ -900,7 +1162,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             AI
           </div>
         </div>
-        
+
         {/* Title and Description */}
         <div className="flex-1">
           <h2 className="text-2xl font-bold mb-2"
@@ -920,8 +1182,10 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex gap-6">
+      {/* Main Content Area - Conditional Layout */}
+      {isGenerating || progressStatus ? (
+        // Two-column layout when generating
+        <div className="flex gap-6">
         {/* Left Side - Input Section */}
         <div className="flex-1">
           <div className="space-y-4">
@@ -983,7 +1247,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   <div className="flex flex-col">
                     <span className="text-xs text-gray-400 mb-1">Product Context</span>
                     <span className="text-xs font-medium text-[#FBAE1C]">
-                      {productData?.title || 'Not set'}
+                      {cleanText(productData?.title) || 'Not set'}
                     </span>
                   </div>
                 </div>
@@ -1024,7 +1288,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             {/* Message Output Area */}
             <div>
               <label className="block text-xs font-medium text-white/70 uppercase tracking-wide mb-2">
-                Generated Message
+                {generatedMessage ? 'Generated Message' : 'Message Generation Progress'}
               </label>
               <div className="bg-black/30 rounded-xl border border-white/10 min-h-[200px]">
                 {generatedMessage ? (
@@ -1193,73 +1457,210 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
               </div>
             </div>
 
-            {/* Message Stats */}
-            <div className="flex justify-between text-xs">
-              <span className={(editedMessage || generatedMessage).length > 300 ? 'text-red-400 font-medium' : 'text-gray-500'}>
-                Character count: {(editedMessage || generatedMessage).length}/300
-                {(editedMessage || generatedMessage).length > 300 && ` (${(editedMessage || generatedMessage).length - 300} over limit)`}
-              </span>
-              {editedMessage && editedMessage !== generatedMessage && (
-                <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
-              )}
-            </div>
-            {(editedMessage || generatedMessage).length > 300 && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400">
-                ⚠️ LinkedIn connection requests are limited to 300 characters. This message will be rejected or truncated if the recipient is not an existing connection.
+            {/* Message Stats - Only show when message is generated */}
+            {generatedMessage && (() => {
+              const messageLength = (editedMessage || generatedMessage).length
+              const limits = getMessageLimits(generatedMessageType)
+              const isOverLimit = messageLength > limits.max
+              const isOverTarget = messageLength > limits.target && limits.type === 'inmail'
+
+              return (
+                <>
+                  <div className="flex justify-between text-xs items-center">
+                    <div className="flex flex-col gap-1">
+                      <span className={isOverLimit ? 'text-red-400 font-medium' : isOverTarget ? 'text-yellow-400' : 'text-gray-500'}>
+                        Character count: {messageLength}/{limits.max}
+                        {isOverLimit && ` (${messageLength - limits.max} over limit)`}
+                      </span>
+                      {limits.type === 'inmail' && messageLength < limits.limit && (
+                        <span className="text-yellow-400/60 text-[10px]">
+                          Target: {limits.limit}-{limits.target} chars for optimal engagement
+                        </span>
+                      )}
+                      {limits.type === 'inmail' && messageLength >= limits.limit && messageLength <= limits.target && (
+                        <span className="text-green-400 text-[10px]">
+                          ✓ Within target range ({limits.limit}-{limits.target})
+                        </span>
+                      )}
+                      {generatedMessageType && (
+                        <span className="text-gray-600 text-[10px]">
+                          {limits.description}
+                        </span>
+                      )}
+                    </div>
+                    {editedMessage && editedMessage !== generatedMessage && (
+                      <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                    )}
+                  </div>
+
+                  {isOverLimit && limits.type === 'connection_request' && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400">
+                      ⚠️ LinkedIn connection requests are limited to {limits.max} characters. This message will be rejected.
+                    </div>
+                  )}
+
+                  {isOverLimit && limits.type === 'inmail' && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400">
+                      ⚠️ InMail messages have a hard limit of {limits.max} characters. This message will be truncated.
+                    </div>
+                  )}
+
+                  {isOverTarget && !isOverLimit && limits.type === 'inmail' && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 text-xs text-yellow-400">
+                      ℹ️ Message is longer than recommended ({limits.target} chars). Consider shortening for better engagement.
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+
+            {/* Action Buttons - Only show when message is generated */}
+            {generatedMessage && (
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSendMessage}
+                  disabled={isSending || !(editedMessage || generatedMessage)}
+                  className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 ${
+                    (editedMessage || generatedMessage)
+                      ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
+                      : 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
+                  }`}>
+                  {isSending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Sending...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>Send Message</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={copyToClipboard}
+                  className={`p-3 rounded-xl border transition-all duration-200 ${
+                    (editedMessage || generatedMessage)
+                      ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                      : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                  }`}
+                  disabled={!(editedMessage || generatedMessage)}>
+                  <Copy className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleArchiveMessage}
+                  disabled={isArchiving || !(editedMessage || generatedMessage)}
+                  className={`p-3 rounded-xl border transition-all duration-200 ${
+                    (editedMessage || generatedMessage)
+                      ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                      : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                  }`}>
+                  {isArchiving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                </button>
               </div>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleSendMessage}
-                disabled={isSending || !(editedMessage || generatedMessage)}
-                className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 ${
-                  (editedMessage || generatedMessage)
-                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
-                    : 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
-                }`}>
-                {isSending ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Sending...</span>
-                  </div>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    <span>Send Message</span>
-                  </>
-                )}
-              </button>
-              <button
-                onClick={copyToClipboard}
-                className={`p-3 rounded-xl border transition-all duration-200 ${
-                  (editedMessage || generatedMessage)
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                    : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
-                }`}
-                disabled={!(editedMessage || generatedMessage)}>
-                <Copy className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleArchiveMessage}
-                disabled={isArchiving || !(editedMessage || generatedMessage)}
-                className={`p-3 rounded-xl border transition-all duration-200 ${
-                  (editedMessage || generatedMessage)
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                    : 'bg-gray-700/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
-                }`}>
-                {isArchiving ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <Save className="w-5 h-5" />
-                )}
-              </button>
-            </div>
           </div>
         </div>
       </div>
-      
+      ) : (
+        // Single-column layout when idle
+        <div className="space-y-4">
+          {/* LinkedIn URL Input */}
+          <div>
+            <label className="block text-xs font-medium text-white/70 uppercase tracking-wide mb-2">
+              LinkedIn Profile URL
+            </label>
+            <div className="relative">
+              <input
+                type="url"
+                value={linkedinUrl}
+                onChange={(e) => {
+                  setLinkedinUrl(e.target.value)
+                  setLinkedinError('')
+                }}
+                onBlur={(e) => {
+                  if (e.target.value && !validateLinkedInUrl(e.target.value)) {
+                    setLinkedinError('Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username')
+                  }
+                }}
+                placeholder="https://linkedin.com/in/example"
+                className={`w-full bg-black/30 border rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none transition-all duration-200 ${
+                  linkedinError
+                    ? 'border-red-500 focus:border-red-500'
+                    : 'border-white/10 focus:border-[#FBAE1C]/50'
+                }`}
+              />
+            </div>
+            {linkedinError && (
+              <p className="text-xs text-red-400 mt-1">{linkedinError}</p>
+            )}
+          </div>
+
+          {/* Configuration Options */}
+          <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left Column */}
+              <div className="space-y-3">
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-400 mb-1">ICP Profile</span>
+                  <button
+                    onClick={() => icpData && openModal('icp-edit', { mode: 'view', data: { icp: icpData }, flowName: 'main' })}
+                    className="text-sm font-medium text-[#FBAE1C] text-left hover:text-[#FC9109] transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!icpData}
+                  >
+                    {icpData?.icp_name || 'Not set'}
+                  </button>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-400 mb-1">Outreach Goal</span>
+                  <button
+                    onClick={() => openModal('profile-communication', { flowName: 'main', mode: 'edit' })}
+                    className="text-sm font-medium text-[#FBAE1C] text-left capitalize hover:text-[#FC9109] transition-colors cursor-pointer"
+                  >
+                    {outreachGoal === 'meeting' ? 'Book Meeting' :
+                     outreachGoal === 'call' ? 'Schedule Call' :
+                     outreachGoal === 'email' ? 'Reply via Email' :
+                     outreachGoal === 'soft' ? 'Soft Ask' : 'Book Meeting'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-3">
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-400 mb-1">Product Context</span>
+                  <button
+                    onClick={() => productData && openModal('knowledge', { mode: 'edit', data: productData })}
+                    className="text-sm font-medium text-[#FBAE1C] text-left hover:text-[#FC9109] transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!productData}
+                  >
+                    {cleanText(productData?.title) || 'Not set'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Generate Button */}
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group disabled:opacity-50">
+            <Zap className={`w-5 h-5 group-hover:rotate-180 transition-transform duration-500`} />
+            <span>Generate Message</span>
+          </button>
+
+          {/* Quick Tips */}
+          <div className="text-xs text-gray-500 space-y-1">
+            <p>💡 Tip: The AI analyses the prospect's profile to craft personalised messages</p>
+          </div>
+        </div>
+      )}
+
       {/* Decorative Elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>

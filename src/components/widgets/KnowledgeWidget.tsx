@@ -21,6 +21,19 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
 
+  // Helper function to clean escaped text from database
+  const cleanText = (text: string | null | undefined): string => {
+    if (!text) return ''
+    // Remove all quotes (escaped and regular) and clean up the text
+    return text
+      .replace(/^["']+/, '') // Remove leading quotes
+      .replace(/["']+$/, '') // Remove trailing quotes
+      .replace(/\\"/g, '') // Remove escaped quotes entirely
+      .replace(/\\'/g, '') // Remove escaped single quotes
+      .replace(/\\n/g, '\n') // Replace escaped newlines
+      .trim()
+  }
+
   useEffect(() => {
     if (user && !forceEmpty) {
       fetchKnowledge()
@@ -282,10 +295,10 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
               {/* Product Name and Summary */}
               <div className="flex-1">
                 <h2 className="text-xl font-bold mb-2 text-white">
-                  {entry?.title || 'Product Name'}
+                  {cleanText(entry?.title) || 'Product Name'}
                 </h2>
                 <p className="text-gray-400 text-sm leading-relaxed line-clamp-2">
-                  {entry?.summary || 'Product summary...'}
+                  {cleanText(entry?.summary) || 'Product summary...'}
                 </p>
               </div>
             </div>
@@ -415,7 +428,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                       backgroundClip: 'text',
                       animation: 'shimmer 3s linear infinite'
                     }}>
-                  {entry?.title || 'Product Name'}
+                  {cleanText(entry?.title) || 'Product Name'}
                 </h2>
                 <p className="text-sm text-gray-400">
                   {entry?.knowledge_type || 'Product'}
@@ -425,7 +438,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
 
             {/* Product Description Preview */}
             <p className="text-sm text-gray-300 mb-4 leading-relaxed line-clamp-3">
-              {entry?.summary || entry?.content?.substring(0, 200) || "Review AI-generated content..."}
+              {cleanText(entry?.summary) || cleanText(entry?.content?.substring(0, 200)) || "Review AI-generated content..."}
             </p>
 
             {/* Review CTA */}
@@ -681,7 +694,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                     backgroundClip: 'text',
                     animation: 'shimmer 3s linear infinite'
                   }}>
-                {entry?.title || 'Product Name'}
+                {cleanText(entry?.title) || 'Product Name'}
               </h2>
               <p className="text-sm text-gray-400">
                 {entry?.knowledge_type || 'Product'}
@@ -691,7 +704,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
 
           {/* Product Description */}
           <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-            {entry?.summary || "Product description..."}
+            {cleanText(entry?.summary) || "Product description..."}
           </p>
 
           {/* Key Features from metadata if available */}

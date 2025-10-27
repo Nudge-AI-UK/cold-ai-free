@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
 
 export function Header() {
   const { user, signOut } = useAuth()
@@ -64,69 +63,63 @@ export function Header() {
 
           <div className="h-6 w-px bg-gray-600" />
 
-          <Badge
-            variant="secondary"
-            className="bg-orange-500/10 text-orange-400 border-orange-500/20"
-          >
-            25 messages/month
-          </Badge>
-
-          <div className="h-6 w-px bg-gray-600" />
-
-          {/* Navigation Links */}
-          <div className="flex items-center space-x-2">
+          {/* Navigation Links - Clean Tab Style */}
+          <div className="flex items-center space-x-1">
             <Link to="/">
-              <Badge
-                variant="secondary"
-                className={`${
-                  location.pathname === '/'
-                    ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                    : 'bg-white/5 text-gray-400 border-white/10'
-                } hover:bg-orange-500/20 hover:border-orange-500/30 hover:text-orange-300 transition-all cursor-pointer`}
-              >
-                Dashboard
-              </Badge>
+              <div className={`px-4 py-2 relative group cursor-pointer transition-all duration-200 ${
+                location.pathname === '/'
+                  ? 'text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}>
+                <span className="font-medium">Dashboard</span>
+                {location.pathname === '/' && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #FBAE1C 100%)',
+                    }}
+                  />
+                )}
+              </div>
             </Link>
-            <Link to="/inbox">
-              <Badge
-                variant="secondary"
-                className={`flex items-center gap-1 ${
-                  location.pathname === '/inbox'
-                    ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                    : 'bg-white/5 text-gray-400 border-white/10'
-                } hover:bg-orange-500/20 hover:border-orange-500/30 hover:text-orange-300 transition-all cursor-pointer`}
-              >
-                <MessageSquare className="h-3 w-3" />
-                Inbox
-              </Badge>
+            <Link to="/outreach">
+              <div className={`px-4 py-2 relative group cursor-pointer transition-all duration-200 flex items-center gap-2 ${
+                location.pathname === '/outreach'
+                  ? 'text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}>
+                <MessageSquare className="h-4 w-4" />
+                <span className="font-medium">Outreach</span>
+                {location.pathname === '/outreach' && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #FBAE1C 100%)',
+                    }}
+                  />
+                )}
+              </div>
             </Link>
           </div>
         </div>
         
-        <div className="ml-auto flex items-center space-x-4">
-          {/* Upgrade Badge - styled consistently */}
+        <div className="ml-auto flex items-center space-x-3">
+          {/* Upgrade Button - Gradient */}
           <button
             onClick={() => window.open(import.meta.env.VITE_UPGRADE_URL || 'https://app.coldai.uk', '_blank')}
-            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded"
+            className="px-5 py-2 rounded-lg font-semibold text-white transition-all duration-200 hover:shadow-lg hover:scale-105"
+            style={{
+              background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 100%)',
+            }}
           >
-            <Badge 
-              variant="secondary"
-              className="bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/30 hover:text-orange-300 transition-all cursor-pointer"
-            >
-              Upgrade to Pro
-            </Badge>
+            Upgrade to Pro
           </button>
-          
-          {/* Profile Dropdown - matching badge style */}
+
+          {/* Profile Dropdown - Clean Circle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded">
-                <Badge 
-                  variant="secondary"
-                  className="bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/30 hover:text-orange-300 transition-all cursor-pointer px-2 py-1"
-                >
-                  <User className="h-4 w-4" />
-                </Badge>
+              <button className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 text-gray-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
+                <User className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-[#0C1725] border-orange-500/30">
@@ -134,7 +127,7 @@ export function Header() {
                 {user?.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-orange-500/20" />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => signOut()}
                 className="hover:bg-orange-500/20 cursor-pointer text-gray-200 focus:bg-orange-500/20 focus:text-orange-300"
               >

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { ExternalLink } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useProspectModal } from '@/components/modals/ProspectModalManager'
 
 // Helper function to parse and clean message
 const parseMessage = (message: string): string => {
@@ -54,17 +54,14 @@ interface Prospect {
   edited_message?: string
   message_metadata?: any
   ai_context?: any
+  focus_report_markdown?: string
 }
 
 export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
   const { user } = useAuth()
+  const { openProspectModal } = useProspectModal()
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [stats, setStats] = useState({ generated: 0, sent: 0, responseRate: 0 })
-  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null)
-  const [prospectMessages, setProspectMessages] = useState<Prospect[]>([])
-  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSending, setIsSending] = useState(false)
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -109,6 +106,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     const userId = user?.id || user?.user_id
 
     // Fetch message generation logs with research_cache data
+    // Only show: generating, generated, pending_scheduled, scheduled, archived, failed
     const { data, error } = await supabase
       .from('message_generation_logs')
       .select(`
@@ -124,6 +122,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
         )
       `)
       .eq('user_id', userId)
+      .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'archived', 'failed'])
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -150,85 +149,27 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     setProspects(prospects)
 
     // Calculate stats from ALL messages (not deduplicated)
-    const generated = allProspects.filter(p => ['generated', 'archived'].includes(p.message_status)).length
-    const sent = allProspects.filter(p =>
-      ['sent', 'approved'].includes(p.message_status)
+    const generated = allProspects.filter(p =>
+      ['generated', 'pending_scheduled', 'scheduled'].includes(p.message_status)
     ).length
-    // TODO: Calculate response rate when reply tracking is implemented
+    const sent = allProspects.filter(p =>
+      p.message_status === 'archived'
+    ).length
+    // Note: sent messages are handled in OutreachPage, not here
+    // responseRate will be shown as "--"
 
     console.log('📈 Stats:', { generated, sent, totalMessages: allProspects.length, uniqueProspects: prospects.length })
     setStats({ generated, sent, responseRate: 0 })
   }
 
-  const handleSendMessage = async (messageLogId: number, messageText: string, recipientUrl: string) => {
-    if (!user) return
+  const handleProspectClick = (prospect: Prospect) => {
+    if (!prospect.id) return
 
-    setIsSending(true)
-    try {
-      const userId = user?.id || user?.user_id
+    // Get all prospect IDs to enable navigation
+    const prospectIds = prospects.map(p => p.id)
 
-      // Call Supabase Edge Function to send message via Unipile
-      const { data, error } = await supabase.functions.invoke('linkedin-send-message', {
-        body: {
-          user_id: userId,
-          message_log_id: messageLogId,
-          recipient_linkedin_url: recipientUrl,
-          message_text: messageText
-        }
-      })
-
-      if (error) throw error
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send message')
-      }
-
-      toast.success('Message sent successfully via LinkedIn!')
-
-      // Refresh prospects to show updated status
-      await fetchProspects()
-
-      // Close modal
-      setIsModalOpen(false)
-
-    } catch (error: any) {
-      console.error('❌ Error sending message:', error)
-      toast.error(error.message || 'Failed to send message. Please try again.')
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const handleProspectClick = async (prospect: Prospect) => {
-    if (!prospect.research_cache_id) return
-
-    // Fetch all messages for this prospect
-    const { data, error } = await supabase
-      .from('message_generation_logs')
-      .select(`
-        id,
-        message_status,
-        research_cache_id,
-        created_at,
-        generated_message,
-        edited_message,
-        message_metadata,
-        ai_context,
-        sent_at
-      `)
-      .eq('research_cache_id', prospect.research_cache_id)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('❌ Error fetching prospect messages:', error)
-      toast.error('Failed to load prospect details')
-      return
-    }
-
-    setSelectedProspect(prospect)
-    setProspectMessages((data || []) as Prospect[])
-    setSelectedMessageId(data?.[0]?.id || null)
-    setIsModalOpen(true)
+    // Open the modal with the prospect ID and all IDs for navigation
+    openProspectModal(prospect.id, prospectIds)
   }
 
   const getTimeSince = (dateString: string) => {
@@ -246,18 +187,18 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
   }
 
   const getStatusColor = (status: string) => {
-    // Generating states
+    // Generating states - purple
     if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(status)) {
-      return { dot: 'bg-[#FBAE1C]', text: 'text-[#FBAE1C]', label: 'Generating' }
+      return { dot: 'bg-purple-500', text: 'text-purple-400', label: 'Generating' }
     }
 
     switch (status) {
       case 'generated':
         return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Generated' }
-      case 'approved':
-        return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Sent' }
-      case 'sent':
-        return { dot: 'bg-purple-500', text: 'text-purple-400', label: 'Sent' }
+      case 'pending_scheduled':
+        return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Pending' }
+      case 'scheduled':
+        return { dot: 'bg-orange-500', text: 'text-orange-400', label: 'Scheduled' }
       case 'archived':
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Archived' }
       case 'failed':
@@ -276,22 +217,6 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     return colors[index % colors.length]
   }
 
-  // Parse research_data for selected prospect (for modal display)
-  const parseResearchData = (data: any) => {
-    if (typeof data === 'string') {
-      try {
-        return JSON.parse(data)
-      } catch (e) {
-        console.error('Failed to parse research_data:', e)
-        return { name: 'Unknown', headline: 'Unknown' }
-      }
-    }
-    return data
-  }
-
-  const modalResearchData = selectedProspect?.research_cache?.research_data
-    ? parseResearchData(selectedProspect.research_cache.research_data)
-    : null
 
   // Empty State
   if (forceEmpty || prospects.length === 0) {
@@ -435,7 +360,6 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
           </div>
           <div className="w-px bg-white/10"></div>
           <div>
-            {/* TODO: Calculate response rate when reply tracking is implemented */}
             <div className="text-lg font-bold text-green-400">--</div>
             <div className="text-xs text-gray-400">Response</div>
           </div>
@@ -553,246 +477,6 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
           )
         })}
       </div>
-
-      {/* Prospect Details Modal - Rendered via Portal */}
-      {isModalOpen && selectedProspect && selectedProspect.research_cache && modalResearchData && createPortal(
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => setIsModalOpen(false)}>
-            <div
-              className="bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-              onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="border-b border-white/10 p-6"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)'
-                   }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={selectedProspect.research_cache.profile_picture_url ||
-                           `https://ui-avatars.com/api/?name=${encodeURIComponent(modalResearchData.name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
-                      alt={modalResearchData.name}
-                      className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
-                    />
-                    <div>
-                      <h2 className="text-xl font-bold text-white">
-                        {modalResearchData.name}
-                      </h2>
-                      <p className="text-sm text-gray-400">
-                        {modalResearchData.headline || modalResearchData.occupation || 'No title'}
-                      </p>
-                    </div>
-                  </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-white transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Message Count Indicator */}
-              {prospectMessages.length > 1 && (
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="bg-[#FBAE1C]/20 text-[#FBAE1C] px-3 py-1 rounded-full text-xs font-medium">
-                    {prospectMessages.length} Messages Generated
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
-              {/* Message Selector - Show only if multiple messages */}
-              {prospectMessages.length > 1 && (
-                <div className="mb-6 flex gap-2 flex-wrap">
-                  {prospectMessages.map((msg, index) => {
-                    const msgStatusInfo = getStatusColor(msg.message_status)
-                    const isSelected = msg.id === selectedMessageId
-
-                    return (
-                      <button
-                        key={msg.id}
-                        onClick={() => setSelectedMessageId(msg.id)}
-                        className={`px-4 py-2 rounded-lg border transition-all text-sm ${
-                          isSelected
-                            ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
-                            : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
-                        }`}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
-                          <span>Message {prospectMessages.length - index}</span>
-                          <span className="text-xs opacity-70">{getTimeSince(msg.created_at)}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Display Current Message */}
-              {prospectMessages.length > 0 && (() => {
-                const currentMessage = prospectMessages.find(m => m.id === selectedMessageId) || prospectMessages[0]
-                const messageText = parseMessage(currentMessage.edited_message || currentMessage.generated_message)
-                const messageMetadata = currentMessage.message_metadata
-                  ? (typeof currentMessage.message_metadata === 'string'
-                      ? JSON.parse(currentMessage.message_metadata)
-                      : currentMessage.message_metadata)
-                  : null
-
-                return (
-                  <div className="space-y-6">
-                    {/* Generated Message */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide">
-                          {currentMessage.edited_message ? 'Edited Message' : 'Generated Message'}
-                        </h3>
-                        {currentMessage.edited_message && (
-                          <span className="text-xs text-[#FBAE1C]">✏️ Edited</span>
-                        )}
-                      </div>
-                      <div className="bg-black/30 rounded-xl border border-white/10 p-4">
-                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-                          {messageText || 'No message generated yet'}
-                        </p>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        {messageText?.length || 0} characters
-                        {messageText && messageText.length > 300 && (
-                          <span className="text-red-400 ml-2">
-                            ({messageText.length - 300} over LinkedIn limit)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ICP Analysis */}
-                    {messageMetadata?.icp_analysis && (
-                      <div>
-                        <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide mb-3">
-                          ICP Match Analysis
-                        </h3>
-                        <div className="bg-black/30 rounded-xl border border-white/10 p-4 space-y-3">
-                          {/* Match Score */}
-                          {messageMetadata.icp_analysis.match_score && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-400">Match Score</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]"
-                                    style={{ width: `${messageMetadata.icp_analysis.match_score}%` }}
-                                  />
-                                </div>
-                                <span className="text-[#FBAE1C] font-bold text-sm">
-                                  {messageMetadata.icp_analysis.match_score}%
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Match Reasoning */}
-                          {messageMetadata.icp_analysis.match_reasoning && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-1">Reasoning</p>
-                              <p className="text-sm text-gray-300">
-                                {messageMetadata.icp_analysis.match_reasoning}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Key Alignment Points */}
-                          {messageMetadata.icp_analysis.key_alignment_points && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-2">Key Alignment Points</p>
-                              <ul className="space-y-1">
-                                {messageMetadata.icp_analysis.key_alignment_points.map((point: string, idx: number) => (
-                                  <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                    <span className="text-green-500 mt-0.5">✓</span>
-                                    <span>{point}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Potential Objections */}
-                          {messageMetadata.icp_analysis.potential_objections && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-2">Potential Objections</p>
-                              <ul className="space-y-1">
-                                {messageMetadata.icp_analysis.potential_objections.map((obj: string, idx: number) => (
-                                  <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                    <span className="text-orange-500 mt-0.5">⚠</span>
-                                    <span>{obj}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 pt-4 border-t border-white/10">
-                      {(() => {
-                        // Check if any message has been sent to this prospect
-                        const hasBeenSent = prospectMessages.some((m: any) => m.sent_at !== null)
-                        const canSend = ['generated', 'archived'].includes(currentMessage.message_status)
-
-                        if (hasBeenSent) {
-                          return (
-                            <div className="flex-1 bg-purple-500/10 border border-purple-500/30 text-purple-400 font-medium py-3 px-6 rounded-xl text-center">
-                              ✓ Conversation already started
-                            </div>
-                          )
-                        }
-
-                        if (canSend) {
-                          return (
-                            <button
-                              onClick={() => handleSendMessage(
-                                currentMessage.id,
-                                messageText,
-                                selectedProspect.research_cache?.profile_url || ''
-                              )}
-                              disabled={isSending}
-                              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                              {isSending ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                  <span>Sending...</span>
-                                </div>
-                              ) : (
-                                'Send via LinkedIn'
-                              )}
-                            </button>
-                          )
-                        }
-
-                        return null
-                      })()}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(messageText || '')
-                          toast.success('Message copied to clipboard!')
-                        }}
-                        className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-gray-300 transition-all">
-                        Copy Message
-                      </button>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Decorative Elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>

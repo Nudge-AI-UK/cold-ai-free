@@ -4,11 +4,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoadingProvider } from '@/contexts/LoadingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
-import { InboxPage } from '@/pages/InboxPage'
+import { OutreachPage } from '@/pages/OutreachPage'
+// import { InboxPage } from '@/pages/InboxPage'
 import { LoginPage } from '@/components/auth/LoginPage'
 import { PasswordResetPage } from '@/components/auth/PasswordResetPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
+import { ProspectModalProvider } from '@/components/modals/ProspectModalManager'
 import { MobileBlocker } from '@/components/MobileBlocker'
 import { MaintenanceBlocker } from '@/components/MaintenanceBlocker'
 import { Analytics } from '@vercel/analytics/react'
@@ -43,7 +45,8 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<WidgetDashboard />} />
-      <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/outreach" element={<OutreachPage />} />
+      {/* <Route path="/inbox" element={<InboxPage />} /> */}
       <Route path="/reset-password" element={<PasswordResetPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -56,21 +59,23 @@ function App() {
       <AuthProvider>
         <LoadingProvider>
           <ModalFlowProvider>
-            <MobileBlocker />
-            <MaintenanceBlocker />
-            <AppContent />
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: 'hsl(222 41% 11%)',
-                  border: '1px solid hsl(217 33% 18%)',
-                  color: 'hsl(210 20% 95%)',
-                },
-              }}
-            />
-            <Analytics />
-            <SpeedInsights />
+            <ProspectModalProvider>
+              <MobileBlocker />
+              <MaintenanceBlocker />
+              <AppContent />
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  style: {
+                    background: 'hsl(222 41% 11%)',
+                    border: '1px solid hsl(217 33% 18%)',
+                    color: 'hsl(210 20% 95%)',
+                  },
+                }}
+              />
+              <Analytics />
+              <SpeedInsights />
+            </ProspectModalProvider>
           </ModalFlowProvider>
         </LoadingProvider>
       </AuthProvider>
