@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type ViewMode = 'today' | 'week' | 'month'
 type StatusFilter = 'all' | 'generated' | 'pending_scheduled' | 'scheduled' | 'sent' | 'reply-received' | 'reply-sent' | 'archived'
@@ -25,6 +25,7 @@ interface Prospect {
   linkedinUrl: string
   jobTitle?: string
   company?: string
+  researchCacheId?: number
 }
 
 interface ScheduledMessage {
@@ -35,6 +36,7 @@ interface ScheduledMessage {
   minute: number // 0-59
   status: string
   messageText: string
+  scheduledFor: Date // Actual scheduled date from DB
 }
 
 export function OutreachPage() {
@@ -49,6 +51,7 @@ export function OutreachPage() {
   const [selectedMessage, setSelectedMessage] = useState<ScheduledMessage | null>(null)
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([])
+  const [originalScheduledMessages, setOriginalScheduledMessages] = useState<ScheduledMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [isScheduling, setIsScheduling] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -92,7 +95,7 @@ export function OutreachPage() {
             )
           `)
           .eq('user_id', userId)
-          .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled'])
+          .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled', 'scheduled', 'sent'])
           .order('created_at', { ascending: false })
 
         console.log('Raw prospect data from Supabase:', data)
@@ -109,12 +112,29 @@ export function OutreachPage() {
           linkedinUrl: msg.research_cache?.profile_url || '',
           jobTitle: msg.research_cache?.research_data?.headline || '',
           company: msg.research_cache?.research_data?.company || '',
+          researchCacheId: msg.research_cache_id, // Add this for grouping
         }))
+
+        // Filter out archived messages only if the same prospect has scheduled/sent messages
+        const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent']
+        const filteredProspects = mappedProspects.filter(prospect => {
+          // If not archived, always show
+          if (prospect.status !== 'archived') return true
+
+          // If archived, only show if there are no active/scheduled messages for this prospect
+          const hasActiveMessage = mappedProspects.some(
+            p => p.researchCacheId === prospect.researchCacheId && activeStatuses.includes(p.status)
+          )
+
+          return !hasActiveMessage
+        })
 
         console.log('Mapped prospects:', mappedProspects)
         console.log('Total prospects found:', mappedProspects.length)
+        console.log('Filtered prospects (hiding archived with active messages):', filteredProspects)
+        console.log('Final count:', filteredProspects.length)
 
-        setProspects(mappedProspects)
+        setProspects(filteredProspects)
       } catch (error) {
         console.error('Error fetching generated messages:', error)
         toast.error(`Failed to load prospects: ${error.message || 'Unknown error'}`)
@@ -132,27 +152,45 @@ export function OutreachPage() {
       try {
         const userId = user.id || user.user_id
 
+        console.log('📅 Fetching scheduled messages for user:', userId)
+
+        // DEBUG: Check what RLS policy sees
+        const { data: debugAuth } = await supabase.rpc('get_current_user_id')
+        console.log('🔐 JWT Claims Debug:', debugAuth)
+
         const { data, error } = await supabase
           .from('sequence_prospects')
-          .select(`
-            id,
-            prospect_name,
-            linkedin_url,
-            scheduled_for,
-            status,
-            prospect_data,
-            sequence_id,
-            sequence_messages (
-              message_text,
-              message_type
-            )
-          `)
+          .select('*')
           .eq('user_id', userId)
           .not('scheduled_for', 'is', null)
-          .in('status', ['scheduled', 'sent'])
+          .in('status', ['scheduled', 'sending', 'sent'])
           .order('scheduled_for', { ascending: true })
 
+        console.log('📅 Query error:', error)
+        console.log('📅 Fetched scheduled prospects from DB:', data)
+        console.log('📅 Total prospects fetched:', data?.length || 0)
+
         if (error) throw error
+
+        // Fetch message texts for each prospect
+        const messageLogIds = data?.map(p => p.message_log_id).filter(Boolean) || []
+        console.log('📅 Fetching messages for log IDs:', messageLogIds)
+
+        const { data: messageData, error: messageError } = await supabase
+          .from('message_generation_logs')
+          .select('id, generated_message, edited_message')
+          .in('id', messageLogIds)
+
+        console.log('📅 Message data fetched:', messageData)
+        console.log('📅 Message fetch error:', messageError)
+
+        // Create a map of message_log_id to message text
+        const messageMap = new Map(
+          (messageData || []).map(msg => [
+            msg.id,
+            msg.edited_message || msg.generated_message || 'Message content unavailable'
+          ])
+        )
 
         // Map to ScheduledMessage interface
         const mappedMessages: ScheduledMessage[] = (data || []).map((prospect: any) => {
@@ -162,18 +200,46 @@ export function OutreachPage() {
           const hour = scheduledTime.getHours()
           const minute = scheduledTime.getMinutes()
 
+          // Get message text from the map
+          const messageText = messageMap.get(prospect.message_log_id) || 'Message content unavailable'
+
           return {
             id: prospect.id.toString(),
-            prospectId: prospect.id,
+            prospectId: prospect.message_log_id, // Use message_log_id to match with prospects array
             day: day,
             hour: hour,
             minute: minute,
             status: prospect.status,
-            messageText: prospect.sequence_messages?.[0]?.message_text || 'Message content unavailable',
+            messageText: messageText,
+            scheduledFor: scheduledTime, // Store actual scheduled date
           }
-        }).filter(msg => msg.day >= 0 && msg.day <= 4 && msg.hour >= 7 && msg.hour <= 20) // Only show weekday work hours 7am-8pm
+        }).filter(msg => {
+          const isWeekday = msg.day >= 0 && msg.day <= 4
+          const isWorkingHours = msg.hour >= 7 && msg.hour <= 20
+          const shouldShow = isWeekday && isWorkingHours
+
+          if (!shouldShow) {
+            console.log('📅 Filtered out message:', {
+              prospectId: msg.prospectId,
+              day: msg.day,
+              hour: msg.hour,
+              reason: !isWeekday ? 'weekend' : 'outside working hours'
+            })
+          }
+
+          return shouldShow
+        })
+
+        console.log('📅 Messages after filtering (weekdays 7am-8pm):', mappedMessages)
+        console.log('📅 Final scheduled messages count:', mappedMessages.length)
+
+        // Debug: Show each message's calendar position
+        mappedMessages.forEach(msg => {
+          console.log(`📅 Message ${msg.id}: day=${msg.day} (${['Mon','Tue','Wed','Thu','Fri'][msg.day]}), hour=${msg.hour}, minute=${msg.minute}, status=${msg.status}`)
+        })
 
         setScheduledMessages(mappedMessages)
+        setOriginalScheduledMessages(mappedMessages) // Store original positions
         setLoading(false)
       } catch (error) {
         console.error('Error fetching scheduled messages:', error)
@@ -203,6 +269,17 @@ export function OutreachPage() {
   const filteredProspects = activeFilter === 'all'
     ? prospects
     : prospects.filter(p => p.status === activeFilter)
+
+  // Check if current state matches original state
+  const checkForChanges = (currentMessages: ScheduledMessage[]) => {
+    if (originalScheduledMessages.length !== currentMessages.length) return true
+
+    return currentMessages.some(msg => {
+      const original = originalScheduledMessages.find(o => o.id === msg.id)
+      if (!original) return true
+      return original.day !== msg.day || original.hour !== msg.hour || original.minute !== msg.minute
+    })
+  }
 
   // Handle view changes
   const handleViewChange = (newView: ViewMode) => {
@@ -240,6 +317,7 @@ export function OutreachPage() {
         toast.error(`Failed to update ${errors.length} message(s)`)
       } else {
         setHasUnsavedChanges(false)
+        setOriginalScheduledMessages(scheduledMessages) // Update original to current positions
         toast.success('Changes saved successfully!')
       }
     } catch (error) {
@@ -270,6 +348,7 @@ export function OutreachPage() {
           minute: 0,
           status: data.message_status,
           messageText: data.edited_message || data.generated_message || '',
+          scheduledFor: new Date(), // Default to now for generated messages
         }
         setSelectedMessage(tempMessage)
       }
@@ -416,6 +495,37 @@ export function OutreachPage() {
     }
   }
 
+  const handleNavigateMessage = (direction: 'prev' | 'next') => {
+    if (!selectedMessage) return
+
+    const currentIndex = scheduledMessages.findIndex(m => m.id === selectedMessage.id)
+    if (currentIndex === -1) return
+
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1
+
+    if (newIndex >= 0 && newIndex < scheduledMessages.length) {
+      setSelectedMessage(scheduledMessages[newIndex])
+    }
+  }
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    if (!selectedMessage) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handleNavigateMessage('prev')
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleNavigateMessage('next')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedMessage, scheduledMessages])
+
   const handleSwap = (targetMessageId: string) => {
     if (!draggedMessage || draggedMessage === targetMessageId) return
 
@@ -437,20 +547,28 @@ export function OutreachPage() {
     }
 
     // Swap the scheduled times (including minutes)
-    setScheduledMessages(prev =>
-      prev.map(msg => {
-        if (msg.id === draggedMessage) {
-          return { ...msg, day: targetMsg.day, hour: targetMsg.hour, minute: targetMsg.minute }
-        }
-        if (msg.id === targetMessageId) {
-          return { ...msg, day: draggedMsg.day, hour: draggedMsg.hour, minute: draggedMsg.minute }
-        }
-        return msg
-      })
-    )
+    const newMessages = scheduledMessages.map(msg => {
+      if (msg.id === draggedMessage) {
+        return { ...msg, day: targetMsg.day, hour: targetMsg.hour, minute: targetMsg.minute }
+      }
+      if (msg.id === targetMessageId) {
+        return { ...msg, day: draggedMsg.day, hour: draggedMsg.hour, minute: draggedMsg.minute }
+      }
+      return msg
+    })
 
-    setHasUnsavedChanges(true)
-    toast.success('Messages swapped - click Save Changes')
+    setScheduledMessages(newMessages)
+
+    // Check if there are actual changes from original
+    const hasChanges = checkForChanges(newMessages)
+    setHasUnsavedChanges(hasChanges)
+
+    if (hasChanges) {
+      toast.success('Messages swapped - click Save Changes')
+    } else {
+      toast.success('Back to original positions')
+    }
+
     handleDragEnd()
   }
 
@@ -459,6 +577,7 @@ export function OutreachPage() {
       'generated': 'border-[#3B82F6] bg-[#3B82F6]/10',
       'pending_scheduled': 'border-[#6B7280] bg-[#6B7280]/10',
       'scheduled': 'border-[#F59E0B] bg-[#F59E0B]/10',
+      'sending': 'border-[#F59E0B] bg-[#F59E0B]/10', // Same as scheduled
       'sent': 'border-[#10B981] bg-[#10B981]/10',
       'reply-received': 'border-[#EAB308] bg-[#EAB308]/10 animate-pulse-slow',
       'reply-sent': 'border-[#10B981] bg-[#10B981]/10',
@@ -644,7 +763,7 @@ export function OutreachPage() {
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-gray-400 font-mono">{timeLabel}</div>
+                <div className="text-[10px] text-gray-400 font-mono text-right">{timeLabel}</div>
               </div>
             )
           })
@@ -671,6 +790,9 @@ export function OutreachPage() {
     if (currentView === 'today') {
       const dayName = today.toLocaleDateString('en-GB', { weekday: 'long' })
       const dateStr = today.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
+      // Get today's day index (0=Mon, 4=Fri)
+      const todayDayOfWeek = today.getDay()
+      const todayDayIndex = todayDayOfWeek === 0 ? -1 : todayDayOfWeek - 1
 
       return (
         <div className="grid grid-cols-[1fr] gap-4 h-full transition-all duration-500 ease-in-out">
@@ -680,7 +802,7 @@ export function OutreachPage() {
               <div className="text-xs text-gray-400 mt-1">{dateStr}</div>
             </div>
             <div className="flex-1 flex flex-col">
-              {hours.map(hour => renderTimeSlot(0, hour))}
+              {hours.map(hour => renderTimeSlot(todayDayIndex, hour))}
             </div>
           </div>
         </div>
@@ -714,12 +836,32 @@ export function OutreachPage() {
       )
     }
 
-    // Month view (simplified)
+    // Month view (simplified) - shows Week 1 = this week, Week 2 = next week, etc.
     const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+
+    // Get this week's Monday
+    const todayDay = today.getDay()
+    const mondayOffsetForMonth = todayDay === 0 ? -6 : 1 - todayDay
+    const thisWeekMonday = new Date(today)
+    thisWeekMonday.setDate(today.getDate() + mondayOffsetForMonth)
+    thisWeekMonday.setHours(0, 0, 0, 0)
+
     return (
       <div className="grid grid-cols-[repeat(4,1fr)] gap-4 h-full transition-all duration-500 ease-in-out">
         {weeks.map((week, weekIndex) => {
-          const weekMessages = scheduledMessages.filter(m => Math.floor(m.day / 1.25) === weekIndex)
+          const weekMessages = scheduledMessages.filter(m => {
+            // Use the actual scheduled date from the database
+            const messageDate = new Date(m.scheduledFor)
+            messageDate.setHours(0, 0, 0, 0)
+
+            // Calculate days from thisWeekMonday
+            const daysFromMonday = Math.floor((messageDate.getTime() - thisWeekMonday.getTime()) / (1000 * 60 * 60 * 24))
+
+            // Calculate which week from today (0 = this week, 1 = next week, etc.)
+            const weekFromToday = Math.floor(daysFromMonday / 7)
+
+            return weekFromToday === weekIndex
+          })
 
           return (
             <div key={week} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden transition-all duration-500 ease-in-out">
@@ -843,7 +985,7 @@ export function OutreachPage() {
                 disabled={!hasUnsavedChanges}
                 className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
                   hasUnsavedChanges
-                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-black hover:shadow-lg'
+                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
                     : 'bg-gray-700/30 text-gray-500 cursor-not-allowed opacity-50'
                 }`}
               >
@@ -979,6 +1121,7 @@ export function OutreachPage() {
               'generated': 'border-[#3B82F6]',
               'pending_scheduled': 'border-[#6B7280]',
               'scheduled': 'border-[#F59E0B]',
+              'sending': 'border-[#F59E0B]', // Same as scheduled
               'sent': 'border-[#10B981]',
               'reply-received': 'border-[#EAB308]',
               'reply-sent': 'border-[#10B981]',
@@ -994,6 +1137,7 @@ export function OutreachPage() {
               'approved': 'Approved Message',
               'pending_scheduled': 'Pending Message',
               'scheduled': 'Scheduled Message',
+              'sending': 'Sending Message',
               'sent': 'Sent Message',
               'reply-received': 'Message (Reply Received)',
               'reply-sent': 'Message (Responded)',
@@ -1002,19 +1146,27 @@ export function OutreachPage() {
             return titles[status] || 'Message'
           }
 
+          const currentIndex = scheduledMessages.findIndex(m => m.id === selectedMessage.id)
+          const hasPrev = currentIndex > 0
+          const hasNext = currentIndex >= 0 && currentIndex < scheduledMessages.length - 1
+          const prevMessage = hasPrev ? scheduledMessages[currentIndex - 1] : null
+          const nextMessage = hasNext ? scheduledMessages[currentIndex + 1] : null
+          const prevProspect = prevMessage ? prospects.find(p => p.id === prevMessage.prospectId) : null
+          const nextProspect = nextMessage ? prospects.find(p => p.id === nextMessage.prospectId) : null
+
           return (
             <DialogContent className={`bg-[#0C1725] border-2 ${getStatusBorderColor(selectedMessage.status)} max-w-2xl [&>button]:hidden`}>
-              <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-2xl font-bold text-white">{getModalTitle(selectedMessage.status)}</DialogTitle>
-                  <button
-                    onClick={() => setSelectedMessage(null)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </DialogHeader>
+                <DialogHeader>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-2xl font-bold text-white">{getModalTitle(selectedMessage.status)}</DialogTitle>
+                    <button
+                      onClick={() => setSelectedMessage(null)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </DialogHeader>
 
               <div className="space-y-6 mt-4">
                 {/* Prospect Info */}
@@ -1071,6 +1223,66 @@ export function OutreachPage() {
                     Close
                   </button>
                 </div>
+
+                {/* Bottom Navigation */}
+                {(hasPrev || hasNext) && (
+                  <div className="pt-4 border-t border-white/10 -mb-2">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => handleNavigateMessage('prev')}
+                        disabled={!hasPrev}
+                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+                          hasPrev
+                            ? 'hover:bg-white/5 cursor-pointer'
+                            : 'opacity-0 cursor-default pointer-events-none'
+                        }`}
+                      >
+                        <ChevronLeft className="h-5 w-5 text-gray-400" />
+                        {prevProspect && (
+                          <>
+                            <img
+                              src={prevProspect.avatar}
+                              alt={prevProspect.name}
+                              className="w-8 h-8 rounded-full"
+                            />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-white">{prevProspect.name}</div>
+                              <div className="text-xs text-gray-400">Previous</div>
+                            </div>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleNavigateMessage('next')}
+                        disabled={!hasNext}
+                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+                          hasNext
+                            ? 'hover:bg-white/5 cursor-pointer'
+                            : 'opacity-0 cursor-default pointer-events-none'
+                        }`}
+                      >
+                        {nextProspect && (
+                          <>
+                            <div className="text-right">
+                              <div className="text-sm font-medium text-white">{nextProspect.name}</div>
+                              <div className="text-xs text-gray-400">Next</div>
+                            </div>
+                            <img
+                              src={nextProspect.avatar}
+                              alt={nextProspect.name}
+                              className="w-8 h-8 rounded-full"
+                            />
+                          </>
+                        )}
+                        <ChevronRight className="h-5 w-5 text-gray-400" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500 text-center mt-2">
+                      {currentIndex + 1} / {scheduledMessages.length}
+                    </div>
+                  </div>
+                )}
               </div>
             </DialogContent>
           )

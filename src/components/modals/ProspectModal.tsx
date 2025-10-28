@@ -4,8 +4,6 @@ import { ChevronLeft, ChevronRight, ExternalLink, User, Briefcase, MapPin, Users
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { AnimatedModalBackground } from './AnimatedModalBackground'
 
 interface ProspectModalProps {
@@ -43,6 +41,7 @@ interface ProspectMessage {
   message_metadata?: any
   ai_context?: any
   focus_report_markdown?: string
+  message_type?: string
 }
 
 // Helper function to parse and clean message
@@ -111,6 +110,77 @@ const getTimeSince = (dateString: string) => {
   return `${hours} hour${hours > 1 ? 's' : ''} ago`
 }
 
+// Helper function to get character limits and message type info
+const getMessageLimits = (messageType: string | null) => {
+  if (!messageType) {
+    return {
+      limit: 600,
+      target: 600,
+      max: 1900,
+      type: 'unknown',
+      description: 'Default limit'
+    }
+  }
+
+  if (messageType === 'connection_request_200') {
+    return {
+      limit: 200,
+      target: 200,
+      max: 200,
+      type: 'connection_request',
+      description: 'Connection Request (Free Account)'
+    }
+  }
+
+  if (messageType === 'connection_request_300') {
+    return {
+      limit: 300,
+      target: 300,
+      max: 300,
+      type: 'connection_request',
+      description: 'Connection Request (Premium Account)'
+    }
+  }
+
+  if (messageType === 'inmail' || messageType === 'open_profile') {
+    return {
+      limit: 600,
+      target: 800,
+      max: 1900,
+      recommendedMax: 850,
+      type: 'inmail',
+      description: messageType === 'inmail' ? 'InMail Message' : 'Open Profile Message'
+    }
+  }
+
+  if (messageType === 'direct_message' || messageType === 'first_message') {
+    return {
+      limit: 600,
+      target: 800,
+      max: 8000,
+      recommendedMax: 850,
+      type: 'direct_message',
+      description: 'Direct Message'
+    }
+  }
+
+  // Default to direct message limits for unknown types
+  return {
+    limit: 600,
+    target: 800,
+    max: 8000,
+    recommendedMax: 850,
+    type: 'unknown',
+    description: 'Message'
+  }
+}
+
+interface AdjacentProspect {
+  id: number
+  name: string
+  avatar: string
+}
+
 export function ProspectModal({
   prospectId,
   allProspectIds,
@@ -125,11 +195,14 @@ export function ProspectModal({
   const [editedMessage, setEditedMessage] = useState<string>('')
   const [isSending, setIsSending] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [prevProspect, setPrevProspect] = useState<AdjacentProspect | null>(null)
+  const [nextProspect, setNextProspect] = useState<AdjacentProspect | null>(null)
 
   // Fetch prospect data when prospectId changes
   useEffect(() => {
     if (prospectId) {
       fetchProspectData()
+      fetchAdjacentProspects()
     }
   }, [prospectId])
 
@@ -209,7 +282,8 @@ export function ProspectModal({
           message_metadata,
           ai_context,
           sent_at,
-          focus_report_markdown
+          focus_analysis,
+          message_type
         `)
         .eq('research_cache_id', prospectData.research_cache_id)
         .order('created_at', { ascending: false })
@@ -224,6 +298,70 @@ export function ProspectModal({
       toast.error('Failed to load prospect data')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchAdjacentProspects = async () => {
+    try {
+      const currentIndex = allProspectIds.indexOf(prospectId)
+      const prevProspectId = currentIndex > 0 ? allProspectIds[currentIndex - 1] : null
+      const nextProspectId = currentIndex < allProspectIds.length - 1 ? allProspectIds[currentIndex + 1] : null
+
+      // Fetch previous prospect data
+      if (prevProspectId) {
+        const { data: prevData, error: prevError } = await supabase
+          .from('message_generation_logs')
+          .select(`
+            id,
+            research_cache (
+              profile_picture_url,
+              research_data
+            )
+          `)
+          .eq('id', prevProspectId)
+          .single()
+
+        if (!prevError && prevData?.research_cache) {
+          const prevResearchData = parseResearchData(prevData.research_cache.research_data)
+          setPrevProspect({
+            id: prevProspectId,
+            name: prevResearchData.name || 'Unknown',
+            avatar: prevData.research_cache.profile_picture_url ||
+                   `https://ui-avatars.com/api/?name=${encodeURIComponent(prevResearchData.name || 'Unknown')}&background=FBAE1C&color=fff&size=60&rounded=true`
+          })
+        }
+      } else {
+        setPrevProspect(null)
+      }
+
+      // Fetch next prospect data
+      if (nextProspectId) {
+        const { data: nextData, error: nextError } = await supabase
+          .from('message_generation_logs')
+          .select(`
+            id,
+            research_cache (
+              profile_picture_url,
+              research_data
+            )
+          `)
+          .eq('id', nextProspectId)
+          .single()
+
+        if (!nextError && nextData?.research_cache) {
+          const nextResearchData = parseResearchData(nextData.research_cache.research_data)
+          setNextProspect({
+            id: nextProspectId,
+            name: nextResearchData.name || 'Unknown',
+            avatar: nextData.research_cache.profile_picture_url ||
+                   `https://ui-avatars.com/api/?name=${encodeURIComponent(nextResearchData.name || 'Unknown')}&background=FBAE1C&color=fff&size=60&rounded=true`
+          })
+        }
+      } else {
+        setNextProspect(null)
+      }
+    } catch (error) {
+      console.error('❌ Error fetching adjacent prospects:', error)
     }
   }
 
@@ -385,45 +523,73 @@ export function ProspectModal({
           </>
         )}
 
-        {/* Progress Dots at bottom */}
+        {/* Bottom Navigation with Circular Profile Buttons */}
         {allProspectIds.length > 1 && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
-            {allProspectIds.map((id, index) => {
-              const isActive = index === currentIndex
-
-              return (
-                <div
-                  key={id}
-                  className={`
-                    transition-all duration-300 cursor-pointer
-                    ${isActive ? 'scale-125' : 'scale-100 hover:scale-110'}
-                  `}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Navigate directly to this prospect
-                    const targetId = allProspectIds[index]
-                    if (targetId !== prospectId) {
-                      // We don't have a direct navigate function, so we'll use next/prev
-                      // This is a limitation - ideally we'd pass a navigateToIndex prop
-                    }
-                  }}
-                >
-                  <div
-                    className={`
-                      w-2 h-2 rounded-full transition-all duration-300
-                      ${isActive
-                        ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] shadow-lg shadow-[#FBAE1C]/30 w-8'
-                        : 'bg-white/30 hover:bg-white/50'
-                      }
-                    `}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex items-center gap-4">
+            {/* Previous Prospect Button */}
+            {prevProspect ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigatePrevious()
+                }}
+                disabled={!canGoPrevious}
+                className={`
+                  w-14 h-14 rounded-full p-0.5 transition-all duration-300
+                  ${canGoPrevious
+                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:scale-110 cursor-pointer shadow-lg shadow-[#FBAE1C]/30'
+                    : 'bg-white/20 cursor-not-allowed opacity-50'
+                  }
+                `}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden bg-black/20">
+                  <img
+                    src={prevProspect.avatar}
+                    alt={prevProspect.name}
+                    className="w-full h-full object-cover"
                   />
                 </div>
-              )
-            })}
+              </button>
+            ) : (
+              <div className="w-14 h-14" />
+            )}
+
+            {/* Current Position Indicator */}
+            <div className="text-xs text-white/70 font-medium bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+              {currentIndex + 1} / {allProspectIds.length}
+            </div>
+
+            {/* Next Prospect Button */}
+            {nextProspect ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateNext()
+                }}
+                disabled={!canGoNext}
+                className={`
+                  w-14 h-14 rounded-full p-0.5 transition-all duration-300
+                  ${canGoNext
+                    ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:scale-110 cursor-pointer shadow-lg shadow-[#FBAE1C]/30'
+                    : 'bg-white/20 cursor-not-allowed opacity-50'
+                  }
+                `}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden bg-black/20">
+                  <img
+                    src={nextProspect.avatar}
+                    alt={nextProspect.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </button>
+            ) : (
+              <div className="w-14 h-14" />
+            )}
           </div>
         )}
 
-        <div className="w-full max-w-6xl h-[calc(100vh-2rem)] max-h-[90vh]">
+        <div className="w-full max-w-[95vw] h-[calc(100vh-2rem)] max-h-[95vh]">
           <div className="w-full h-full flex flex-col rounded-3xl border border-white/10 text-white overflow-hidden bg-gradient-to-br from-[rgba(10,14,27,0.95)] to-[rgba(26,31,54,0.95)] backdrop-blur-[10px] shadow-2xl shadow-black/50"
             onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
@@ -452,55 +618,193 @@ export function ProspectModal({
                   <p className="text-sm text-gray-400">
                     {researchData?.headline || researchData?.occupation || 'No title'}
                   </p>
-                  {prospectMessages.length > 1 && (
-                    <div className="mt-2 bg-[#FBAE1C]/20 text-[#FBAE1C] px-2 py-1 rounded-full text-xs font-medium inline-block">
-                      {prospectMessages.length} Messages Generated
-                    </div>
-                  )}
+                  {(() => {
+                    const nonArchivedCount = prospectMessages.filter(m => m.message_status !== 'archived').length
+                    if (nonArchivedCount > 1) {
+                      return (
+                        <div className="mt-2 bg-[#FBAE1C]/20 text-[#FBAE1C] px-2 py-1 rounded-full text-xs font-medium inline-block">
+                          {nonArchivedCount} Messages Generated
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
               </div>
             </div>
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="flex gap-6 h-full">
-            {/* Left Column - Focus Report */}
+              <div className="flex gap-6 pb-20">
+            {/* Left Column - Focus Analysis */}
             <div className="flex-1">
               <h4 className="text-sm font-medium text-white/70 uppercase tracking-wide mb-3 flex items-center gap-2">
                 <span className="text-lg">📊</span>
-                Focus Analysis Report
+                Focus Analysis
               </h4>
               <div className="bg-black/20 backdrop-blur-sm rounded-xl p-6 border border-white/10 max-h-[calc(90vh-280px)] overflow-y-auto">
                 {(() => {
                   const currentMessage = prospectMessages.find(m => m.id === selectedMessageId) || prospectMessages[0]
-                  let focusMarkdown = currentMessage?.focus_report_markdown
+                  const focusAnalysis = currentMessage?.focus_analysis
 
-                  if (focusMarkdown) {
-                    // Preprocess markdown to add double line breaks after lines starting with **Label:**
-                    focusMarkdown = focusMarkdown.replace(/(\*\*[^*]+\*\*[^\n]+)\n(?!\n)/g, '$1\n\n')
-
+                  if (focusAnalysis) {
                     return (
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-white mb-4 mt-6 first:mt-0" {...props} />,
-                            h2: ({node, ...props}) => <h2 className="text-xl font-bold text-white mb-3 mt-5 first:mt-0" {...props} />,
-                            h3: ({node, ...props}) => <h3 className="text-lg font-semibold text-white mb-2 mt-4" {...props} />,
-                            p: ({node, ...props}) => <p className="text-gray-300 leading-relaxed mb-2" {...props} />,
-                            ul: ({node, ...props}) => <ul className="list-disc list-inside text-gray-300 mb-3 space-y-1" {...props} />,
-                            ol: ({node, ...props}) => <ol className="list-decimal list-inside text-gray-300 mb-3 space-y-1" {...props} />,
-                            li: ({node, ...props}) => <li className="text-gray-300" {...props} />,
-                            strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
-                            em: ({node, ...props}) => <em className="italic text-gray-400" {...props} />,
-                            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#FBAE1C] pl-4 italic text-gray-400 my-4" {...props} />,
-                            code: ({node, ...props}) => <code className="bg-black/40 px-1.5 py-0.5 rounded text-[#FBAE1C] text-sm" {...props} />,
-                            hr: ({node, ...props}) => <hr className="border-white/10 my-6" {...props} />,
-                            a: ({node, ...props}) => <a className="text-[#FBAE1C] hover:text-[#FC9109] underline transition-colors" {...props} />,
-                          }}
-                        >
-                          {focusMarkdown}
-                        </ReactMarkdown>
+                      <div className="space-y-6">
+                        {/* Recommended Approach */}
+                        {focusAnalysis.recommended_focus && (
+                          <div>
+                            <h3 className="text-base font-bold text-white mb-3">Recommended Approach</h3>
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Primary Angle</p>
+                                <p className="text-[#FBAE1C] font-medium">{focusAnalysis.recommended_focus.primary_angle}</p>
+                              </div>
+
+                              {focusAnalysis.recommended_focus.why_this_works && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Why This Works</p>
+                                  <p className="text-gray-300 leading-relaxed">{focusAnalysis.recommended_focus.why_this_works}</p>
+                                </div>
+                              )}
+
+                              {focusAnalysis.recommended_focus.evidence_quote && (
+                                <div className="bg-black/30 border-l-4 border-[#FBAE1C] pl-4 py-2 italic text-gray-400 text-xs">
+                                  "{focusAnalysis.recommended_focus.evidence_quote}"
+                                </div>
+                              )}
+
+                              {focusAnalysis.recommended_focus.connection_to_product && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Product Connection</p>
+                                  <p className="text-gray-300 leading-relaxed">{focusAnalysis.recommended_focus.connection_to_product}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t border-white/10"></div>
+
+                        {/* Prospect Insights */}
+                        {focusAnalysis.prospect_insights && (
+                          <div>
+                            <h3 className="text-base font-bold text-white mb-3">Prospect Insights</h3>
+                            <div className="space-y-3 text-sm">
+                              {focusAnalysis.prospect_insights.recent_activity_summary && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Recent Activity</p>
+                                  <p className="text-gray-300 leading-relaxed">{focusAnalysis.prospect_insights.recent_activity_summary}</p>
+                                </div>
+                              )}
+
+                              {focusAnalysis.prospect_insights.most_relevant_pain_points && focusAnalysis.prospect_insights.most_relevant_pain_points.length > 0 && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Key Pain Points</p>
+                                  <ul className="space-y-2">
+                                    {focusAnalysis.prospect_insights.most_relevant_pain_points.map((point: string, idx: number) => (
+                                      <li key={idx} className="text-gray-300 flex items-start gap-2">
+                                        <span className="text-[#FBAE1C] mt-1">•</span>
+                                        <span>{point}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {focusAnalysis.prospect_insights.icp_alignment_score !== undefined && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">ICP Alignment</p>
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]"
+                                        style={{ width: `${focusAnalysis.prospect_insights.icp_alignment_score}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-[#FBAE1C] font-bold text-sm">
+                                      {focusAnalysis.prospect_insights.icp_alignment_score}/100
+                                    </span>
+                                  </div>
+                                  {focusAnalysis.prospect_insights.icp_reasoning && (
+                                    <p className="text-gray-400 text-xs italic">{focusAnalysis.prospect_insights.icp_reasoning}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t border-white/10"></div>
+
+                        {/* Messaging Strategy */}
+                        {focusAnalysis.messaging_strategy && (
+                          <div>
+                            <h3 className="text-base font-bold text-white mb-3">Messaging Strategy</h3>
+                            <div className="space-y-3 text-sm">
+                              {focusAnalysis.messaging_strategy.recommended_tone && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Recommended Tone</p>
+                                  <p className="text-[#FBAE1C] font-medium">{focusAnalysis.messaging_strategy.recommended_tone}</p>
+                                  {focusAnalysis.messaging_strategy.tone_reasoning && (
+                                    <p className="text-gray-400 text-xs mt-1 italic">{focusAnalysis.messaging_strategy.tone_reasoning}</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {focusAnalysis.messaging_strategy.angles_to_avoid && focusAnalysis.messaging_strategy.angles_to_avoid.length > 0 && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Angles to Avoid</p>
+                                  <ul className="space-y-1">
+                                    {focusAnalysis.messaging_strategy.angles_to_avoid.map((angle: string, idx: number) => (
+                                      <li key={idx} className="text-red-400 text-xs flex items-start gap-2">
+                                        <span>❌</span>
+                                        <span>{angle}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {focusAnalysis.messaging_strategy.differentiation_strategy && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Differentiation Strategy</p>
+                                  <p className="text-gray-300 leading-relaxed">{focusAnalysis.messaging_strategy.differentiation_strategy}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t border-white/10"></div>
+
+                        {/* Product Alignment */}
+                        {focusAnalysis.product_alignment && (
+                          <div>
+                            <h3 className="text-base font-bold text-white mb-3">Product Alignment</h3>
+                            <div className="space-y-3 text-sm">
+                              {focusAnalysis.product_alignment.relevant_capabilities && focusAnalysis.product_alignment.relevant_capabilities.length > 0 && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Relevant Capabilities</p>
+                                  <ul className="space-y-2">
+                                    {focusAnalysis.product_alignment.relevant_capabilities.map((cap: string, idx: number) => (
+                                      <li key={idx} className="text-gray-300 flex items-start gap-2">
+                                        <span className="text-green-500 mt-1">✓</span>
+                                        <span>{cap}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {focusAnalysis.product_alignment.value_proposition_approach && (
+                                <div>
+                                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Value Proposition</p>
+                                  <p className="text-gray-300 leading-relaxed">{focusAnalysis.product_alignment.value_proposition_approach}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   }
@@ -508,8 +812,8 @@ export function ProspectModal({
                   return (
                     <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                       <span className="text-4xl mb-3 opacity-30">📄</span>
-                      <p className="text-sm">No focus report available</p>
-                      <p className="text-xs text-gray-600 mt-1">Report will appear here when generated</p>
+                      <p className="text-sm">No focus analysis available</p>
+                      <p className="text-xs text-gray-600 mt-1">Analysis will appear here when generated</p>
                     </div>
                   )
                 })()}
@@ -558,32 +862,38 @@ export function ProspectModal({
                   </div>
                 </div>
 
-                {/* Message Selector - Show only if multiple messages */}
-                {prospectMessages.length > 1 && (
-                  <div className="flex gap-2 flex-wrap">
-                    {prospectMessages.map((msg, index) => {
-                      const msgStatusInfo = getStatusColor(msg.message_status)
-                      const isSelected = msg.id === selectedMessageId
+                {/* Message Selector - Show only if multiple non-archived messages */}
+                {(() => {
+                  const nonArchivedMessages = prospectMessages.filter(m => m.message_status !== 'archived')
 
-                      return (
-                        <button
-                          key={msg.id}
-                          onClick={() => setSelectedMessageId(msg.id)}
-                          className={`px-4 py-2 rounded-lg border transition-all text-sm ${
-                            isSelected
-                              ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
-                              : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
-                          }`}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
-                            <span>Message {prospectMessages.length - index}</span>
-                            <span className="text-xs opacity-70">{getTimeSince(msg.created_at)}</span>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+                  if (nonArchivedMessages.length <= 1) return null
+
+                  return (
+                    <div className="flex gap-2 flex-wrap">
+                      {nonArchivedMessages.map((msg, index) => {
+                        const msgStatusInfo = getStatusColor(msg.message_status)
+                        const isSelected = msg.id === selectedMessageId
+
+                        return (
+                          <button
+                            key={msg.id}
+                            onClick={() => setSelectedMessageId(msg.id)}
+                            className={`px-4 py-2 rounded-lg border transition-all text-sm ${
+                              isSelected
+                                ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
+                                : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
+                            }`}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
+                              <span>Message {nonArchivedMessages.length - index}</span>
+                              <span className="text-xs opacity-70">{getTimeSince(msg.created_at)}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
                 {/* Display Current Message */}
                 {prospectMessages.length > 0 && (() => {
@@ -628,14 +938,58 @@ export function ProspectModal({
                             </p>
                           </div>
                         )}
-                        <div className="mt-2 text-xs text-gray-500">
-                          {displayMessage?.length || 0} characters
-                          {displayMessage && displayMessage.length > 300 && (
-                            <span className="text-red-400 ml-2">
-                              ({displayMessage.length - 300} over LinkedIn limit)
-                            </span>
-                          )}
-                        </div>
+                        {(() => {
+                          const messageLength = displayMessage?.length || 0
+                          const limits = getMessageLimits(currentMessage.message_type || null)
+                          const isOverLimit = messageLength > limits.max
+                          const isOverRecommended = limits.recommendedMax && messageLength > limits.recommendedMax
+
+                          return (
+                            <>
+                              <div className="mt-2 text-xs">
+                                <div className="flex flex-col gap-1">
+                                  <span className={isOverLimit ? 'text-red-400 font-medium' : isOverRecommended ? 'text-orange-400 font-medium' : 'text-gray-500'}>
+                                    Character count: {messageLength}/{limits.max}
+                                    {isOverLimit && ` (${messageLength - limits.max} over limit)`}
+                                  </span>
+                                  {messageLength < limits.limit && (
+                                    <span className="text-gray-500 text-[10px]">
+                                      Target: {limits.limit}-{limits.target} chars for optimal engagement
+                                    </span>
+                                  )}
+                                  {messageLength >= limits.limit && messageLength <= limits.target && (
+                                    <span className="text-green-400 text-[10px]">
+                                      ✓ Within target range ({limits.limit}-{limits.target})
+                                    </span>
+                                  )}
+                                  {currentMessage.message_type && (
+                                    <span className="text-gray-600 text-[10px]">
+                                      {limits.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {isOverLimit && limits.type === 'connection_request' && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400 mt-2">
+                                  ⚠️ LinkedIn connection requests are limited to {limits.max} characters. This message will be rejected.
+                                </div>
+                              )}
+
+                              {isOverLimit && limits.type === 'inmail' && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-400 mt-2">
+                                  ⚠️ InMail messages have a hard limit of {limits.max} characters. This message will be truncated.
+                                </div>
+                              )}
+
+                              {isOverRecommended && !isOverLimit && (limits.type === 'inmail' || limits.type === 'direct_message' || limits.type === 'unknown') && (
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 text-xs text-orange-400 mt-2">
+                                  💡 Cold AI recommends shorter, focused messages that start conversations for better response rates. Keep it under {limits.recommendedMax} characters.
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
                       </div>
 
                       {/* ICP Analysis */}

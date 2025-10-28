@@ -87,16 +87,29 @@ const getMessageLimits = (messageType: string | null) => {
       limit: 600,
       target: 800,
       max: 1900,
+      recommendedMax: 850,
       type: 'inmail',
       description: messageType === 'inmail' ? 'InMail Message' : 'Open Profile Message'
     }
   }
 
-  // Default to InMail limits for unknown types
+  if (messageType === 'direct_message' || messageType === 'first_message') {
+    return {
+      limit: 600,
+      target: 800,
+      max: 8000,
+      recommendedMax: 850,
+      type: 'direct_message',
+      description: 'Direct Message'
+    }
+  }
+
+  // Default to direct message limits for unknown types
   return {
     limit: 600,
     target: 800,
-    max: 1900,
+    max: 8000,
+    recommendedMax: 850,
     type: 'unknown',
     description: 'Message'
   }
@@ -983,11 +996,6 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                 ) : 'LinkedIn Profile'}
               </p>
             </div>
-            {generatedMessageType && (
-              <div className="text-xs text-gray-400 bg-black/30 px-3 py-1 rounded-full">
-                {limits.description}
-              </div>
-            )}
           </div>
         </div>
 
@@ -1010,22 +1018,22 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
 
         {/* Character Count */}
         {(() => {
-          const isOverTarget = messageLength > limits.target && limits.type === 'inmail'
+          const isOverRecommended = limits.recommendedMax && messageLength > limits.recommendedMax
 
           return (
             <>
               <div className="flex justify-between text-xs items-center mb-4">
                 <div className="flex flex-col gap-1">
-                  <span className={isOverLimit ? 'text-red-400 font-medium' : isOverTarget ? 'text-yellow-400' : 'text-gray-500'}>
+                  <span className={isOverLimit ? 'text-red-400 font-medium' : isOverRecommended ? 'text-orange-400 font-medium' : 'text-gray-500'}>
                     Character count: {messageLength}/{limits.max}
                     {isOverLimit && ` (${messageLength - limits.max} over limit)`}
                   </span>
-                  {limits.type === 'inmail' && messageLength < limits.limit && (
-                    <span className="text-yellow-400/60 text-[10px]">
+                  {messageLength < limits.limit && (
+                    <span className="text-gray-500 text-[10px]">
                       Target: {limits.limit}-{limits.target} chars for optimal engagement
                     </span>
                   )}
-                  {limits.type === 'inmail' && messageLength >= limits.limit && messageLength <= limits.target && (
+                  {messageLength >= limits.limit && messageLength <= limits.target && (
                     <span className="text-green-400 text-[10px]">
                       ✓ Within target range ({limits.limit}-{limits.target})
                     </span>
@@ -1048,9 +1056,9 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                 </div>
               )}
 
-              {isOverTarget && !isOverLimit && limits.type === 'inmail' && (
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 text-xs text-yellow-400 mb-4">
-                  ℹ️ Message is longer than recommended ({limits.target} chars). Consider shortening for better engagement.
+              {isOverRecommended && !isOverLimit && (limits.type === 'inmail' || limits.type === 'direct_message' || limits.type === 'unknown') && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 text-xs text-orange-400 mb-4">
+                  💡 Cold AI recommends shorter, focused messages that start conversations for better response rates. Keep it under {limits.recommendedMax} characters.
                 </div>
               )}
             </>
@@ -1462,22 +1470,22 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
               const messageLength = (editedMessage || generatedMessage).length
               const limits = getMessageLimits(generatedMessageType)
               const isOverLimit = messageLength > limits.max
-              const isOverTarget = messageLength > limits.target && limits.type === 'inmail'
+              const isOverRecommended = limits.recommendedMax && messageLength > limits.recommendedMax
 
               return (
                 <>
                   <div className="flex justify-between text-xs items-center">
                     <div className="flex flex-col gap-1">
-                      <span className={isOverLimit ? 'text-red-400 font-medium' : isOverTarget ? 'text-yellow-400' : 'text-gray-500'}>
+                      <span className={isOverLimit ? 'text-red-400 font-medium' : isOverRecommended ? 'text-orange-400 font-medium' : 'text-gray-500'}>
                         Character count: {messageLength}/{limits.max}
                         {isOverLimit && ` (${messageLength - limits.max} over limit)`}
                       </span>
-                      {limits.type === 'inmail' && messageLength < limits.limit && (
-                        <span className="text-yellow-400/60 text-[10px]">
+                      {messageLength < limits.limit && (
+                        <span className="text-gray-500 text-[10px]">
                           Target: {limits.limit}-{limits.target} chars for optimal engagement
                         </span>
                       )}
-                      {limits.type === 'inmail' && messageLength >= limits.limit && messageLength <= limits.target && (
+                      {messageLength >= limits.limit && messageLength <= limits.target && (
                         <span className="text-green-400 text-[10px]">
                           ✓ Within target range ({limits.limit}-{limits.target})
                         </span>
@@ -1505,9 +1513,9 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                     </div>
                   )}
 
-                  {isOverTarget && !isOverLimit && limits.type === 'inmail' && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 text-xs text-yellow-400">
-                      ℹ️ Message is longer than recommended ({limits.target} chars). Consider shortening for better engagement.
+                  {isOverRecommended && !isOverLimit && (limits.type === 'inmail' || limits.type === 'direct_message' || limits.type === 'unknown') && (
+                    <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 text-xs text-orange-400">
+                      💡 Cold AI recommends shorter, focused messages that start conversations for better response rates. Keep it under {limits.recommendedMax} characters.
                     </div>
                   )}
                 </>
