@@ -61,7 +61,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
   const { user } = useAuth()
   const { openProspectModal } = useProspectModal()
   const [prospects, setProspects] = useState<Prospect[]>([])
-  const [stats, setStats] = useState({ generated: 0, sent: 0, responseRate: 0 })
+  const [stats, setStats] = useState({ generated: 0, scheduled: 0, sent: 0 })
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -106,7 +106,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     const userId = user?.id || user?.user_id
 
     // Fetch message generation logs with research_cache data
-    // Only show: generating, generated, pending_scheduled, scheduled, archived, failed
+    // Show: generating, generated, pending_scheduled, scheduled, sent, reply_received, reply_sent, archived, failed
     const { data, error } = await supabase
       .from('message_generation_logs')
       .select(`
@@ -122,7 +122,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
         )
       `)
       .eq('user_id', userId)
-      .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'archived', 'failed'])
+      .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent', 'archived', 'failed'])
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -148,18 +148,25 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     const prospects = Array.from(prospectMap.values()).map(messages => messages[0])
     setProspects(prospects)
 
-    // Calculate stats from ALL messages (not deduplicated)
-    const generated = allProspects.filter(p =>
-      ['generated', 'pending_scheduled', 'scheduled'].includes(p.message_status)
-    ).length
-    const sent = allProspects.filter(p =>
-      p.message_status === 'archived'
-    ).length
-    // Note: sent messages are handled in OutreachPage, not here
-    // responseRate will be shown as "--"
+    // Fetch ALL messages for stats (not limited to 10)
+    const { data: allMessages } = await supabase
+      .from('message_generation_logs')
+      .select('message_status')
+      .eq('user_id', userId)
 
-    console.log('📈 Stats:', { generated, sent, totalMessages: allProspects.length, uniqueProspects: prospects.length })
-    setStats({ generated, sent, responseRate: 0 })
+    const allMessagesList = (allMessages || []) as { message_status: string }[]
+
+    // Calculate stats from ALL user messages
+    const generated = allMessagesList.length // Every message ever made
+    const scheduled = allMessagesList.filter(m =>
+      ['pending_scheduled', 'scheduled'].includes(m.message_status)
+    ).length
+    const sent = allMessagesList.filter(m =>
+      ['sent', 'reply_received', 'reply_sent'].includes(m.message_status)
+    ).length
+
+    console.log('📈 Stats:', { generated, scheduled, sent, totalMessages: allMessagesList.length, uniqueProspects: prospects.length })
+    setStats({ generated, scheduled, sent })
   }
 
   const handleProspectClick = (prospect: Prospect) => {
@@ -199,12 +206,46 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Pending' }
       case 'scheduled':
         return { dot: 'bg-orange-500', text: 'text-orange-400', label: 'Scheduled' }
+      case 'sent':
+        return { dot: 'bg-green-500', text: 'text-green-400', label: 'Sent' }
+      case 'reply_received':
+        return { dot: 'bg-yellow-500', text: 'text-yellow-400', label: 'Reply Received' }
+      case 'reply_sent':
+        return { dot: 'bg-green-500', text: 'text-green-400', label: 'Reply Sent' }
       case 'archived':
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Archived' }
       case 'failed':
         return { dot: 'bg-red-500', text: 'text-red-400', label: 'Failed' }
       default:
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Unknown' }
+    }
+  }
+
+  const getCardBorderStyle = (status: string) => {
+    // Generating states - purple with glow
+    if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(status)) {
+      return 'border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+    }
+
+    switch (status) {
+      case 'generated':
+        return 'border-2 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+      case 'pending_scheduled':
+        return 'border-2 border-gray-500'
+      case 'scheduled':
+        return 'border-2 border-orange-500'
+      case 'sent':
+        return 'border-2 border-green-500'
+      case 'reply_received':
+        return 'border-2 border-yellow-500'
+      case 'reply_sent':
+        return 'border-2 border-green-500'
+      case 'archived':
+        return 'border-2 border-gray-500 opacity-70'
+      case 'failed':
+        return 'border-2 border-red-500'
+      default:
+        return 'border-2 border-gray-500'
     }
   }
 
@@ -268,24 +309,24 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">📊</div>
-            <p className="text-xs text-gray-300">Track Opens</p>
+            <div className="text-2xl mb-2">✨</div>
+            <p className="text-xs text-gray-300">Generated</p>
           </div>
           <div className="rounded-xl p-3 text-center border border-white/5"
                style={{
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">💬</div>
-            <p className="text-xs text-gray-300">Messages</p>
+            <div className="text-2xl mb-2">📅</div>
+            <p className="text-xs text-gray-300">Scheduled</p>
           </div>
           <div className="rounded-xl p-3 text-center border border-white/5"
                style={{
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">📈</div>
-            <p className="text-xs text-gray-300">Response Rate</p>
+            <div className="text-2xl mb-2">✅</div>
+            <p className="text-xs text-gray-300">Sent</p>
           </div>
         </div>
 
@@ -355,13 +396,13 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
           </div>
           <div className="w-px bg-white/10"></div>
           <div>
-            <div className="text-lg font-bold text-[#FBAE1C]">{stats.sent}</div>
-            <div className="text-xs text-gray-400">Sent</div>
+            <div className="text-lg font-bold text-[#FBAE1C]">{stats.scheduled}</div>
+            <div className="text-xs text-gray-400">Scheduled</div>
           </div>
           <div className="w-px bg-white/10"></div>
           <div>
-            <div className="text-lg font-bold text-green-400">--</div>
-            <div className="text-xs text-gray-400">Response</div>
+            <div className="text-lg font-bold text-green-400">{stats.sent}</div>
+            <div className="text-xs text-gray-400">Sent</div>
           </div>
         </div>
       </div>
@@ -378,7 +419,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
             console.log('⚠️ No research_cache for prospect:', prospect.id)
             return (
               <div key={prospect.id}
-                   className="rounded-xl border border-white/5 p-3 animate-pulse"
+                   className={`rounded-xl p-3 animate-pulse ${getCardBorderStyle(prospect.message_status)}`}
                    style={{
                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
                    }}>
@@ -424,7 +465,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
             <button
               key={prospect.id}
               onClick={() => handleProspectClick(prospect)}
-              className="w-full rounded-xl border border-white/5 p-3 transition-all text-left hover:bg-white/5 hover:border-white/10 cursor-pointer"
+              className={`w-full rounded-xl p-3 transition-all text-left hover:bg-white/5 cursor-pointer ${getCardBorderStyle(prospect.message_status)}`}
               style={{
                 background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
               }}>

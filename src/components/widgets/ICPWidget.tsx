@@ -825,10 +825,8 @@ export function ICPWidget({ className }: ICPWidgetProps) {
         </div>
 
         <div className="relative z-20">
-          {/* Last Used */}
-          <div className="text-sm font-light opacity-80 mb-1 tracking-wide">
-            Last used: {icp?.last_used ? formatDistanceToNow(new Date(icp.last_used), { addSuffix: true }) : 'Never used'}
-          </div>
+          {/* Spacing placeholder where "Last used" text was */}
+          <div className="mb-1 h-5"></div>
 
           {/* ICP Name with icon */}
           <div className="flex items-center mb-2">

@@ -774,7 +774,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       return
     }
 
-    openProspectModal(currentLogId)
+    // Pass both the ID and an array with just that ID for consistency
+    openProspectModal(currentLogId, [currentLogId])
   }
 
   const settingsCount = Object.values(setupStatus.settings).filter(Boolean).length
@@ -1071,8 +1072,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             onClick={handleViewResearch}
             className="px-4 py-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all duration-200 text-sm font-medium flex items-center gap-2"
           >
-            <span className="text-lg">🔍</span>
-            <span>View Research</span>
+            <span className="text-lg pointer-events-none">🔍</span>
+            <span className="pointer-events-none">View Research</span>
           </button>
 
           <button
@@ -1120,8 +1121,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         </div>
 
         {/* Decorative green glow elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-full blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-green-600/10 to-transparent rounded-tr-full blur-2xl"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-full blur-2xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-green-600/10 to-transparent rounded-tr-full blur-2xl pointer-events-none"></div>
       </div>
     )
   }
@@ -1213,6 +1214,12 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   onBlur={(e) => {
                     if (e.target.value && !validateLinkedInUrl(e.target.value)) {
                       setLinkedinError('Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username')
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isGenerating) {
+                      e.preventDefault()
+                      handleGenerate()
                     }
                   }}
                   placeholder="https://linkedin.com/in/example"
@@ -1595,6 +1602,12 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                     setLinkedinError('Invalid LinkedIn URL format. Expected: https://linkedin.com/in/username')
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isGenerating) {
+                    e.preventDefault()
+                    handleGenerate()
+                  }
+                }}
                 placeholder="https://linkedin.com/in/example"
                 className={`w-full bg-black/30 border rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none transition-all duration-200 ${
                   linkedinError
@@ -1670,8 +1683,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       )}
 
       {/* Decorative Elements */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl pointer-events-none"></div>
     </div>
   )
 }
