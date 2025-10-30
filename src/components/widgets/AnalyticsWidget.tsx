@@ -282,7 +282,7 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
                 Upgrade to Pro
               </div>
               <div className="text-[10px] text-gray-400">
-                Unlimited messages, ICPs & products
+                Higher limits, track connections & AI replies
               </div>
             </div>
             <svg className="w-4 h-4 text-[#FBAE1C] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

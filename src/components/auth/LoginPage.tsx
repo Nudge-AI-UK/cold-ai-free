@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,18 +15,118 @@ export const LoginPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
   const [lockoutInfo, setLockoutInfo] = useState<{
     locked: boolean;
     minutes_remaining?: number;
     attempts_remaining?: number;
   } | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+  const scriptLoadedRef = useRef(false);
+
+  // Load Turnstile script only once
+  useEffect(() => {
+    // Check if already loaded
+    if (scriptLoadedRef.current || window.turnstile) {
+      setTurnstileReady(true);
+      return;
+    }
+
+    // Check if script is already in DOM
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+    if (existingScript) {
+      // Script exists, wait for it to load
+      const checkTurnstile = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(checkTurnstile);
+          scriptLoadedRef.current = true;
+          setTurnstileReady(true);
+        }
+      }, 100);
+      return () => clearInterval(checkTurnstile);
+    }
+
+    // Load the script
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      scriptLoadedRef.current = true;
+      setTurnstileReady(true);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  // Render Turnstile widget for both sign-up and login
+  useEffect(() => {
+    if (!turnstileReady || !showEmailForm || !turnstileRef.current) {
+      return;
+    }
+
+    // Small delay to ensure DOM is ready
+    const renderTimeout = setTimeout(() => {
+      if (turnstileRef.current && window.turnstile) {
+        // Clear previous widget if it exists
+        if (turnstileWidgetId.current) {
+          try {
+            window.turnstile.remove(turnstileWidgetId.current);
+          } catch (e) {
+            console.warn('Failed to remove previous turnstile widget:', e);
+          }
+          turnstileWidgetId.current = null;
+        }
+
+        // Reset captcha token when switching modes
+        setCaptchaToken(null);
+
+        // Render new widget
+        try {
+          turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
+            sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+            callback: (token: string) => {
+              setCaptchaToken(token);
+            },
+            'error-callback': () => {
+              toast.error('CAPTCHA verification failed. Please try again.');
+            },
+          });
+        } catch (e) {
+          console.error('Failed to render Turnstile widget:', e);
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(renderTimeout);
+      if (turnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+        } catch (e) {
+          console.warn('Failed to remove turnstile widget on cleanup:', e);
+        }
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [isSignUp, showEmailForm, turnstileReady]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // For sign up, skip rate limiting
+      // Check captcha for both sign up and login
+      if (!captchaToken) {
+        toast.error("Please complete the CAPTCHA verification");
+        setIsLoading(false);
+        return;
+      }
+
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
           email,
@@ -35,13 +135,17 @@ export const LoginPage = () => {
             emailRedirectTo: `${window.location.origin}`,
             data: {
               full_name: email.split('@')[0], // Default name from email
-            }
+            },
+            captchaToken, // Include captcha token
           },
         });
 
         if (error) throw error;
 
-        toast.success("Success! Check your email to confirm your account.");
+        // Show OTP verification screen
+        setVerificationEmail(email);
+        setShowOtpVerification(true);
+        toast.success("Verification code sent! Check your email.");
         setIsLoading(false);
       } else {
         console.log('🔐 Attempting login for:', email);
@@ -76,6 +180,9 @@ export const LoginPage = () => {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
+          options: {
+            captchaToken, // Include captcha token for login
+          },
         });
 
         // Record the login attempt
@@ -145,6 +252,47 @@ export const LoginPage = () => {
       // OAuth will redirect, so no need to handle success here
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: verificationEmail,
+        token: otpCode,
+        type: 'email',
+      });
+
+      if (error) throw error;
+
+      toast.success("Email verified! Welcome to Cold AI!");
+      setShowOtpVerification(false);
+      // AuthContext will handle the session and redirect
+    } catch (error: any) {
+      toast.error(error.message || "Invalid verification code. Please try again.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: verificationEmail,
+      });
+
+      if (error) throw error;
+
+      toast.success("New verification code sent! Check your email.");
+      setOtpCode(""); // Clear the input
+      setIsLoading(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend code. Please try again.");
       setIsLoading(false);
     }
   };
@@ -345,6 +493,7 @@ export const LoginPage = () => {
                   <p className="text-xs text-gray-500 text-center">
                     Quick setup, no password needed
                   </p>
+
                 </div>
 
                 {/* Divider / Email Toggle */}
@@ -412,9 +561,30 @@ export const LoginPage = () => {
                     )}
                   </div>
 
+                  {/* Turnstile CAPTCHA Widget - Show for both sign up and login */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-300">Verify you're human</Label>
+                    <div className="relative min-h-[65px] flex justify-center items-center">
+                      {/* Loading spinner - shows while CAPTCHA loads */}
+                      {!captchaToken && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin"></div>
+                            <p className="text-xs text-gray-500">Loading verification...</p>
+                          </div>
+                        </div>
+                      )}
+                      {/* Turnstile widget container */}
+                      <div
+                        ref={turnstileRef}
+                        className="flex justify-center"
+                      />
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !captchaToken}
                     className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium py-2 transition-all duration-300 group"
                   >
                     {isLoading ? (
@@ -503,6 +673,90 @@ export const LoginPage = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* OTP Verification Modal */}
+      {showOtpVerification && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+             style={{
+               backgroundColor: 'rgba(0, 0, 0, 0.7)',
+               backdropFilter: 'blur(4px)',
+               WebkitBackdropFilter: 'blur(4px)'
+             }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="border border-gray-700 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            style={{
+              backgroundColor: 'rgba(31, 41, 55, 0.95)'
+            }}>
+            <h3 className="text-xl font-bold text-white mb-2">Verify Your Email</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              We sent a 6-digit verification code to <span className="text-orange-400">{verificationEmail}</span>
+            </p>
+
+            <form onSubmit={handleVerifyOtp}>
+              <div className="space-y-2 mb-4">
+                <Label htmlFor="otp-code" className="text-gray-300">Verification Code</Label>
+                <Input
+                  id="otp-code"
+                  type="text"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="text-center text-2xl tracking-widest bg-gray-900/50 border-gray-600 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/20"
+                  placeholder="000000"
+                  maxLength={6}
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 text-center">
+                  Enter the 6-digit code from your email
+                </p>
+              </div>
+
+              <div className="flex gap-3 mb-4">
+                <Button
+                  type="submit"
+                  disabled={isLoading || otpCode.length !== 6}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Verifying...</span>
+                    </div>
+                  ) : (
+                    "Verify Email"
+                  )}
+                </Button>
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-gray-400 mb-2">
+                  Didn't receive the code?
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                  className="text-sm text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50">
+                  Resend Code
+                </button>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-700 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpVerification(false);
+                    setOtpCode("");
+                  }}
+                  className="text-sm text-gray-400 hover:text-orange-400 transition-colors">
+                  ← Back to Sign In
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
 
       {/* Password Reset Modal */}
       {showPasswordReset && (

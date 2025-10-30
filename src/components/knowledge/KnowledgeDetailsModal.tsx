@@ -53,6 +53,7 @@ interface KnowledgeDetailsModalProps {
     updated_at: string;
     created_by?: string;
   } | null;
+  mode?: 'view' | 'edit'; // Optional mode prop to override automatic determination
 }
 
 // Helper function to clean escaped text from database
@@ -279,7 +280,7 @@ const parseMarkdownSections = (content: string) => {
   return sections;
 };
 
-export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => {
+export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProps) => {
   const { } = useModalFlow();
   const { user } = useAuth();
 
@@ -288,8 +289,8 @@ export const KnowledgeDetailsModal = ({ entry }: KnowledgeDetailsModalProps) => 
     return null;
   }
 
-  // Check if in draft/pending mode (editable)
-  const isDraftPending = entry.workflow_status === 'draft' && entry.review_status === 'pending';
+  // Check if in draft/pending mode (editable) - override with mode prop if provided
+  const isDraftPending = mode === 'edit' || (entry.workflow_status === 'draft' && entry.review_status === 'pending');
 
   // State for editing
   const [_isEditing, _setIsEditing] = useState(isDraftPending);

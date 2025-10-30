@@ -19,8 +19,9 @@ export function KnowledgeModal() {
   const [existingKnowledgeEntry, setExistingKnowledgeEntry] = useState<any>(null)
 
 
-  // Check if we're in edit mode
+  // Check if we're in edit or view mode
   const isEditMode = state.mode === 'edit'
+  const isViewMode = state.mode === 'view'
 
   // Use a ref to persist entry data across navigation, with sessionStorage backup
   const persistedEntryRef = useRef<any>(null)
@@ -319,19 +320,19 @@ export function KnowledgeModal() {
       console.warn('KnowledgeModal: existingEntry is null in edit mode')
       return null
     }
-    return <KnowledgeDetailsModal entry={existingEntry} />
+    return <KnowledgeDetailsModal entry={existingEntry} mode="edit" />
   }
 
   // Debug logging for render decisions
 
   // If in add mode but we have existing knowledge (navigated from other modals), show details
   if (existingKnowledgeEntry) {
-    return <KnowledgeDetailsModal entry={existingKnowledgeEntry} />
+    return <KnowledgeDetailsModal entry={existingKnowledgeEntry} mode="view" />
   }
 
   // If we have existing data from flow navigation, show details even in "add" mode
   if (!isEditMode && existingEntry) {
-    return <KnowledgeDetailsModal entry={existingEntry} />
+    return <KnowledgeDetailsModal entry={existingEntry} mode="view" />
   }
 
   // Render add mode modal (when no existing knowledge)

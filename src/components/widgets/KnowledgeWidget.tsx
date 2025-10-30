@@ -5,6 +5,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
+import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
+import { HoverTooltip } from '@/components/ui/HoverTooltip'
 import type { Database } from '@/types/supabase'
 
 type KnowledgeEntry = Database['public']['Tables']['knowledge_base']['Row']
@@ -17,9 +19,77 @@ interface KnowledgeWidgetProps {
 export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps) {
   const { user } = useAuth()
   const { openModal } = useModalFlow()
+  const { planType } = useSimpleSubscription(user?.id)
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
+
+  // Check if user can edit product (for free users, limit to once per day)
+  const canEditProduct = () => {
+    if (!entry) return false
+
+    // If not free plan, allow editing anytime
+    if (planType !== 'free') return true
+
+    // For free users, check if 24 hours have passed since last review
+    if (!entry.reviewed_at) return true // Never reviewed, can edit
+
+    const reviewedAt = new Date(entry.reviewed_at)
+    const now = new Date()
+    const hoursSinceReview = (now.getTime() - reviewedAt.getTime()) / (1000 * 60 * 60)
+
+    return hoursSinceReview >= 24
+  }
+
+  const getEditLimitMessage = () => {
+    if (!entry?.reviewed_at) return ''
+
+    const reviewedAt = new Date(entry.reviewed_at)
+    const now = new Date()
+    const hoursSinceReview = (now.getTime() - reviewedAt.getTime()) / (1000 * 60 * 60)
+    const hoursRemaining = Math.ceil(24 - hoursSinceReview)
+
+    if (hoursRemaining > 1) {
+      return `Daily edit limit reached. Available in ${hoursRemaining} hours.`
+    } else {
+      return 'Daily edit limit reached. Available in less than 1 hour.'
+    }
+  }
+
+  // Check if user can delete product (for free users, limit to once per 5 days)
+  const canDeleteProduct = () => {
+    if (!entry) return false
+
+    // If not free plan, allow deletion anytime
+    if (planType !== 'free') return true
+
+    // For free users, check if 5 days (120 hours) have passed since last review
+    if (!entry.reviewed_at) return true // Never reviewed, can delete
+
+    const reviewedAt = new Date(entry.reviewed_at)
+    const now = new Date()
+    const hoursSinceReview = (now.getTime() - reviewedAt.getTime()) / (1000 * 60 * 60)
+
+    return hoursSinceReview >= 120 // 5 days = 120 hours
+  }
+
+  const getDeleteLimitMessage = () => {
+    if (!entry?.reviewed_at) return ''
+
+    const reviewedAt = new Date(entry.reviewed_at)
+    const now = new Date()
+    const hoursSinceReview = (now.getTime() - reviewedAt.getTime()) / (1000 * 60 * 60)
+    const hoursRemaining = Math.ceil(120 - hoursSinceReview)
+
+    if (hoursRemaining > 24) {
+      const daysRemaining = Math.ceil(hoursRemaining / 24)
+      return `Delete locked for ${daysRemaining} more day${daysRemaining === 1 ? '' : 's'}.`
+    } else if (hoursRemaining > 1) {
+      return `Delete locked. Available in ${hoursRemaining} hours.`
+    } else {
+      return 'Delete locked. Available in less than 1 hour.'
+    }
+  }
 
   // Helper function to clean escaped text from database
   const cleanText = (text: string | null | undefined): string => {
@@ -656,7 +726,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
 
   // Active State (when product exists)
   return (
-    <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+    <div className={`relative shadow-2xl rounded-3xl p-6 overflow-visible border border-white/10 text-white ${className}`}
          style={{
            background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
            backdropFilter: 'blur(10px)',
@@ -725,19 +795,39 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
           {/* Action Buttons */}
           <div className="flex gap-3">
             <button
-              onClick={handleViewDetails}
-              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group"
+              onClick={() => openModal('knowledge', { mode: 'view', data: entry as any })}
+              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm"
             >
-              <Edit2 className="w-5 h-5" />
-              <span>View Details</span>
+              View Details
             </button>
-            <button
-              onClick={handleDelete}
-              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 text-sm flex items-center justify-center border border-red-500/30"
-              title="Delete entry"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            <HoverTooltip content={getEditLimitMessage()} disabled={canEditProduct()}>
+              <button
+                onClick={() => canEditProduct() && openModal('knowledge', { mode: 'edit', data: entry as any })}
+                disabled={!canEditProduct()}
+                className={`p-3 backdrop-blur-sm rounded-xl border transition-all duration-200 ${
+                  canEditProduct()
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer'
+                    : 'bg-white/5 border-white/5 opacity-50 cursor-not-allowed'
+                }`}
+                title={!canEditProduct() ? getEditLimitMessage() : 'Edit Product'}
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            </HoverTooltip>
+            <HoverTooltip content={getDeleteLimitMessage()} disabled={canDeleteProduct()}>
+              <button
+                onClick={() => canDeleteProduct() && handleDelete()}
+                disabled={!canDeleteProduct()}
+                className={`p-3 rounded-xl border transition-all duration-200 ${
+                  canDeleteProduct()
+                    ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30 hover:border-red-500/40 cursor-pointer'
+                    : 'bg-red-500/10 border-red-500/20 opacity-50 cursor-not-allowed'
+                }`}
+                title={!canDeleteProduct() ? getDeleteLimitMessage() : 'Delete Product'}
+              >
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </button>
+            </HoverTooltip>
           </div>
         </div>
 
