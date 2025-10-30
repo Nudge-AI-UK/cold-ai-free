@@ -444,9 +444,15 @@ export function ProspectModal({
         <AnimatedModalBackground />
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(10,14,27,0.4)] backdrop-blur-sm">
           <div className="bg-gradient-to-br from-[rgba(10,14,27,0.95)] to-[rgba(26,31,54,0.95)] border border-white/10 rounded-2xl p-8">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <span className="text-white">Loading prospect data...</span>
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <img
+                  src="/Square_bishop.svg"
+                  alt="Loading"
+                  className="w-12 h-12 animate-pulse"
+                />
+                <div className="absolute inset-0 rounded-full border-2 border-[#FBAE1C]/30 border-t-[#FBAE1C] animate-spin"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -619,11 +625,11 @@ export function ProspectModal({
                     {researchData?.headline || researchData?.occupation || 'No title'}
                   </p>
                   {(() => {
-                    const nonArchivedCount = prospectMessages.filter(m => m.message_status !== 'archived').length
-                    if (nonArchivedCount > 1) {
+                    const totalMessagesCount = prospectMessages.length
+                    if (totalMessagesCount > 1) {
                       return (
                         <div className="mt-2 bg-[#FBAE1C]/20 text-[#FBAE1C] px-2 py-1 rounded-full text-xs font-medium inline-block">
-                          {nonArchivedCount} Messages Generated
+                          {totalMessagesCount} Messages Generated
                         </div>
                       )
                     }
@@ -862,17 +868,16 @@ export function ProspectModal({
                   </div>
                 </div>
 
-                {/* Message Selector - Show only if multiple non-archived messages */}
+                {/* Message Selector - Show all messages including archived */}
                 {(() => {
-                  const nonArchivedMessages = prospectMessages.filter(m => m.message_status !== 'archived')
-
-                  if (nonArchivedMessages.length <= 1) return null
+                  if (prospectMessages.length <= 1) return null
 
                   return (
                     <div className="flex gap-2 flex-wrap">
-                      {nonArchivedMessages.map((msg, index) => {
+                      {prospectMessages.map((msg, index) => {
                         const msgStatusInfo = getStatusColor(msg.message_status)
                         const isSelected = msg.id === selectedMessageId
+                        const isArchived = msg.message_status === 'archived'
 
                         return (
                           <button
@@ -881,12 +886,15 @@ export function ProspectModal({
                             className={`px-4 py-2 rounded-lg border transition-all text-sm ${
                               isSelected
                                 ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
+                                : isArchived
+                                ? 'border-white/10 bg-white/5 text-gray-500 hover:border-white/20 opacity-60'
                                 : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
                             }`}>
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
-                              <span>Message {nonArchivedMessages.length - index}</span>
+                              <span>Message {prospectMessages.length - index}</span>
                               <span className="text-xs opacity-70">{getTimeSince(msg.created_at)}</span>
+                              {isArchived && <span className="text-xs opacity-50">(Archived)</span>}
                             </div>
                           </button>
                         )

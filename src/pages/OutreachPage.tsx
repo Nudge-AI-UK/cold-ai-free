@@ -44,7 +44,7 @@ export function OutreachPage() {
   const { openProspectModal } = useProspectModal()
 
   const [currentView, setCurrentView] = useState<ViewMode>('week')
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>('all')
+  const [activeFilters, setActiveFilters] = useState<StatusFilter[]>(['all'])
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [draggedMessage, setDraggedMessage] = useState<string | null>(null)
   const [draggedProspect, setDraggedProspect] = useState<Prospect | null>(null)
@@ -265,10 +265,10 @@ export function OutreachPage() {
 
   const statusCounts = getStatusCounts()
 
-  // Filter prospects
-  const filteredProspects = activeFilter === 'all'
+  // Filter prospects - if 'all' is selected or no filters, show all
+  const filteredProspects = activeFilters.includes('all') || activeFilters.length === 0
     ? prospects
-    : prospects.filter(p => p.status === activeFilter)
+    : prospects.filter(p => activeFilters.includes(p.status as StatusFilter))
 
   // Check if current state matches original state
   const checkForChanges = (currentMessages: ScheduledMessage[]) => {
@@ -285,6 +285,26 @@ export function OutreachPage() {
   const handleViewChange = (newView: ViewMode) => {
     if (newView === currentView) return
     setCurrentView(newView)
+  }
+
+  // Handle filter toggle
+  const handleFilterToggle = (filter: StatusFilter) => {
+    if (filter === 'all') {
+      // Clicking "All" clears all other filters
+      setActiveFilters(['all'])
+    } else {
+      // Toggle the filter
+      if (activeFilters.includes(filter)) {
+        // Deselect this filter
+        const newFilters = activeFilters.filter(f => f !== filter && f !== 'all')
+        // If no filters left, default to 'all'
+        setActiveFilters(newFilters.length === 0 ? ['all'] : newFilters)
+      } else {
+        // Select this filter (remove 'all' if present)
+        const newFilters = activeFilters.filter(f => f !== 'all')
+        setActiveFilters([...newFilters, filter])
+      }
+    }
   }
 
   const handleSaveChanges = async () => {
@@ -534,14 +554,9 @@ export function OutreachPage() {
 
     if (!draggedMsg || !targetMsg) return
 
-    // Check if target message is locked (within 10 minutes)
-    const now = new Date()
-    const targetTime = new Date()
-    targetTime.setHours(targetMsg.hour, 0, 0, 0)
-    const timeDiff = targetTime.getTime() - now.getTime()
-
-    if (timeDiff < 10 * 60 * 1000 && timeDiff > 0) {
-      toast.error('Cannot swap - target message is locked (within 10 minutes of send time)')
+    // Check if target message is locked
+    if (isMessageLocked(targetMsg)) {
+      toast.error('Cannot swap - message is locked')
       handleDragEnd()
       return
     }
@@ -570,6 +585,21 @@ export function OutreachPage() {
     }
 
     handleDragEnd()
+  }
+
+  // Helper to check if a message is locked (time-based or status-based)
+  const isMessageLocked = (msg: ScheduledMessage, currentTime: Date = new Date()): boolean => {
+    // Unconditional status-based locking - these statuses are always locked
+    const unconditionallyLockedStatuses = ['sending', 'sent', 'reply_received', 'reply_sent']
+    if (unconditionallyLockedStatuses.includes(msg.status)) {
+      return true
+    }
+
+    // Time-based locking - within 10 minutes of send time (applies to all statuses including 'scheduled')
+    const msgTime = new Date()
+    msgTime.setHours(msg.hour, msg.minute, 0, 0)
+    const timeDiff = msgTime.getTime() - currentTime.getTime()
+    return timeDiff < 10 * 60 * 1000 && timeDiff > 0
   }
 
   const getStatusColor = (status: string) => {
@@ -652,14 +682,8 @@ export function OutreachPage() {
 
     const collisionGroups = detectCollisions(slotMessages)
 
-    // Check if any message in slot is locked (within 10 minutes)
+    // Current time for lock checks
     const now = new Date()
-    const hasLockedMessage = slotMessages.some(msg => {
-      const msgTime = new Date()
-      msgTime.setHours(hour, msg.minute, 0, 0)
-      const timeDiff = msgTime.getTime() - now.getTime()
-      return timeDiff < 10 * 60 * 1000 && timeDiff > 0
-    })
 
     // Check if current time indicator should be in this slot
     const currentHour = currentTime.getHours()
@@ -675,9 +699,8 @@ export function OutreachPage() {
         className="p-3 border-b border-white/5 flex-1 transition-colors relative min-h-[80px]"
         style={{ position: 'relative' }}
       >
-        <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
+        <div className="text-xs text-gray-500 mb-2">
           {hourLabel}
-          {hasLockedMessage && <span>🔒</span>}
         </div>
 
         {/* Current time indicator - rendered inside this slot */}
@@ -702,10 +725,7 @@ export function OutreachPage() {
             if (!prospect) return null
 
             // Check if this specific message is locked
-            const msgTime = new Date()
-            msgTime.setHours(hour, msg.minute, 0, 0)
-            const timeDiff = msgTime.getTime() - now.getTime()
-            const isLocked = timeDiff < 10 * 60 * 1000 && timeDiff > 0
+            const isLocked = isMessageLocked(msg, now)
 
             const isReplySent = msg.status === 'reply-sent'
             const isSwapTarget = swapPreview?.toId === msg.id
@@ -879,11 +899,7 @@ export function OutreachPage() {
                   const isDragging = draggedMessage === msg.id
 
                   // Check if locked
-                  const now = new Date()
-                  const msgTime = new Date()
-                  msgTime.setHours(msg.hour, 0, 0, 0)
-                  const timeDiff = msgTime.getTime() - now.getTime()
-                  const isLocked = timeDiff < 10 * 60 * 1000 && timeDiff > 0
+                  const isLocked = isMessageLocked(msg)
 
                   return (
                     <div
@@ -959,7 +975,7 @@ export function OutreachPage() {
               <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] bg-clip-text text-transparent">
                 Outreach Calendar
               </h1>
-              <p className="text-gray-400 text-sm mt-1">Drag messages to schedule sends</p>
+              <p className="text-gray-400 text-sm mt-1">Drag messages from the prospect list to the calendar for Cold to schedule and reorder sends by dragging and dropping scheduled messages on top of one another</p>
             </div>
             <div className="flex items-center gap-3">
               {/* View Toggle */}
@@ -1028,12 +1044,14 @@ export function OutreachPage() {
                   'failed': 'bg-[#EF4444]',
                 }
 
+                const isActive = activeFilters.includes(filter)
+
                 return (
                   <button
                     key={filter}
-                    onClick={() => setActiveFilter(filter)}
+                    onClick={() => handleFilterToggle(filter)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                      activeFilter === filter
+                      isActive
                         ? 'bg-[#FBAE1C]/20 text-[#FBAE1C] border-[#FBAE1C]'
                         : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'
                     }`}
@@ -1047,7 +1065,7 @@ export function OutreachPage() {
                      filter === 'reply-sent' ? 'Responded' :
                      filter.charAt(0).toUpperCase() + filter.slice(1)}
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      activeFilter === filter ? 'bg-[#FBAE1C]/30' : 'bg-white/10'
+                      isActive ? 'bg-[#FBAE1C]/30' : 'bg-white/10'
                     }`}>
                       {statusCounts[filter]}
                     </span>

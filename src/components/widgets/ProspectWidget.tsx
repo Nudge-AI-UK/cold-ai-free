@@ -55,6 +55,7 @@ interface Prospect {
   message_metadata?: any
   ai_context?: any
   focus_report_markdown?: string
+  message_count?: number
 }
 
 export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
@@ -144,8 +145,14 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
       prospectMap.get(p.research_cache_id)!.push(p)
     })
 
-    // Get the most recent message for each prospect
-    const prospects = Array.from(prospectMap.values()).map(messages => messages[0])
+    // Get the most recent message for each prospect and add message count
+    const prospects = Array.from(prospectMap.values()).map(messages => {
+      const mostRecent = messages[0]
+      return {
+        ...mostRecent,
+        message_count: messages.length
+      }
+    })
     setProspects(prospects)
 
     // Fetch ALL messages for stats (not limited to 10)
@@ -423,24 +430,23 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                    style={{
                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
                    }}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
-                    <div>
-                      <div className="h-4 w-32 bg-gray-700 rounded mb-1"></div>
-                      <div className="h-3 w-40 bg-gray-800 rounded"></div>
-                    </div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-4 w-32 bg-gray-700 rounded mb-1"></div>
+                    <div className="h-3 w-40 bg-gray-800 rounded"></div>
                   </div>
+                </div>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
+                    <span className="text-gray-500">|</span>
                     <div className="relative flex items-center justify-center">
                       <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
                       <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
                     </div>
                     <span className="text-xs text-[#FBAE1C]">Loading...</span>
                   </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
                 </div>
               </div>
             )
@@ -465,31 +471,40 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
             <button
               key={prospect.id}
               onClick={() => handleProspectClick(prospect)}
-              className={`w-full rounded-xl p-3 transition-all text-left hover:bg-white/5 cursor-pointer ${getCardBorderStyle(prospect.message_status)}`}
+              className={`relative w-full rounded-xl p-3 transition-all text-left hover:bg-white/5 cursor-pointer ${getCardBorderStyle(prospect.message_status)}`}
               style={{
                 background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
               }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      src={profilePicture}
-                      alt={researchData.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                      onError={(e) => {
-                        // Fallback to UI avatars if LinkedIn image fails
-                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">{researchData.name}</h3>
-                    <p className="text-xs text-gray-400">{researchData.headline || researchData.occupation || 'No title'}</p>
-                  </div>
+              {/* Message Count Badge - Top Right */}
+              {prospect.message_count && prospect.message_count > 1 && (
+                <div className="absolute top-1 right-1 w-6 h-6 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg z-10">
+                  {prospect.message_count}
                 </div>
+              )}
+
+              <div className="flex items-center gap-3 mb-2">
+                <div className="relative">
+                  <img
+                    src={profilePicture}
+                    alt={researchData.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                    onError={(e) => {
+                      // Fallback to UI avatars if LinkedIn image fails
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-white">{researchData.name}</h3>
+                  <p className="text-xs text-gray-400 line-clamp-1">{researchData.headline || researchData.occupation || 'No title'}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
                   {isGenerating ? (
                     <>
+                      <span className="text-gray-500">|</span>
                       <div className="relative flex items-center justify-center">
                         <div className={`w-2 h-2 ${statusInfo.dot} rounded-full animate-pulse`}></div>
                         <div className={`absolute w-2 h-2 ${statusInfo.dot} rounded-full animate-ping`}></div>
@@ -498,14 +513,12 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                     </>
                   ) : (
                     <>
+                      <span className="text-gray-500">|</span>
                       <div className={`w-2 h-2 ${statusInfo.dot} rounded-full`}></div>
                       <span className={`text-xs ${statusInfo.text}`}>{statusInfo.label}</span>
                     </>
                   )}
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <div
                     onClick={() => cache.profile_url && window.open(cache.profile_url, '_blank')}

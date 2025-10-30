@@ -214,8 +214,8 @@ export function ICPUnifiedModalWrapper({
 
   return (
     <BaseModal
-      title="Edit Ideal Customer Profile"
-      description="Review and approve your ICP"
+      title={mode === 'edit' ? "Edit Ideal Customer Profile" : "View Ideal Customer Profile"}
+      description={mode === 'edit' ? "Review and approve your ICP" : "Review your ideal customer profile details"}
       className="icp-modal-large"
     >
       <ICPUnifiedModal
