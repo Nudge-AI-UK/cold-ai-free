@@ -56,6 +56,7 @@ interface Prospect {
   ai_context?: any
   focus_report_markdown?: string
   message_count?: number
+  all_statuses?: string[]
 }
 
 export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
@@ -106,8 +107,8 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
 
     const userId = user?.id || user?.user_id
 
-    // Fetch message generation logs with research_cache data
-    // Show: generating, generated, pending_scheduled, scheduled, sent, reply_received, reply_sent, archived, failed
+    // Fetch ALL message generation logs with research_cache data (no limit)
+    // We need all messages to properly filter by status history
     const { data, error } = await supabase
       .from('message_generation_logs')
       .select(`
@@ -125,7 +126,6 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
       .eq('user_id', userId)
       .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent', 'archived', 'failed'])
       .order('created_at', { ascending: false })
-      .limit(10)
 
     if (error) {
       console.error('❌ Error fetching prospects:', error)
@@ -146,13 +146,62 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     })
 
     // Get the most recent message for each prospect and add message count
-    const prospects = Array.from(prospectMap.values()).map(messages => {
-      const mostRecent = messages[0]
-      return {
-        ...mostRecent,
-        message_count: messages.length
-      }
-    })
+    // Filter to show only prospects needing immediate action
+    const prospects = Array.from(prospectMap.values())
+      .map(messages => {
+        const mostRecent = messages[0]
+        return {
+          ...mostRecent,
+          message_count: messages.length,
+          all_statuses: messages.map(m => m.message_status)
+        }
+      })
+      .filter(prospect => {
+        const statuses = prospect.all_statuses
+
+        // Hide if scheduled or pending_scheduled (already in pipeline)
+        if (statuses.includes('scheduled') || statuses.includes('pending_scheduled')) {
+          return false
+        }
+
+        // Hide if sent (conversation already started)
+        if (statuses.includes('sent')) {
+          return false
+        }
+
+        // Show generating states
+        const generatingStatuses = ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message']
+        if (generatingStatuses.includes(prospect.message_status)) {
+          return true
+        }
+
+        // Show generated messages (ready to schedule)
+        if (prospect.message_status === 'generated') {
+          return true
+        }
+
+        // Show reply_received (needs response)
+        if (prospect.message_status === 'reply_received') {
+          return true
+        }
+
+        // Show failed messages (need attention)
+        if (prospect.message_status === 'failed') {
+          return true
+        }
+
+        // Show archived ONLY if never been contacted or scheduled
+        if (prospect.message_status === 'archived') {
+          const hasBeenContactedOrScheduled = statuses.some(s =>
+            ['sent', 'scheduled', 'pending_scheduled'].includes(s)
+          )
+          return !hasBeenContactedOrScheduled
+        }
+
+        return false
+      })
+      .slice(0, 10) // Limit to 10 prospects for display
+
     setProspects(prospects)
 
     // Fetch ALL messages for stats (not limited to 10)

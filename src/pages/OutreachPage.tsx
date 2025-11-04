@@ -26,6 +26,8 @@ interface Prospect {
   jobTitle?: string
   company?: string
   researchCacheId?: number
+  messageCount?: number
+  createdAt?: Date
 }
 
 interface ScheduledMessage {
@@ -87,6 +89,8 @@ export function OutreachPage() {
             recipient_linkedin_id,
             recipient_name,
             research_cache_id,
+            created_at,
+            updated_at,
             research_cache (
               id,
               profile_url,
@@ -103,38 +107,86 @@ export function OutreachPage() {
 
         if (error) throw error
 
-        // Map to Prospect interface
-        const mappedProspects: Prospect[] = (data || []).map((msg: any) => ({
+        // Map to Prospect interface with all properties
+        const allMessages = (data || []).map((msg: any) => ({
           id: msg.id,
           name: msg.recipient_name || msg.research_cache?.research_data?.name || 'Unknown',
           avatar: msg.research_cache?.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.recipient_name || 'U')}`,
-          status: msg.message_status, // Use actual status from DB instead of hardcoding 'generated'
+          status: msg.message_status,
           linkedinUrl: msg.research_cache?.profile_url || '',
           jobTitle: msg.research_cache?.research_data?.headline || '',
           company: msg.research_cache?.research_data?.company || '',
-          researchCacheId: msg.research_cache_id, // Add this for grouping
+          researchCacheId: msg.research_cache_id,
+          createdAt: new Date(msg.created_at),
+          updatedAt: msg.updated_at ? new Date(msg.updated_at) : new Date(msg.created_at),
         }))
 
-        // Filter out archived messages only if the same prospect has scheduled/sent messages
-        const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent']
-        const filteredProspects = mappedProspects.filter(prospect => {
-          // If not archived, always show
-          if (prospect.status !== 'archived') return true
+        // Filter out ALL messages for prospects who were contacted before this week
+        // For 'sent' status, check updated_at (when it was sent), not created_at
+        const now = new Date()
+        const currentDay = now.getDay() // 0=Sun, 1=Mon, etc.
 
-          // If archived, only show if there are no active/scheduled messages for this prospect
-          const hasActiveMessage = mappedProspects.some(
-            p => p.researchCacheId === prospect.researchCacheId && activeStatuses.includes(p.status)
-          )
+        // Calculate this week's Monday at 00:00:00
+        const thisWeekMonday = new Date(now)
+        const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1 // If Sunday, go back 6 days
+        thisWeekMonday.setDate(now.getDate() - daysFromMonday)
+        thisWeekMonday.setHours(0, 0, 0, 0)
 
-          return !hasActiveMessage
+        // First, identify all prospects who have sent messages from before this week
+        const prospectsContactedBeforeThisWeek = new Set<number>()
+        allMessages.forEach(msg => {
+          if (msg.status === 'sent' && msg.updatedAt && msg.updatedAt < thisWeekMonday) {
+            if (msg.researchCacheId) {
+              prospectsContactedBeforeThisWeek.add(msg.researchCacheId)
+              console.log(`📧 Found prospect contacted before this week: ${msg.name} (sent on ${msg.updatedAt.toLocaleDateString()})`)
+            }
+          }
         })
 
-        console.log('Mapped prospects:', mappedProspects)
-        console.log('Total prospects found:', mappedProspects.length)
-        console.log('Filtered prospects (hiding archived with active messages):', filteredProspects)
-        console.log('Final count:', filteredProspects.length)
+        // Then filter out ALL messages for those prospects
+        const timeFilteredMessages = allMessages.filter(msg => {
+          if (msg.researchCacheId && prospectsContactedBeforeThisWeek.has(msg.researchCacheId)) {
+            console.log(`❌ Filtering out message for ${msg.name} (prospect contacted before this week)`)
+            return false
+          }
+          return true
+        })
 
-        setProspects(filteredProspects)
+        // Group by research_cache_id (same prospect, multiple messages)
+        const prospectMap = new Map<number, typeof allMessages>()
+        timeFilteredMessages.forEach(msg => {
+          if (!msg.researchCacheId) return
+          if (!prospectMap.has(msg.researchCacheId)) {
+            prospectMap.set(msg.researchCacheId, [])
+          }
+          prospectMap.get(msg.researchCacheId)!.push(msg)
+        })
+
+        // Get the most recent message for each prospect and add message count
+        // Also apply active message filtering
+        const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent']
+
+        const groupedProspects = Array.from(prospectMap.entries()).map(([cacheId, messages]) => {
+          // Filter out archived messages if there are active messages for this prospect
+          const hasActiveMessage = messages.some(m => activeStatuses.includes(m.status))
+          const filteredMessages = hasActiveMessage
+            ? messages.filter(m => m.status !== 'archived')
+            : messages
+
+          // Get the most recent message after filtering
+          const mostRecent = filteredMessages[0]
+
+          return {
+            ...mostRecent,
+            messageCount: filteredMessages.length
+          }
+        })
+
+        console.log('Time-filtered messages (sent messages < 1 week):', timeFilteredMessages.length)
+        console.log('Grouped prospects with counts:', groupedProspects)
+        console.log('Final count:', groupedProspects.length)
+
+        setProspects(groupedProspects)
       } catch (error) {
         console.error('Error fetching generated messages:', error)
         toast.error(`Failed to load prospects: ${error.message || 'Unknown error'}`)
@@ -620,6 +672,7 @@ export function OutreachPage() {
   const renderProspectCard = (prospect: Prospect) => {
     const isPending = prospect.status === 'pending_scheduled'
     const isReplySent = prospect.status === 'reply-sent'
+    const hasMultipleMessages = prospect.messageCount && prospect.messageCount > 1
 
     return (
       <div
@@ -632,6 +685,12 @@ export function OutreachPage() {
           isPending ? 'cursor-not-allowed opacity-60' : 'cursor-grab hover:scale-105'
         } transition-all duration-300 ease-in-out hover:shadow-xl flex items-center gap-2 relative`}
       >
+        {/* Message Count Badge - Top Right */}
+        {hasMultipleMessages && (
+          <div className="absolute top-1 right-1 w-6 h-6 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg z-10">
+            {prospect.messageCount}
+          </div>
+        )}
         <img
           src={prospect.avatar}
           alt={prospect.name}
@@ -641,7 +700,7 @@ export function OutreachPage() {
         {isPending && (
           <div className="text-xs text-gray-400">⏳</div>
         )}
-        {isReplySent && (
+        {isReplySent && !hasMultipleMessages && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
             2
           </div>
