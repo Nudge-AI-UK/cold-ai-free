@@ -650,8 +650,23 @@ export function OutreachPage() {
     )
   }
 
-  const renderTimeSlot = (day: number, hour: number) => {
-    const slotMessages = scheduledMessages.filter(m => m.day === day && m.hour === hour)
+  const renderTimeSlot = (day: number, hour: number, columnDate?: Date) => {
+    // Filter by day, hour AND actual date (if provided)
+    const slotMessages = scheduledMessages.filter(m => {
+      if (m.day !== day || m.hour !== hour) return false
+
+      // If we have a specific date for this column, verify the message's scheduledFor matches it
+      if (columnDate) {
+        const msgDate = new Date(m.scheduledFor)
+        msgDate.setHours(0, 0, 0, 0)
+        const colDate = new Date(columnDate)
+        colDate.setHours(0, 0, 0, 0)
+
+        return msgDate.getTime() === colDate.getTime()
+      }
+
+      return true // No date filter (for backward compatibility with other views)
+    })
     const hourLabel = hour === 0 ? '12am' : hour === 12 ? '12pm' : hour > 12 ? `${hour - 12}pm` : `${hour}am`
 
     // Detect collisions - messages within 10 minutes of each other
@@ -822,7 +837,7 @@ export function OutreachPage() {
               <div className="text-xs text-gray-400 mt-1">{dateStr}</div>
             </div>
             <div className="flex-1 flex flex-col">
-              {hours.map(hour => renderTimeSlot(todayDayIndex, hour))}
+              {hours.map(hour => renderTimeSlot(todayDayIndex, hour, today))}
             </div>
           </div>
         </div>
@@ -847,7 +862,7 @@ export function OutreachPage() {
                   <div className="text-xs text-gray-400 mt-1">{dateStr}</div>
                 </div>
                 <div className="flex-1 flex flex-col">
-                  {hours.map(hour => renderTimeSlot(dayIndex, hour))}
+                  {hours.map(hour => renderTimeSlot(dayIndex, hour, date))}
                 </div>
               </div>
             )
