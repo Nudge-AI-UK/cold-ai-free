@@ -301,7 +301,7 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   const getNextResearchDate = (lastResearchedAt: string) => {
     const lastDate = new Date(lastResearchedAt)
     const nextDate = new Date(lastDate)
-    nextDate.setDate(nextDate.getDate() + 30)
+    nextDate.setDate(nextDate.getDate() + 7)
     return nextDate
   }
 
@@ -656,7 +656,7 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
               ? getDaysUntilNextResearch(profile.lastResearchedAt) > 0
                 ? `Next research in ${getDaysUntilNextResearch(profile.lastResearchedAt)} days`
                 : 'Updates on next message generation'
-              : 'Profile data refreshed monthly'}
+              : 'Profile data refreshed weekly'}
           </p>
         </div>
 
