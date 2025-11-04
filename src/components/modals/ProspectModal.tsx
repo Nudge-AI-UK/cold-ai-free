@@ -979,12 +979,18 @@ export function ProspectModal({
                                   </span>
                                   {messageLength < limits.limit && (
                                     <span className="text-gray-500 text-[10px]">
-                                      Target: {limits.limit}-{limits.target} chars for optimal engagement
+                                      {limits.type === 'connection_request'
+                                        ? `LinkedIn enforced limit: ${limits.max} characters for connection requests`
+                                        : `Target: ${limits.limit}-${limits.target} chars for optimal engagement`
+                                      }
                                     </span>
                                   )}
                                   {messageLength >= limits.limit && messageLength <= limits.target && (
                                     <span className="text-green-400 text-[10px]">
-                                      ✓ Within target range ({limits.limit}-{limits.target})
+                                      {limits.type === 'connection_request'
+                                        ? `✓ At LinkedIn's ${limits.max} character limit for connection requests`
+                                        : `✓ Within target range (${limits.limit}-${limits.target})`
+                                      }
                                     </span>
                                   )}
                                   {currentMessage.message_type && (
