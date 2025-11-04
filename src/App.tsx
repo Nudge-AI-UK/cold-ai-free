@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { LoadingProvider } from '@/contexts/LoadingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
 import { OutreachPage } from '@/pages/OutreachPage'
+import { ProspectsPage } from '@/pages/ProspectsPage'
 // import { InboxPage } from '@/pages/InboxPage'
 import { LoginPage } from '@/components/auth/LoginPage'
 import { PasswordResetPage } from '@/components/auth/PasswordResetPage'
@@ -46,6 +47,7 @@ function AppContent() {
     <Routes>
       <Route path="/" element={<WidgetDashboard />} />
       <Route path="/outreach" element={<OutreachPage />} />
+      <Route path="/prospects" element={<ProspectsPage />} />
       {/* <Route path="/inbox" element={<InboxPage />} /> */}
       <Route path="/reset-password" element={<PasswordResetPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

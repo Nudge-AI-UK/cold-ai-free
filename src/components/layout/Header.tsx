@@ -1,5 +1,5 @@
 import { useAuth } from '@/hooks/useAuth'
-import { LogOut, User, MessageSquare } from 'lucide-react'
+import { LogOut, User, MessageSquare, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   DropdownMenu,
@@ -73,6 +73,24 @@ export function Header() {
               }`}>
                 <span className="font-medium">Dashboard</span>
                 {location.pathname === '/' && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #FBAE1C 100%)',
+                    }}
+                  />
+                )}
+              </div>
+            </Link>
+            <Link to="/prospects">
+              <div className={`px-4 py-2 relative group cursor-pointer transition-all duration-200 flex items-center gap-2 ${
+                location.pathname === '/prospects'
+                  ? 'text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}>
+                <Users className="h-4 w-4" />
+                <span className="font-medium">Prospects</span>
+                {location.pathname === '/prospects' && (
                   <div
                     className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
                     style={{

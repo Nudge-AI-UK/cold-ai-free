@@ -76,22 +76,30 @@ const parseResearchData = (data: any): ResearchData => {
 // Helper to get status color
 const getStatusColor = (status: string) => {
   if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(status)) {
-    return { dot: 'bg-[#FBAE1C]', text: 'text-[#FBAE1C]', label: 'Generating' }
+    return { dot: 'bg-[#FBAE1C]', text: 'text-[#FBAE1C]', border: 'border-[#FBAE1C]', label: 'Generating' }
   }
 
   switch (status) {
     case 'generated':
-      return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Generated' }
+      return { dot: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500', label: 'Generated' }
     case 'approved':
-      return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Sent' }
+      return { dot: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500', label: 'Sent' }
+    case 'pending_scheduled':
+      return { dot: 'bg-gray-500', text: 'text-gray-400', border: 'border-gray-500', label: 'Pending' }
+    case 'scheduled':
+      return { dot: 'bg-orange-500', text: 'text-orange-400', border: 'border-orange-500', label: 'Scheduled' }
     case 'sent':
-      return { dot: 'bg-purple-500', text: 'text-purple-400', label: 'Sent' }
+      return { dot: 'bg-green-500', text: 'text-green-400', border: 'border-green-500', label: 'Sent' }
+    case 'reply_received':
+      return { dot: 'bg-yellow-500', text: 'text-yellow-400', border: 'border-yellow-500', label: 'Reply Received' }
+    case 'reply_sent':
+      return { dot: 'bg-green-500', text: 'text-green-400', border: 'border-green-500', label: 'Reply Sent' }
     case 'archived':
-      return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Archived' }
+      return { dot: 'bg-gray-500', text: 'text-gray-400', border: 'border-gray-500', label: 'Archived' }
     case 'failed':
-      return { dot: 'bg-red-500', text: 'text-red-400', label: 'Failed' }
+      return { dot: 'bg-red-500', text: 'text-red-400', border: 'border-red-500', label: 'Failed' }
     default:
-      return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Unknown' }
+      return { dot: 'bg-gray-500', text: 'text-gray-400', border: 'border-gray-500', label: 'Unknown' }
   }
 }
 
@@ -290,8 +298,17 @@ export function ProspectModal({
 
       if (messagesError) throw messagesError
 
-      setProspectMessages((messages || []) as ProspectMessage[])
-      setSelectedMessageId(messages?.[0]?.id || null)
+      // Apply filtering logic: prioritize active messages over archived
+      const allMessages = (messages || []) as ProspectMessage[]
+      const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent']
+      const hasActiveMessage = allMessages.some(m => activeStatuses.includes(m.message_status))
+
+      const filteredMessages = hasActiveMessage
+        ? allMessages.filter(m => m.message_status !== 'archived')
+        : allMessages
+
+      setProspectMessages(filteredMessages)
+      setSelectedMessageId(filteredMessages[0]?.id || null)
 
     } catch (error) {
       console.error('❌ Error fetching prospect data:', error)
@@ -868,7 +885,7 @@ export function ProspectModal({
                   </div>
                 </div>
 
-                {/* Message Selector - Show all messages including archived */}
+                {/* Message Selector - Show filtered messages with status-colored borders */}
                 {(() => {
                   if (prospectMessages.length <= 1) return null
 
@@ -883,12 +900,12 @@ export function ProspectModal({
                           <button
                             key={msg.id}
                             onClick={() => setSelectedMessageId(msg.id)}
-                            className={`px-4 py-2 rounded-lg border transition-all text-sm ${
+                            className={`px-4 py-2 rounded-lg border-2 transition-all text-sm ${
                               isSelected
-                                ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
+                                ? `${msgStatusInfo.border} ${msgStatusInfo.text} bg-${msgStatusInfo.dot.replace('bg-', '')}/20`
                                 : isArchived
-                                ? 'border-white/10 bg-white/5 text-gray-500 hover:border-white/20 opacity-60'
-                                : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
+                                ? 'border-gray-500/30 bg-white/5 text-gray-500 hover:border-gray-500/50 opacity-60'
+                                : `${msgStatusInfo.border}/30 bg-white/5 text-gray-400 hover:${msgStatusInfo.border}/50`
                             }`}>
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
