@@ -745,7 +745,7 @@ export function ProspectsPage() {
                 <thead className="bg-white/5 border-b border-white/10">
                   <tr className="group">
                     {renderSortableHeader('Prospect', 'name')}
-                    {renderSortableHeader('Job Title', 'jobTitle')}
+                    {renderSortableHeader('LinkedIn Headline', 'jobTitle')}
                     {renderSortableHeader('Status', 'status')}
                     <th
                       onClick={() => handleSort('messages')}
