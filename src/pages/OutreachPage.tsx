@@ -91,14 +91,16 @@ export function OutreachPage() {
             research_cache_id,
             created_at,
             updated_at,
-            research_cache (
+            research_cache!inner (
               id,
               profile_url,
               profile_picture_url,
-              research_data
+              research_data,
+              deleted_at
             )
           `)
           .eq('user_id', userId)
+          .is('research_cache.deleted_at', null)
           .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled', 'scheduled', 'sent'])
           .order('created_at', { ascending: false })
 

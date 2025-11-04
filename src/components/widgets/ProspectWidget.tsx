@@ -116,14 +116,16 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
         message_status,
         research_cache_id,
         created_at,
-        research_cache (
+        research_cache!inner (
           id,
           profile_url,
           profile_picture_url,
-          research_data
+          research_data,
+          deleted_at
         )
       `)
       .eq('user_id', userId)
+      .is('research_cache.deleted_at', null)
       .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent', 'archived', 'failed'])
       .order('created_at', { ascending: false })
 

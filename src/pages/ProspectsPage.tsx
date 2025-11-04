@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { Header } from '@/components/layout/Header'
 import { toast } from 'sonner'
-import { Users, ExternalLink, Calendar, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react'
+import { Users, ExternalLink, Calendar, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, SlidersHorizontal, X, MoreVertical, Trash2 } from 'lucide-react'
 import { useProspectModal } from '@/components/modals/ProspectModalManager'
 
 type SortColumn = 'name' | 'jobTitle' | 'status' | 'messages' | 'added' | 'scheduled'
@@ -179,6 +179,9 @@ export function ProspectsPage() {
     return saved ? JSON.parse(saved) : DEFAULT_RULES
   })
   const [showRulesModal, setShowRulesModal] = useState(false)
+  const [openMenuProspectId, setOpenMenuProspectId] = useState<number | null>(null)
+  const [deleteConfirmProspect, setDeleteConfirmProspect] = useState<{ id: number; name: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchProspects = async () => {
     if (!user) return
@@ -196,17 +199,19 @@ export function ProspectsPage() {
             research_cache_id,
             created_at,
             updated_at,
-            research_cache (
+            research_cache!inner (
               id,
               profile_url,
               profile_picture_url,
-              research_data
+              research_data,
+              deleted_at
             ),
             sequence_prospects!sequence_prospects_message_log_id_fkey (
               scheduled_for
             )
           `)
           .eq('user_id', userId)
+          .is('research_cache.deleted_at', null)
           .in('message_status', [
             'analysing_prospect',
             'researching_product',
@@ -545,6 +550,31 @@ export function ProspectsPage() {
     openProspectModal(prospectId, prospectIds)
   }
 
+  // Handle prospect removal (soft delete)
+  const handleRemoveProspect = async (researchCacheId: number) => {
+    if (!user) return
+
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('research_cache')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', researchCacheId)
+
+      if (error) throw error
+
+      toast.success('Prospect removed successfully')
+      setDeleteConfirmProspect(null)
+      // Refresh the prospects list
+      fetchProspects()
+    } catch (error) {
+      console.error('Error removing prospect:', error)
+      toast.error('Failed to remove prospect')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Count active rules
   const activeRulesCount = Object.entries(rules).filter(([key, value]) => {
     if (key === 'activityDays' || key === 'addedDays' || key === 'hideInactiveDays' ||
@@ -736,8 +766,7 @@ export function ProspectsPage() {
                     </th>
                     {renderSortableHeader('Added', 'added')}
                     {renderSortableHeader('Scheduled', 'scheduled')}
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Actions
+                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider w-16">
                     </th>
                   </tr>
                 </thead>
@@ -809,17 +838,56 @@ export function ProspectsPage() {
                             <span className="text-sm text-gray-500">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <a
-                            href={prospect.linkedinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 text-sm text-[#FBAE1C] hover:text-[#FC9109] transition-colors"
-                          >
-                            View Profile
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="relative inline-block">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOpenMenuProspectId(openMenuProspectId === prospect.id ? null : prospect.id)
+                              }}
+                              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                              <MoreVertical className="h-4 w-4 text-gray-400" />
+                            </button>
+
+                            {openMenuProspectId === prospect.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setOpenMenuProspectId(null)
+                                  }}
+                                />
+                                <div className="absolute right-0 mt-1 w-48 bg-[#1a1f36] border border-white/10 rounded-lg shadow-xl z-20 overflow-hidden">
+                                  <a
+                                    href={prospect.linkedinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenMenuProspectId(null)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                    View Profile
+                                  </a>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenMenuProspectId(null)
+                                      setDeleteConfirmProspect({ id: prospect.researchCacheId, name: prospect.name })
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors w-full text-left"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Remove Prospect
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1168,6 +1236,48 @@ export function ProspectsPage() {
               >
                 Apply Rules
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmProspect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteConfirmProspect(null)}>
+          <div className="bg-gradient-to-br from-[#0C1725] to-[#1a1f36] border border-white/10 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-1">Remove Prospect?</h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Are you sure you want to remove <span className="font-semibold text-white">{deleteConfirmProspect.name}</span>? This will hide them from your prospects list.
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setDeleteConfirmProspect(null)}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleRemoveProspect(deleteConfirmProspect.id)}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Removing...
+                      </>
+                    ) : (
+                      'Remove'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
