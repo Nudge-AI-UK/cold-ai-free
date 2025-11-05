@@ -25,9 +25,15 @@ export const LoginPage = () => {
   } | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
+
+  // Reset terms acceptance when switching between sign-up and login
+  useEffect(() => {
+    setTermsAccepted(false);
+  }, [isSignUp]);
 
   // Load Turnstile script only once
   useEffect(() => {
@@ -123,6 +129,13 @@ export const LoginPage = () => {
       // Check captcha for both sign up and login
       if (!captchaToken) {
         toast.error("Please complete the CAPTCHA verification");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check terms acceptance for sign up
+      if (isSignUp && !termsAccepted) {
+        toast.error("Please accept the Terms & Conditions to continue");
         setIsLoading(false);
         return;
       }
@@ -561,6 +574,39 @@ export const LoginPage = () => {
                     )}
                   </div>
 
+                  {/* Terms & Conditions Checkbox - Only for Sign Up */}
+                  {isSignUp && (
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="terms"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-900/50 text-orange-500 focus:ring-orange-500/20 focus:ring-offset-0"
+                      />
+                      <label htmlFor="terms" className="text-sm text-gray-300">
+                        I agree to the{' '}
+                        <a
+                          href="https://coldai.uk/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-400 hover:text-orange-300 transition-colors underline"
+                        >
+                          Terms & Conditions
+                        </a>
+                        {' '}and{' '}
+                        <a
+                          href="https://coldai.uk/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-400 hover:text-orange-300 transition-colors underline"
+                        >
+                          Privacy Policy
+                        </a>
+                      </label>
+                    </div>
+                  )}
+
                   {/* Turnstile CAPTCHA Widget - Show for both sign up and login */}
                   <div className="space-y-2">
                     <Label className="text-gray-300">Verify you're human</Label>
@@ -662,11 +708,11 @@ export const LoginPage = () => {
                 Back to Home
               </a>
               <span className="text-gray-600">•</span>
-              <a href="#" className="text-gray-400 hover:text-orange-400 transition-colors">
+              <a href="https://coldai.uk/privacy" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-400 transition-colors">
                 Privacy Policy
               </a>
               <span className="text-gray-600">•</span>
-              <a href="#" className="text-gray-400 hover:text-orange-400 transition-colors">
+              <a href="https://coldai.uk/terms" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-400 transition-colors">
                 Terms
               </a>
             </div>
