@@ -148,6 +148,9 @@ export const LoginPage = () => {
             emailRedirectTo: `${window.location.origin}`,
             data: {
               full_name: email.split('@')[0], // Default name from email
+              terms_accepted: termsAccepted,
+              terms_version: '2024-10-16',
+              privacy_version: '2024-10-16',
             },
             captchaToken, // Include captcha token
           },
