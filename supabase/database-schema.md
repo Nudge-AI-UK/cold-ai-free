@@ -351,7 +351,7 @@ CREATE TABLE public.message_generation_logs (
   team_id character varying,
   generated_message text,
   edited_message text,
-  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_prospect'::character varying, 'researching_product'::character varying, 'analysing_icp'::character varying, 'generating_message'::character varying, 'generated'::character varying, 'approved'::character varying, 'sent'::character varying, 'archived'::character varying, 'failed'::character varying]::text[])),
+  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text])),
   ai_model_used character varying,
   generation_cost numeric,
   sent_at timestamp with time zone,
@@ -364,7 +364,7 @@ CREATE TABLE public.message_generation_logs (
   conversation_thread_id character varying DEFAULT (gen_random_uuid())::text,
   response_id integer,
   message_metadata jsonb,
-  message_type text CHECK (message_type = ANY (ARRAY['direct_message'::text, 'connection_request'::text, 'inmail'::text, 'open_profile'::text, 'group_message'::text, 'event_message'::text])),
+  message_type text CHECK (message_type = ANY (ARRAY['direct_message'::text, 'connection_request'::text, 'connection_request_200'::text, 'connection_request_300'::text, 'first_message'::text, 'inmail'::text, 'open_profile'::text, 'group_message'::text, 'event_message'::text])),
   recipient_linkedin_id text,
   recipient_name text,
   subject_line text,
@@ -377,13 +377,14 @@ CREATE TABLE public.message_generation_logs (
   sequence_id bigint,
   sequence_message_id bigint,
   focus_analysis jsonb,
-  focus_report_markdown text,
   focus_generated_at timestamp with time zone,
+  sequence_prospect_id bigint,
   CONSTRAINT message_generation_logs_pkey PRIMARY KEY (id),
   CONSTRAINT message_generation_logs_research_cache_id_fkey FOREIGN KEY (research_cache_id) REFERENCES public.research_cache(id),
   CONSTRAINT message_generation_logs_parent_message_id_fkey FOREIGN KEY (parent_message_id) REFERENCES public.message_generation_logs(message_id),
   CONSTRAINT message_generation_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT message_generation_logs_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id),
+  CONSTRAINT message_generation_logs_sequence_prospect_id_fkey FOREIGN KEY (sequence_prospect_id) REFERENCES public.sequence_prospects(id),
   CONSTRAINT message_generation_logs_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
   CONSTRAINT message_generation_logs_sequence_message_id_fkey FOREIGN KEY (sequence_message_id) REFERENCES public.sequence_messages(id)
 );
@@ -525,6 +526,7 @@ CREATE TABLE public.research_cache (
   research_version integer DEFAULT 1,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   profile_picture_url text,
+  deleted_at timestamp with time zone,
   CONSTRAINT research_cache_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.sequence_messages (
@@ -560,7 +562,7 @@ CREATE TABLE public.sequence_prospects (
   prospect_headline text,
   prospect_company text,
   prospect_data jsonb DEFAULT '{}'::jsonb,
-  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'searching'::text, 'scheduled'::text, 'sending'::text, 'sent'::text, 'accepted'::text, 'replied'::text, 'failed'::text, 'skipped'::text])),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'pending_scheduled'::text, 'searching'::text, 'scheduled'::text, 'sending'::text, 'sent'::text, 'accepted'::text, 'replied'::text, 'failed'::text, 'skipped'::text])),
   scheduled_for timestamp with time zone,
   sent_at timestamp with time zone,
   last_message_at timestamp with time zone,
@@ -571,9 +573,11 @@ CREATE TABLE public.sequence_prospects (
   error_message text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  message_log_id bigint,
   CONSTRAINT sequence_prospects_pkey PRIMARY KEY (id),
   CONSTRAINT sequence_prospects_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
-  CONSTRAINT sequence_prospects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+  CONSTRAINT sequence_prospects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT sequence_prospects_message_log_id_fkey FOREIGN KEY (message_log_id) REFERENCES public.message_generation_logs(id)
 );
 CREATE TABLE public.subscriptions (
   subscription_id character varying NOT NULL,

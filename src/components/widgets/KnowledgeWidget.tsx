@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
+import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 import type { Database } from '@/types/supabase'
 
 type KnowledgeEntry = Database['public']['Tables']['knowledge_base']['Row']
@@ -20,9 +22,13 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
+  const { currentStep: onboardingStep } = useOnboardingState()
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
+
+  // Check if this widget should be highlighted for onboarding
+  const isOnboardingHighlight = onboardingStep === 'product'
 
   // Check if user can edit product (for free users, limit to once per day)
   const canEditProduct = () => {
@@ -202,7 +208,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   // Empty State
   if (forceEmpty || (!entry && !isGenerating)) {
     return (
-        <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+        <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${isOnboardingHighlight ? 'onboarding-highlight' : ''} ${className}`}
              style={{
                background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
                backdropFilter: 'blur(10px)',
@@ -289,12 +295,20 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
               </div>
 
               {/* CTA Button */}
-              <button 
-                onClick={handleCreateProduct}
-                className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group">
-                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                <span>Create Your Product/Service Entry</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={handleCreateProduct}
+                  className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group w-full">
+                  <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                  <span>Create Your Product/Service Entry</span>
+                </button>
+                {/* Onboarding Arrow */}
+                {isOnboardingHighlight && (
+                  <div className="absolute -right-16 top-1/2 -translate-y-1/2">
+                    <OnboardingArrow direction="left" />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Right Side - What You'll Define */}

@@ -35,6 +35,45 @@ export const LoginPage = () => {
     setTermsAccepted(false);
   }, [isSignUp]);
 
+  // Check for OAuth callback and skip OTP verification for OAuth users
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        // Check if user signed in via OAuth (Google, etc.)
+        const isOAuthUser = session.user.app_metadata?.provider === 'google' ||
+                           session.user.app_metadata?.providers?.includes('google');
+
+        if (isOAuthUser) {
+          // OAuth users don't need OTP verification - they're already verified by Google
+          console.log('✅ OAuth user detected, skipping OTP verification');
+          setShowOtpVerification(false);
+        }
+      }
+    };
+
+    handleAuthCallback();
+
+    // Listen for auth state changes (e.g., OAuth redirect callback)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 Auth state changed:', event);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const isOAuthUser = session.user.app_metadata?.provider === 'google' ||
+                           session.user.app_metadata?.providers?.includes('google');
+
+        if (isOAuthUser) {
+          // Hide OTP modal for OAuth users
+          console.log('✅ OAuth sign-in detected, user is verified');
+          setShowOtpVerification(false);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Load Turnstile script only once
   useEffect(() => {
     // Check if already loaded
@@ -141,7 +180,7 @@ export const LoginPage = () => {
       }
 
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { error, data } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -158,10 +197,17 @@ export const LoginPage = () => {
 
         if (error) throw error;
 
-        // Show OTP verification screen
-        setVerificationEmail(email);
-        setShowOtpVerification(true);
-        toast.success("Verification code sent! Check your email.");
+        // Only show OTP verification for email/password signups (not OAuth)
+        const isEmailPasswordSignup = data?.user && !data.user.app_metadata?.provider;
+
+        if (isEmailPasswordSignup) {
+          setVerificationEmail(email);
+          setShowOtpVerification(true);
+          toast.success("Verification code sent! Check your email.");
+        } else {
+          toast.success("Account created successfully!");
+        }
+
         setIsLoading(false);
       } else {
         console.log('🔐 Attempting login for:', email);
@@ -253,10 +299,18 @@ export const LoginPage = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
+      // Use localhost for development, production URL otherwise
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const redirectUrl = isDevelopment
+        ? `http://localhost:${window.location.port}`
+        : import.meta.env.VITE_APP_URL || window.location.origin;
+
+      console.log('🔐 OAuth redirect URL:', redirectUrl);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

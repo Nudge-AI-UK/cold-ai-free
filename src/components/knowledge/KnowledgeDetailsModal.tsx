@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { DismissibleTooltip } from '@/components/ui/dismissible-tooltip';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -614,7 +616,8 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
       description={typeInfo.label}
       className="knowledge-modal-large !max-w-[95vw] !h-[90vh]"
     >
-      <div className="flex h-full overflow-hidden">
+      <TooltipProvider delayDuration={0}>
+        <div className="flex h-full overflow-hidden">
         {/* Left Content Area */}
         <div className="flex-1 overflow-y-auto pr-6 space-y-6">
           {isDraftPending ? (
@@ -694,21 +697,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.pain_points.map((point: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {point}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('pain_points', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{point}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('pain_points', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -777,21 +781,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.key_features.map((feature: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {feature}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('key_features', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{feature}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('key_features', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -864,21 +869,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.ideal_titles.map((title: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {title}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('ideal_titles', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{title}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('ideal_titles', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -923,21 +929,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.industries.map((industry: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {industry}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('industries', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{industry}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('industries', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -989,21 +996,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.hook_angles.map((angle: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {angle}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('hook_angles', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{angle}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('hook_angles', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -1047,21 +1055,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
                   </Label>
                   <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-gray-900/50 border border-gray-700">
                     {formData.qualifying_questions.map((question: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="bg-gray-800 text-gray-300 border-gray-600"
-                      >
-                        {question}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-1 p-0 h-auto hover:bg-transparent"
-                          onClick={() => handleArrayFieldRemove('qualifying_questions', index)}
+                      <DismissibleTooltip key={index} content="Click the X to remove this item">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-800 text-gray-300 border-gray-600 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-600"
                         >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </Badge>
+                          <span className="select-none">{question}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                            onClick={() => handleArrayFieldRemove('qualifying_questions', index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </Badge>
+                      </DismissibleTooltip>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -1549,6 +1558,7 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
           </button>
         </div>
       )}
+      </TooltipProvider>
     </BaseModal>
   );
 };

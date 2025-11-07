@@ -7,6 +7,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
+import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 
 interface ICPWidgetProps {
   className?: string
@@ -21,11 +23,15 @@ export function ICPWidget({ className }: ICPWidgetProps) {
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
+  const { currentStep: onboardingStep } = useOnboardingState()
   const [icp, setIcp] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [icpState, setIcpState] = useState<ICPState>('empty')
   const [currentStep, setCurrentStep] = useState(2)
   const [hasApprovedProduct, setHasApprovedProduct] = useState<boolean | null>(null)
+
+  // Check if this widget should be highlighted for onboarding (only when unlocked)
+  const isOnboardingHighlight = onboardingStep === 'icp' && hasApprovedProduct === true
 
   // Check if user can edit ICP (for free users, limit to once per day)
   const canEditICP = () => {
@@ -262,7 +268,7 @@ export function ICPWidget({ className }: ICPWidgetProps) {
     const isLocked = hasApprovedProduct === false
 
     return (
-      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
+      <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${isOnboardingHighlight ? 'onboarding-highlight' : ''} ${className}`}
            style={{
              background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
              backdropFilter: 'blur(10px)',
@@ -389,19 +395,27 @@ export function ICPWidget({ className }: ICPWidgetProps) {
           </div>
   
           {/* CTA Button */}
-          <button
-            onClick={() => isLocked ? openModal('knowledge', { mode: 'add' }) : openModal('icp-edit', { flowName: 'main', mode: 'add' })}
-            disabled={isLocked}
-            className={`w-full font-semibold py-4 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 group ${
-              isLocked
-                ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
-            }`}
-          >
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-            <span>{isLocked ? 'Add Product First' : 'Create Your First ICP'}</span>
-          </button>
-  
+          <div className="relative">
+            <button
+              onClick={() => isLocked ? openModal('knowledge', { mode: 'add' }) : openModal('icp-edit', { flowName: 'main', mode: 'add' })}
+              disabled={isLocked}
+              className={`w-full font-semibold py-4 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 group ${
+                isLocked
+                  ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
+              }`}
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+              <span>{isLocked ? 'Add Product First' : 'Create Your First ICP'}</span>
+            </button>
+            {/* Onboarding Arrow */}
+            {isOnboardingHighlight && (
+              <div className="absolute -right-16 top-1/2 -translate-y-1/2">
+                <OnboardingArrow direction="left" />
+              </div>
+            )}
+          </div>
+
           {/* Helper Text */}
           <p className="text-center text-xs text-gray-500 mt-4">
             Takes ~5 minutes • AI assists with suggestions

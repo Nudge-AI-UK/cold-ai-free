@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { unipileService } from '@/services/unipileService'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 
 interface LinkedInWidgetProps {
   forceEmpty?: boolean
@@ -33,12 +35,16 @@ interface LinkedInProfile {
 
 export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   const { user } = useAuth()
+  const { currentStep: onboardingStep } = useOnboardingState()
   const [isConnected, setIsConnected] = useState(false)
   const [profile, setProfile] = useState<LinkedInProfile | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [showManageModal, setShowManageModal] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+
+  // Check if this widget should be highlighted for onboarding
+  const isOnboardingHighlight = onboardingStep === 'linkedin'
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -316,7 +322,7 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   // Disconnected State
   if (forceEmpty || !isConnected) {
     return (
-      <div className={`relative shadow-2xl rounded-2xl p-4 overflow-hidden border border-white/10 text-white ${className}`}
+      <div className={`relative shadow-2xl rounded-2xl p-4 overflow-hidden border border-white/10 text-white ${isOnboardingHighlight ? 'onboarding-highlight' : ''} ${className}`}
            style={{
              background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
              backdropFilter: 'blur(10px)',
@@ -343,14 +349,22 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
         </p>
 
         {/* Connect Button */}
-        <button 
-          onClick={handleConnect}
-          disabled={isConnecting}
-          className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-xs flex items-center justify-center space-x-2 disabled:opacity-50">
-          <Link2 className="w-4 h-4" />
-          <span>{isConnecting ? 'Connecting...' : 'Connect LinkedIn'}</span>
-        </button>
-        
+        <div className="relative">
+          <button
+            onClick={handleConnect}
+            disabled={isConnecting}
+            className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-xs flex items-center justify-center space-x-2 disabled:opacity-50">
+            <Link2 className="w-4 h-4" />
+            <span>{isConnecting ? 'Connecting...' : 'Connect LinkedIn'}</span>
+          </button>
+          {/* Onboarding Arrow */}
+          {isOnboardingHighlight && (
+            <div className="absolute -right-16 top-1/2 -translate-y-1/2">
+              <OnboardingArrow direction="left" />
+            </div>
+          )}
+        </div>
+
         {/* Decorative Elements */}
         <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-xl"></div>
       </div>
