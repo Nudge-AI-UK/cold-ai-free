@@ -421,30 +421,67 @@ export function ProspectModal({
     try {
       const userId = user?.id || user?.user_id
 
-      // Call Supabase Edge Function to send message via Unipile
-      const { data, error } = await supabase.functions.invoke('linkedin-send-message', {
-        body: {
-          user_id: userId,
-          message_log_id: messageLogId,
-          recipient_linkedin_url: recipientUrl,
-          message_text: messageText
-        }
-      })
+      // Step 1: Get or create an active outreach sequence for manual sends using RPC function
+      const { data: sequenceId, error: seqError } = await supabase
+        .rpc('get_or_create_manual_outreach_sequence', {
+          p_user_id: userId
+        })
 
-      if (error) throw error
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send message')
+      if (seqError || !sequenceId) {
+        console.error('Error getting/creating sequence:', seqError)
+        toast.error('Failed to create outreach sequence')
+        setIsSending(false)
+        return
       }
 
-      toast.success('Message sent successfully via LinkedIn!')
+      // Step 2: Create sequence_prospects entry with pending_scheduled status using RPC function
+      const scheduledFor = new Date()
+      scheduledFor.setMinutes(scheduledFor.getMinutes() + 1) // Schedule for 1 minute from now
+
+      const currentMessage = prospectMessages.find(m => m.id === messageLogId)
+
+      const { data: prospectId, error: prospectError } = await supabase
+        .rpc('create_sequence_prospect', {
+          p_user_id: userId,
+          p_sequence_id: sequenceId,
+          p_message_log_id: messageLogId,
+          p_linkedin_url: recipientUrl,
+          p_linkedin_public_id: recipientUrl.match(/linkedin\.com\/in\/([\w%-]+)\/?/)?.[1] || '',
+          p_prospect_name: researchData?.name || 'Unknown',
+          p_prospect_headline: researchData?.headline || '',
+          p_prospect_company: researchData?.company || '',
+          p_prospect_data: researchData || {},
+          p_status: 'pending_scheduled',
+          p_scheduled_for: scheduledFor.toISOString(),
+        })
+
+      if (prospectError || !prospectId) {
+        console.error('Error creating sequence prospect:', prospectError)
+        toast.error('Failed to schedule message')
+        setIsSending(false)
+        return
+      }
+
+      // Step 3: Update message_generation_logs to mark as pending_scheduled
+      await supabase
+        .from('message_generation_logs')
+        .update({
+          message_status: 'pending_scheduled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', messageLogId)
+
+      toast.success('Message queued! Scheduler will process within 5 minutes.')
+
+      // Wait for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Refresh prospect data
       await fetchProspectData()
 
     } catch (error: any) {
-      console.error('❌ Error sending message:', error)
-      toast.error(error.message || 'Failed to send message. Please try again.')
+      console.error('❌ Error scheduling message:', error)
+      toast.error(error.message || 'Failed to schedule message. Please try again.')
     } finally {
       setIsSending(false)
     }

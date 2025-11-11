@@ -22,13 +22,16 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
-  const { currentStep: onboardingStep } = useOnboardingState()
+  const { currentStep: onboardingStep, status: onboardingStatus } = useOnboardingState()
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
 
   // Check if this widget should be highlighted for onboarding
   const isOnboardingHighlight = onboardingStep === 'product'
+
+  // Check if LinkedIn is connected - Product requires LinkedIn first
+  const isLinkedInConnected = onboardingStatus.linkedin
 
   // Check if user can edit product (for free users, limit to once per day)
   const canEditProduct = () => {
@@ -207,6 +210,9 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
 
   // Empty State
   if (forceEmpty || (!entry && !isGenerating)) {
+    // Check if widget is locked (LinkedIn not connected)
+    const isLocked = !isLinkedInConnected
+
     return (
         <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${isOnboardingHighlight ? 'onboarding-highlight' : ''} ${className}`}
              style={{
@@ -215,10 +221,38 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
                WebkitBackdropFilter: 'blur(10px)'
              }}>
           
+          {/* Locked Overlay - Identical to ICP Widget */}
+          {isLocked && (
+            <div className="absolute inset-0 backdrop-blur-md bg-black/80 z-40 rounded-3xl flex items-center justify-center">
+              <div className="text-center px-6">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#FBAE1C]/10 border border-[#FBAE1C]/20 flex items-center justify-center">
+                  <span className="text-4xl">🔒</span>
+                </div>
+                <h3 className="text-white font-semibold mb-2 text-lg">LinkedIn Connection Required</h3>
+                <p className="text-gray-300 text-sm mb-4 max-w-xs mx-auto">
+                  Connect your LinkedIn account before creating products or services
+                </p>
+                <button
+                  onClick={() => toast.info('Please connect your LinkedIn account first')}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium hover:shadow-lg hover:shadow-[#FBAE1C]/30 transition-all"
+                >
+                  <span>Connect LinkedIn</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Status Badge */}
           <div className="absolute top-4 right-4 z-30">
-            <div className="bg-gray-700/50 text-gray-400 border border-gray-600/50 px-3 py-1 rounded-full text-xs">
-              Not Created
+            <div className={`px-3 py-1 rounded-full text-xs ${
+              isLocked
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : 'bg-gray-700/50 text-gray-400 border border-gray-600/50'
+            }`}>
+              {isLocked ? 'Locked' : 'Not Created'}
             </div>
           </div>
 
@@ -297,13 +331,18 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
               {/* CTA Button */}
               <div className="relative">
                 <button
-                  onClick={handleCreateProduct}
-                  className="bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 text-sm flex items-center justify-center space-x-2 group w-full">
-                  <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                  <span>Create Your Product/Service Entry</span>
+                  onClick={isLocked ? () => toast.info('Please connect your LinkedIn account first') : handleCreateProduct}
+                  disabled={isLocked}
+                  className={`w-full font-semibold py-3 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center space-x-2 group ${
+                    isLocked
+                      ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed border border-gray-500/30'
+                      : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
+                  }`}>
+                  <Plus className={`w-5 h-5 ${isLocked ? '' : 'group-hover:rotate-90'} transition-transform duration-300`} />
+                  <span>{isLocked ? 'Connect LinkedIn to Unlock' : 'Create Your Product/Service Entry'}</span>
                 </button>
                 {/* Onboarding Arrow */}
-                {isOnboardingHighlight && (
+                {isOnboardingHighlight && !isLocked && (
                   <div className="absolute -right-16 top-1/2 -translate-y-1/2">
                     <OnboardingArrow direction="left" />
                   </div>

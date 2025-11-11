@@ -116,6 +116,8 @@ export const useOnboardingState = (): OnboardingState => {
   }, [user]);
 
   // Determine current step based on status
+  // IMPORTANT: LinkedIn must be connected BEFORE Product/ICP to prevent abuse
+  // This protects against users creating multiple accounts to bypass AI usage limits
   const getCurrentStep = (): OnboardingStep => {
     const { settings, product, icp, linkedin } = status;
     const settingsComplete = settings.personal && settings.company && settings.communication;
@@ -123,14 +125,16 @@ export const useOnboardingState = (): OnboardingState => {
     if (!settingsComplete) {
       return 'settings';
     }
+    // ⚠️ LinkedIn connection MUST come before Product/ICP AI features
+    // This prevents users from burning through our OpenAI API costs before we can detect duplicates
+    if (!linkedin) {
+      return 'linkedin';
+    }
     if (!product) {
       return 'product';
     }
     if (!icp) {
       return 'icp';
-    }
-    if (!linkedin) {
-      return 'linkedin';
     }
     return 'complete';
   };

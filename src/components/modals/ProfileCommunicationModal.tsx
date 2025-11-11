@@ -223,16 +223,30 @@ export function ProfileCommunicationModal() {
           setOnboardingCompleted(true)
         }
 
-        toast.success('Profile setup completed! Let\'s add your first product or service.')
+        // Check if user has LinkedIn connected before opening Product modal
+        const { data: userProfile } = await supabase
+          .from('user_profiles')
+          .select('linkedin_connected')
+          .eq('user_id', userId)
+          .single()
 
-        // Close current modal and open Knowledge modal after a short delay
-        setTimeout(() => {
-          closeAllModals()
-          // Open Knowledge modal in 'add' mode after a short delay
+        if (userProfile?.linkedin_connected) {
+          // LinkedIn connected - proceed to Product creation
+          toast.success('Profile setup completed! Let\'s add your first product or service.')
           setTimeout(() => {
-            openModal('knowledge', { mode: 'add' })
-          }, 300)
-        }, 1000) // Delay to show toast message
+            closeAllModals()
+            setTimeout(() => {
+              openModal('knowledge', { mode: 'add' })
+            }, 300)
+          }, 1000)
+        } else {
+          // LinkedIn NOT connected - direct user to connect LinkedIn first
+          toast.success('Profile setup completed! Please connect your LinkedIn account to continue.')
+          setTimeout(() => {
+            closeAllModals()
+            // User will see the LinkedIn widget highlighted in onboarding
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error('Error saving communication data:', error)

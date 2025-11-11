@@ -42,6 +42,7 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   const [showManageModal, setShowManageModal] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   // Check if this widget should be highlighted for onboarding
   const isOnboardingHighlight = onboardingStep === 'linkedin'
@@ -58,6 +59,24 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
     const userId = user?.id || user?.user_id
 
     try {
+      // First check for connection error in user profile
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('linkedin_connection_error, linkedin_url')
+        .eq('user_id', userId)
+        .single()
+
+      // If there's an error, show error state and exit early
+      if (userProfile?.linkedin_connection_error) {
+        setConnectionError(userProfile.linkedin_connection_error)
+        setIsConnected(false)
+        setProfile(null)
+        return
+      } else {
+        setConnectionError(null)
+      }
+
+      // Continue with normal LinkedIn status check
       const { connected, account } = await unipileService.checkLinkedInStatus(userId)
 
       setIsConnected(connected)
@@ -66,15 +85,8 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
         console.log('📊 Setting profile data in widget:', account);
 
         // Fetch last researched date from research_cache
-        // Use the linkedin_url from user profile to query research_cache
         let lastResearchedAt: string | undefined = undefined
         try {
-          const { data: userProfile } = await supabase
-            .from('user_profiles')
-            .select('linkedin_url')
-            .eq('user_id', userId)
-            .single()
-
           console.log('🔍 User profile linkedin_url:', userProfile?.linkedin_url)
 
           if (userProfile?.linkedin_url) {
@@ -284,6 +296,64 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
     }
   }
 
+  const handleSwitchAccount = async () => {
+    if (!user || !profile) return
+
+    const userId = user?.id || user?.user_id
+    setIsDisconnecting(true)
+
+    toast.info('Switching LinkedIn account...')
+
+    try {
+      // Step 1: Disconnect current account
+      const disconnectSuccess = await unipileService.disconnectLinkedIn(userId)
+
+      if (!disconnectSuccess) {
+        throw new Error('Failed to disconnect current account')
+      }
+
+      // Step 2: Close the modal
+      setShowManageModal(false)
+
+      // Step 3: Reset local state
+      setIsConnected(false)
+      setProfile(null)
+      setIsDisconnecting(false)
+
+      // Step 4: Open new connection popup (same as handleConnect)
+      // Small delay to let disconnect complete
+      setTimeout(() => {
+        toast.success('Previous account disconnected. Connect your new account now.')
+        handleConnect()
+      }, 500)
+    } catch (error) {
+      console.error('Switch account error:', error)
+      toast.error('Failed to switch account. Please try disconnecting and reconnecting manually.')
+      setIsDisconnecting(false)
+    }
+  }
+
+  const handleClearError = async () => {
+    if (!user) return
+
+    const userId = user?.id || user?.user_id
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ linkedin_connection_error: null })
+        .eq('user_id', userId)
+
+      if (error) throw error
+
+      setConnectionError(null)
+      toast.success('Error cleared. You can try connecting again.')
+    } catch (error) {
+      console.error('Failed to clear error:', error)
+      toast.error('Failed to clear error')
+    }
+  }
+
   const handleViewProfile = () => {
     if (profile?.metadata?.profile_url || profile?.profileUrl) {
       const url = profile.metadata?.profile_url || profile.profileUrl
@@ -317,6 +387,51 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
     const diffTime = nextDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
+  }
+
+  // Error State
+  if (connectionError) {
+    return (
+      <div className={`relative shadow-2xl rounded-2xl p-4 overflow-hidden border border-red-500/30 text-white ${className}`}
+           style={{
+             background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
+             backdropFilter: 'blur(10px)',
+             WebkitBackdropFilter: 'blur(10px)'
+           }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            <h3 className="text-sm font-semibold text-white/90">LinkedIn</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400" />
+            <span className="text-xs text-red-400">Connection Failed</span>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        <div className="mb-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+          <p className="text-sm text-red-200 leading-relaxed whitespace-pre-line">
+            {connectionError}
+          </p>
+        </div>
+
+        {/* Action Button */}
+        <button
+          onClick={handleClearError}
+          className="w-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-medium py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-xs flex items-center justify-center space-x-2">
+          <X className="w-4 h-4" />
+          <span>Clear Error & Try Again</span>
+        </button>
+
+        {/* Decorative Elements */}
+        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-red-500/10 to-transparent rounded-bl-full blur-xl"></div>
+      </div>
+    )
   }
 
   // Disconnected State
@@ -524,6 +639,18 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
                     <span className="font-medium text-base">View LinkedIn Profile</span>
                   </button>
                 )}
+
+                {/* Switch Account Button */}
+                <button
+                  onClick={handleSwitchAccount}
+                  disabled={isDisconnecting}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#FBAE1C]/50 hover:border-[#FBAE1C] bg-[#FBAE1C]/10 hover:bg-[#FBAE1C]/20 text-[#FBAE1C] hover:text-white transition-all duration-200 hover:shadow-lg disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  <span className="font-medium text-base">Switch Account</span>
+                </button>
 
                 {/* Disconnect Button */}
                 {!showDisconnectConfirm ? (

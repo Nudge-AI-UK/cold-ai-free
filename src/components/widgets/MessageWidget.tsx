@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { unipileService } from '@/services/unipileService'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useProspectModal } from '@/components/modals/ProspectModalManager'
+import { WidgetStateTransition } from '@/components/ui/widget-state-transition'
 
 interface MessageWidgetProps {
   forceEmpty?: boolean
@@ -146,6 +147,13 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [environment, setEnvironment] = useState<'production' | 'testing'>('production')
   const [isAdmin, setIsAdmin] = useState(false)
   const [generatedMessageType, setGeneratedMessageType] = useState<string | null>(null)
+
+  // Compute widget state for transition animation
+  const widgetState =
+    forceEmpty || !setupComplete ? 'setup-required' :
+    generatedMessage && progressStatus === 'generated' ? 'message-ready' :
+    isGenerating || progressStatus ? 'generating' :
+    'idle';
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -783,13 +791,13 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   // Setup Required State
   if (forceEmpty || !setupComplete) {
     return (
+      <WidgetStateTransition stateKey={widgetState} variant="pop">
       <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
            style={{
              background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
              backdropFilter: 'blur(10px)',
              WebkitBackdropFilter: 'blur(10px)'
            }}>
-        
         {/* Status Badge */}
         <div className="absolute top-4 right-4 z-30">
           <div className="bg-orange-500/20 text-orange-400 border border-orange-500/30 px-3 py-1 rounded-full text-xs flex items-center gap-2">
@@ -954,6 +962,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-gray-600/10 to-transparent rounded-bl-full blur-2xl"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-gray-700/10 to-transparent rounded-tr-full blur-2xl"></div>
       </div>
+      </WidgetStateTransition>
     )
   }
 
@@ -964,6 +973,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     const isOverLimit = messageLength > limits.max
 
     return (
+      <WidgetStateTransition stateKey={widgetState} variant="pop">
       <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden text-white ${className}`}
            style={{
              background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
@@ -972,7 +982,6 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
              border: '2px solid rgba(34, 197, 94, 0.5)',
              boxShadow: '0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1)'
            }}>
-
         {/* Success Badge */}
         <div className="absolute top-4 right-4 z-30">
           <div className="bg-green-500/20 text-green-400 border border-green-500/50 px-3 py-1 rounded-full text-xs flex items-center gap-2">
@@ -1124,18 +1133,19 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-full blur-2xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-green-600/10 to-transparent rounded-tr-full blur-2xl pointer-events-none"></div>
       </div>
+      </WidgetStateTransition>
     )
   }
 
   // Ready State - Split into Idle and Generating views
   return (
+    <WidgetStateTransition stateKey={widgetState} variant="pop">
     <div className={`relative shadow-2xl rounded-3xl p-6 overflow-hidden border border-white/10 text-white ${className}`}
          style={{
            background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)',
            backdropFilter: 'blur(10px)',
            WebkitBackdropFilter: 'blur(10px)'
          }}>
-
       {/* Status Badge and Environment Selector */}
       <div className="absolute top-4 right-4 z-30 flex items-center gap-3">
         {/* Admin Environment Selector */}
@@ -1686,5 +1696,6 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl pointer-events-none"></div>
     </div>
+    </WidgetStateTransition>
   )
 }

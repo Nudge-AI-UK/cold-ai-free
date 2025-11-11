@@ -1,3 +1,4 @@
+// supabase/functions/server-icp-action/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
@@ -15,29 +16,28 @@ serve(async (req) => {
     });
   }
 
-  // Store the parsed body to avoid reading it multiple times
   let body = null;
 
   try {
-    // Parse request body once
+    // Parse request body
     body = await req.json();
     const { action, userId, teamId, data } = body;
 
     // Get environment variables
-    const N8N_KNOWLEDGE_WEBHOOK = Deno.env.get('N8N_KNOWLEDGE_WEBHOOK');
+    const N8N_ICP_WEBHOOK = Deno.env.get('N8N_ICP_WEBHOOK');
     const N8N_API_KEY = Deno.env.get('N8N_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    console.log('Knowledge action received:', {
+    console.log('ICP action received:', {
       action,
       userId,
       timestamp: new Date().toISOString()
     });
 
-    // ⚠️ SECURITY: Check LinkedIn connection before allowing AI-powered knowledge base operations
+    // ⚠️ SECURITY: Check LinkedIn connection before allowing AI-powered ICP operations
     // This prevents users from burning through OpenAI API costs before duplicate detection
-    if (action !== 'test_connection' && action !== 'get_entry' && action !== 'list_entries') {
+    if (action !== 'test_connection') {
       // Initialize Supabase client for LinkedIn check
       if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
         throw new Error('Missing Supabase configuration');
@@ -69,11 +69,11 @@ serve(async (req) => {
       }
 
       if (!userProfile.linkedin_connected || !userProfile.unipile_account_id) {
-        console.warn('⚠️ User attempted knowledge base operation without LinkedIn connection:', userId);
+        console.warn('⚠️ User attempted ICP operation without LinkedIn connection:', userId);
         return new Response(JSON.stringify({
           success: false,
           error: 'LinkedIn connection required',
-          message: 'Please connect your LinkedIn account before using AI-powered knowledge base features. This helps us prevent abuse and ensure fair usage.',
+          message: 'Please connect your LinkedIn account before using AI-powered ICP features. This helps us prevent abuse and ensure fair usage.',
           requiresLinkedIn: true
         }), {
           status: 403,
@@ -87,7 +87,7 @@ serve(async (req) => {
       console.log('✅ LinkedIn verification passed for user:', userId);
     }
 
-    // Initialize Supabase client for database operations (used by all actions)
+    // Initialize Supabase client for database operations
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing Supabase configuration');
     }
@@ -97,9 +97,8 @@ serve(async (req) => {
     if (action === 'test_connection') {
       console.log('Test connection request received');
 
-      if (N8N_KNOWLEDGE_WEBHOOK) {
+      if (N8N_ICP_WEBHOOK) {
         try {
-          // Try to ping the n8n webhook
           const testPayload = {
             action: 'test_connection',
             data: {
@@ -109,7 +108,7 @@ serve(async (req) => {
             }
           };
 
-          const headers = {
+          const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'ngrok-skip-browser-warning': 'true'
           };
@@ -118,17 +117,17 @@ serve(async (req) => {
             headers['X-API-Key'] = N8N_API_KEY;
           }
 
-          const response = await fetch(N8N_KNOWLEDGE_WEBHOOK, {
+          const response = await fetch(N8N_ICP_WEBHOOK, {
             method: 'POST',
             headers,
             body: JSON.stringify(testPayload),
-            signal: AbortSignal.timeout(5000) // 5 second timeout
+            signal: AbortSignal.timeout(5000)
           });
 
           if (response.ok) {
             return new Response(JSON.stringify({
               success: true,
-              message: 'Successfully connected to n8n Knowledge Base webhook',
+              message: 'Successfully connected to n8n ICP webhook',
               details: {
                 webhookConfigured: true,
                 webhookResponding: true,
@@ -163,7 +162,7 @@ serve(async (req) => {
             details: {
               webhookConfigured: true,
               webhookResponding: false,
-              error: webhookError.message
+              error: (webhookError as Error).message
             }
           }), {
             headers: {
@@ -175,7 +174,7 @@ serve(async (req) => {
       } else {
         return new Response(JSON.stringify({
           success: false,
-          message: 'N8N_KNOWLEDGE_WEBHOOK environment variable is not configured',
+          message: 'N8N_ICP_WEBHOOK environment variable is not configured',
           details: {
             webhookConfigured: false
           }
@@ -189,8 +188,8 @@ serve(async (req) => {
     }
 
     // Validate webhook configuration for other actions
-    if (!N8N_KNOWLEDGE_WEBHOOK) {
-      throw new Error('N8N_KNOWLEDGE_WEBHOOK is not configured');
+    if (!N8N_ICP_WEBHOOK) {
+      throw new Error('N8N_ICP_WEBHOOK is not configured');
     }
 
     // Transform payload for n8n
@@ -204,49 +203,30 @@ serve(async (req) => {
       }
     };
 
-    // Special handling for different actions
+    // Handle different ICP actions
     switch (action) {
-      case 'add_entry':
-        // Handle simplified payload from frontend (just URL + knowledge_type)
-        // Title and content will be undefined - generate placeholders
-        const title = (!data.title || data.title === 'fill_with_ai')
-          ? `AI Generated - ${new Date().toISOString()}`
-          : data.title;
-
-        const content = (!data.content || data.content === 'fill_with_ai')
-          ? 'Generating content...'
-          : data.content;
-
-        // Build metadata with productLink
-        const metadata = {
-          ...(data.metadata || {}),
-          source_info: {
-            research_url: data.productLink,
-            url: data.productLink,
-            original_url: data.productLink,
-            productLink: data.productLink
-          },
-          aiGenerated: true,
-          sourceUrl: data.productLink,
-          generated_at: new Date().toISOString()
-        };
-
-        console.log('Creating knowledge base entry:', {
-          title,
-          knowledge_type: data.knowledgeType || data.knowledge_type,
-          has_productLink: !!data.productLink
+      case 'create_icp':
+        console.log('Creating ICP entry:', {
+          icp_name: data.icp_name,
+          user_id: userId
         });
 
         // Create entry in database first
-        const { data: newEntry, error: insertError } = await supabase
-          .from('knowledge_base')
+        const { data: newICP, error: insertError } = await supabase
+          .from('icps')
           .insert({
-            title,
-            content,
-            knowledge_type: data.knowledgeType || data.knowledge_type,
-            metadata,
+            icp_name: data.icp_name,
+            description: data.description,
+            job_titles: data.job_titles,
+            pain_points: data.pain_points,
+            value_drivers: data.value_drivers,
+            industry_focus: data.industry_focus,
+            company_characteristics: data.company_characteristics,
+            product_link_id: data.product_link_id,
+            metadata: data.metadata,
             created_by: userId,
-            workflow_status: 'processing'
+            workflow_status: 'processing',
+            review_status: 'pending'
           })
           .select()
           .single();
@@ -256,22 +236,22 @@ serve(async (req) => {
           throw insertError;
         }
 
-        console.log('Created entry:', { id: newEntry.id, title: newEntry.title });
+        console.log('Created ICP:', { id: newICP.id, name: newICP.icp_name });
 
-        // Add entry ID to payload for n8n
-        n8nPayload.data.entry_id = newEntry.id;
-        n8nPayload.data.database_entry = newEntry;
+        // Add ICP ID to payload for n8n
+        n8nPayload.data.icp_id = newICP.id;
+        n8nPayload.data.database_entry = newICP;
         break;
 
-      case 'update_entry':
+      case 'update_icp':
         // Update in database
         const { error: updateError } = await supabase
-          .from('knowledge_base')
+          .from('icps')
           .update({
-            ...data,
+            ...(data.updates || data),
             updated_at: new Date().toISOString()
           })
-          .eq('id', data.entryId || data.entry_id)
+          .eq('id', data.icp_id)
           .eq('created_by', userId);
 
         if (updateError) {
@@ -280,97 +260,35 @@ serve(async (req) => {
         }
         break;
 
-      case 'approve_entry':
-        // Handle approval with potential content updates
-        const entryId = data.entryId || data.entry_id;
-
-        console.log('Processing approve_entry:', {
-          entryId,
-          hasContentUpdates: !!(data.title || data.content || data.summary),
-          reviewerId: data.reviewerId,
-          reviewNotes: data.reviewNotes
-        });
-
-        // Prepare update object with content changes
-        const updateData = {
-          workflow_status: 'reviewing',
-	  review_status: 'approved',
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: data.reviewerId || userId,
-          updated_at: new Date().toISOString()
-        };
-
-        // Include content updates if provided
-        if (data.title) updateData.title = data.title;
-        if (data.content) updateData.content = data.content;
-        if (data.summary) updateData.summary = data.summary;
-
-        // Update metadata if provided
-        if (data.metadata) {
-          // Fetch existing metadata to merge
-          const { data: existingEntry } = await supabase
-            .from('knowledge_base')
-            .select('metadata')
-            .eq('id', entryId)
-            .single();
-
-          updateData.metadata = {
-            ...existingEntry?.metadata || {},
-            ...data.metadata,
-            review_started_at: new Date().toISOString(),
-            reviewed_by: data.reviewerId || userId,
-            review_notes: data.reviewNotes
-          };
-        }
-
-        // Apply the update
-        const { data: approvedEntry, error: approveError } = await supabase
-          .from('knowledge_base')
-          .update(updateData)
-          .eq('id', entryId)
-          .select()
-          .single();
-
-        if (approveError) {
-          console.error('Database approve error:', approveError);
-          throw approveError;
-        }
-
-        // Add full entry data to n8n payload
-        n8nPayload.data.entry_id = entryId;
-        n8nPayload.data.database_entry = approvedEntry;
-        n8nPayload.data.updates_applied = updateData;
-        n8nPayload.data.review_notes = data.reviewNotes;
-        break;
-
-      case 'delete_entry':
+      case 'archive_icp':
         // Soft delete in database
-        const { error: deleteError } = await supabase
-          .from('knowledge_base')
+        const { error: archiveError } = await supabase
+          .from('icps')
           .update({
-            deleted_at: new Date().toISOString(),
-            can_restore_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-          })
-          .eq('id', data.entryId || data.entry_id)
-          .eq('created_by', userId);
-
-        if (deleteError) {
-          console.error('Database delete error:', deleteError);
-          throw deleteError;
-        }
-        break;
-
-      case 'restore_entry':
-        // Restore soft-deleted entry
-        const { error: restoreError } = await supabase
-          .from('knowledge_base')
-          .update({
-            deleted_at: null,
-            can_restore_until: null,
-            workflow_status: 'active',
+            is_archived: true,
+            archived_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq('id', data.entryId || data.entry_id);
+          .eq('id', data.icp_id)
+          .eq('created_by', userId);
+
+        if (archiveError) {
+          console.error('Database archive error:', archiveError);
+          throw archiveError;
+        }
+        break;
+
+      case 'restore_icp':
+        // Restore archived entry
+        const { error: restoreError } = await supabase
+          .from('icps')
+          .update({
+            is_archived: false,
+            archived_at: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.icp_id)
+          .eq('created_by', userId);
 
         if (restoreError) {
           console.error('Database restore error:', restoreError);
@@ -378,26 +296,44 @@ serve(async (req) => {
         }
         break;
 
-      case 'generate_wiki':
-        // Set status for wiki generation
-        const { error: wikiError } = await supabase
-          .from('knowledge_base')
+      case 'submit_for_review':
+        // Update status for review
+        const { error: reviewError } = await supabase
+          .from('icps')
+          .update({
+            workflow_status: 'reviewing',
+            review_status: 'pending',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.icp_id)
+          .eq('created_by', userId);
+
+        if (reviewError) {
+          console.error('Database review error:', reviewError);
+          throw reviewError;
+        }
+        break;
+
+      case 'regenerate_icp':
+        // Set status for regeneration
+        const { error: regenError } = await supabase
+          .from('icps')
           .update({
             workflow_status: 'processing',
             updated_at: new Date().toISOString()
           })
-          .eq('created_by', userId)
-          .eq('review_status', 'approved');
+          .eq('id', data.icp_id)
+          .eq('created_by', userId);
 
-        if (wikiError) {
-          console.error('Database wiki status error:', wikiError);
-          // Don't throw - wiki generation can proceed anyway
+        if (regenError) {
+          console.error('Database regeneration error:', regenError);
+          throw regenError;
         }
         break;
     }
 
-    // Call n8n webhook for workflow processing
-    const headers = {
+    // Call n8n webhook for AI processing
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': 'true'
     };
@@ -407,13 +343,13 @@ serve(async (req) => {
     }
 
     console.log('Calling n8n webhook:', {
-      url: N8N_KNOWLEDGE_WEBHOOK,
+      url: N8N_ICP_WEBHOOK,
       action,
       userId,
       hasData: !!n8nPayload.data.database_entry
     });
 
-    const n8nResponse = await fetch(N8N_KNOWLEDGE_WEBHOOK, {
+    const n8nResponse = await fetch(N8N_ICP_WEBHOOK, {
       method: 'POST',
       headers,
       body: JSON.stringify(n8nPayload)
@@ -426,11 +362,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         data: {
-          entry_id: n8nPayload.data.entry_id,
+          icp_id: n8nPayload.data.icp_id,
           n8n_status: 'failed',
           n8n_error: `n8n responded with ${n8nResponse.status}: ${errorText}`
         },
-        message: `Knowledge base ${action} completed (n8n processing failed)`,
+        message: `ICP ${action} completed (n8n processing failed)`,
         warning: 'Database operation succeeded but n8n workflow failed to process'
       }), {
         headers: {
@@ -453,9 +389,9 @@ serve(async (req) => {
       success: true,
       data: {
         ...n8nData,
-        entry_id: n8nPayload.data.entry_id
+        icp_id: n8nPayload.data.icp_id
       },
-      message: `Knowledge base ${action} completed successfully`
+      message: `ICP ${action} completed successfully`
     }), {
       headers: {
         ...corsHeaders,
@@ -464,11 +400,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Knowledge action error:', error);
+    console.error('ICP action error:', error);
 
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: (error as Error).message,
       details: {
         action: body?.action || 'unknown',
         timestamp: new Date().toISOString()

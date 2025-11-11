@@ -54,8 +54,10 @@ serve(async (req)=>{
     }
     const recipientPublicId = decodeURIComponent(urlMatch[1]);
     // Step 1: Get recipient's messaging ID from Unipile
-    console.log('🔍 Looking up recipient messaging ID for:', recipientPublicId);
-    const profileLookupUrl = `${unipileApiUrl}/api/v1/users/${profile.unipile_account_id}/search?query=${encodeURIComponent(recipientPublicId)}&provider=LINKEDIN`;
+    console.log('🔍 Looking up recipient profile for:', recipientPublicId);
+    const profileLookupUrl = `${unipileApiUrl}/api/v1/users/${recipientPublicId}?account_id=${profile.unipile_account_id}`;
+    console.log('📡 Unipile profile lookup URL:', profileLookupUrl);
+
     const profileResponse = await fetch(profileLookupUrl, {
       method: 'GET',
       headers: {
@@ -63,13 +65,24 @@ serve(async (req)=>{
         'accept': 'application/json'
       }
     });
+
     const profileData = await profileResponse.json();
-    if (!profileResponse.ok || !profileData.items || profileData.items.length === 0) {
+    console.log('📦 Unipile profile response:', { ok: profileResponse.ok, status: profileResponse.status, data: profileData });
+
+    if (!profileResponse.ok) {
       console.error('❌ Failed to find recipient:', profileData);
-      throw new Error('Could not find recipient LinkedIn profile. Please verify the LinkedIn URL.');
+      throw new Error(`Could not find recipient LinkedIn profile. Status: ${profileResponse.status}, Error: ${profileData.message || 'Unknown error'}`);
     }
-    // Extract messaging ID from first result
-    const recipientMessagingId = profileData.items[0].provider_id;
+
+    // Extract messaging ID from profile response
+    // The provider_id is what we need to send messages
+    const recipientMessagingId = profileData.provider_id || profileData.id;
+
+    if (!recipientMessagingId) {
+      console.error('❌ No messaging ID in profile response:', profileData);
+      throw new Error('Could not extract messaging ID from profile. Please try again.');
+    }
+
     console.log('✅ Found recipient messaging ID:', recipientMessagingId);
     // Step 2: Send message using Classic API with multipart/form-data
     console.log('📨 Sending message via Unipile Classic API...');
