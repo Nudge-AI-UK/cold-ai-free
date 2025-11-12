@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Mail, Lock, ArrowRight, Zap, Brain, Target, MessageSquare, Chrome } from "lucide-react";
+import { Mail, Lock, ArrowRight, Zap, Brain, Target, MessageSquare } from "lucide-react";
+import { useMessageCount } from "@/hooks/useMessageCount";
+import { TickerCounter } from "@/components/ui/animated-counter";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -29,6 +31,9 @@ export const LoginPage = () => {
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
+
+  // Fetch real-time message count
+  const { count: messageCount, isLoading: isLoadingCount } = useMessageCount();
 
   // Reset terms acceptance when switching between sign-up and login
   useEffect(() => {
@@ -481,7 +486,7 @@ export const LoginPage = () => {
     { icon: Brain, text: "AI-Powered Messages", color: "from-purple-500 to-pink-500" },
     { icon: Target, text: "Smart ICP Targeting", color: "from-blue-500 to-cyan-500" },
     { icon: MessageSquare, text: "Personalised Outreach", color: "from-green-500 to-emerald-500" },
-    { icon: Zap, text: "Instant Generation", color: "from-orange-500 to-amber-500" }
+    { icon: Zap, text: "Super-Fast Research", color: "from-orange-500 to-amber-500" }
   ];
 
   return (
@@ -588,18 +593,20 @@ export const LoginPage = () => {
               </div>
 
               {/* Stats */}
-              <div className="flex gap-6 pt-4">
-                <div>
-                  <p className="text-2xl font-bold text-white">10x</p>
-                  <p className="text-sm text-gray-400">Faster Outreach</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-white">85%</p>
-                  <p className="text-sm text-gray-400">Response Rate</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-white">500+</p>
-                  <p className="text-sm text-gray-400">Happy Users</p>
+              <div className="flex justify-center pt-4">
+                <div className="text-center">
+                  <div className="flex items-baseline justify-center gap-1">
+                    {isLoadingCount ? (
+                      <div className="h-8 w-24 bg-gray-700/30 animate-pulse rounded"></div>
+                    ) : (
+                      <TickerCounter
+                        value={messageCount}
+                        className="text-2xl font-bold text-white"
+                        digitClassName="text-2xl font-bold text-white"
+                      />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400">Messages Generated</p>
                 </div>
               </div>
             </div>
