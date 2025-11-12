@@ -76,7 +76,6 @@ export function OutreachPage() {
     const fetchGeneratedMessages = async () => {
       try {
         const userId = user.id || user.user_id
-        console.log('Fetching prospects for user:', userId)
 
         const { data, error } = await supabase
           .from('message_generation_logs')
@@ -103,9 +102,6 @@ export function OutreachPage() {
           .is('research_cache.deleted_at', null)
           .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled', 'scheduled', 'sent'])
           .order('created_at', { ascending: false })
-
-        console.log('Raw prospect data from Supabase:', data)
-        console.log('Supabase error (if any):', error)
 
         if (error) throw error
 
@@ -140,7 +136,6 @@ export function OutreachPage() {
           if (msg.status === 'sent' && msg.updatedAt && msg.updatedAt < thisWeekMonday) {
             if (msg.researchCacheId) {
               prospectsContactedBeforeThisWeek.add(msg.researchCacheId)
-              console.log(`📧 Found prospect contacted before this week: ${msg.name} (sent on ${msg.updatedAt.toLocaleDateString()})`)
             }
           }
         })
@@ -148,7 +143,6 @@ export function OutreachPage() {
         // Then filter out ALL messages for those prospects
         const timeFilteredMessages = allMessages.filter(msg => {
           if (msg.researchCacheId && prospectsContactedBeforeThisWeek.has(msg.researchCacheId)) {
-            console.log(`❌ Filtering out message for ${msg.name} (prospect contacted before this week)`)
             return false
           }
           return true
@@ -184,10 +178,6 @@ export function OutreachPage() {
           }
         })
 
-        console.log('Time-filtered messages (sent messages < 1 week):', timeFilteredMessages.length)
-        console.log('Grouped prospects with counts:', groupedProspects)
-        console.log('Final count:', groupedProspects.length)
-
         setProspects(groupedProspects)
       } catch (error) {
         console.error('Error fetching generated messages:', error)
@@ -206,12 +196,6 @@ export function OutreachPage() {
       try {
         const userId = user.id || user.user_id
 
-        console.log('📅 Fetching scheduled messages for user:', userId)
-
-        // DEBUG: Check what RLS policy sees
-        const { data: debugAuth } = await supabase.rpc('get_current_user_id')
-        console.log('🔐 JWT Claims Debug:', debugAuth)
-
         const { data, error } = await supabase
           .from('sequence_prospects')
           .select('*')
@@ -220,23 +204,17 @@ export function OutreachPage() {
           .in('status', ['scheduled', 'sending', 'sent'])
           .order('scheduled_for', { ascending: true })
 
-        console.log('📅 Query error:', error)
-        console.log('📅 Fetched scheduled prospects from DB:', data)
-        console.log('📅 Total prospects fetched:', data?.length || 0)
-
         if (error) throw error
 
         // Fetch message texts for each prospect
         const messageLogIds = data?.map(p => p.message_log_id).filter(Boolean) || []
-        console.log('📅 Fetching messages for log IDs:', messageLogIds)
 
         const { data: messageData, error: messageError } = await supabase
           .from('message_generation_logs')
           .select('id, generated_message, edited_message')
           .in('id', messageLogIds)
 
-        console.log('📅 Message data fetched:', messageData)
-        console.log('📅 Message fetch error:', messageError)
+        if (messageError) console.error('Error fetching message data:', messageError)
 
         // Create a map of message_log_id to message text
         const messageMap = new Map(
@@ -270,26 +248,7 @@ export function OutreachPage() {
         }).filter(msg => {
           const isWeekday = msg.day >= 0 && msg.day <= 4
           const isWorkingHours = msg.hour >= 7 && msg.hour <= 20
-          const shouldShow = isWeekday && isWorkingHours
-
-          if (!shouldShow) {
-            console.log('📅 Filtered out message:', {
-              prospectId: msg.prospectId,
-              day: msg.day,
-              hour: msg.hour,
-              reason: !isWeekday ? 'weekend' : 'outside working hours'
-            })
-          }
-
-          return shouldShow
-        })
-
-        console.log('📅 Messages after filtering (weekdays 7am-8pm):', mappedMessages)
-        console.log('📅 Final scheduled messages count:', mappedMessages.length)
-
-        // Debug: Show each message's calendar position
-        mappedMessages.forEach(msg => {
-          console.log(`📅 Message ${msg.id}: day=${msg.day} (${['Mon','Tue','Wed','Thu','Fri'][msg.day]}), hour=${msg.hour}, minute=${msg.minute}, status=${msg.status}`)
+          return isWeekday && isWorkingHours
         })
 
         setScheduledMessages(mappedMessages)

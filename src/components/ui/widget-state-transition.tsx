@@ -29,27 +29,27 @@ interface WidgetStateTransitionProps {
 const animationVariants = {
   pop: {
     initial: {
-      scale: 0,
+      scale: 0.95,
       opacity: 0,
-      rotate: -5
+      y: 10
     },
     animate: {
       scale: 1,
       opacity: 1,
-      rotate: 0,
+      y: 0,
       transition: {
         type: 'spring',
-        stiffness: 400,
-        damping: 15,
+        stiffness: 260,
+        damping: 20,
         mass: 0.8,
       }
     },
     exit: {
-      scale: 0,
+      scale: 0.95,
       opacity: 0,
-      rotate: 5,
+      y: -10,
       transition: {
-        duration: 0.4,
+        duration: 0.2,
         ease: [0.43, 0.13, 0.23, 0.96]
       }
     }

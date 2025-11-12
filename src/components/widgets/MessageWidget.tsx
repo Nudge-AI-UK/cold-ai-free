@@ -206,7 +206,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at')
+      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, prospect_data')
       .eq('user_id', userId)
       .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
       .order('created_at', { ascending: false })
@@ -221,6 +221,15 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     if (existingLog) {
       console.log('📝 Found existing message log:', existingLog)
       setCurrentLogId(existingLog.id)
+
+      // Extract LinkedIn URL from prospect_data
+      if (existingLog.prospect_data && typeof existingLog.prospect_data === 'object') {
+        const prospectData = existingLog.prospect_data as any
+        if (prospectData.linkedin_url) {
+          setRecipientUrl(prospectData.linkedin_url)
+          console.log('✅ Restored LinkedIn URL from prospect_data:', prospectData.linkedin_url)
+        }
+      }
 
       // Check if it's in progress
       if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(existingLog.message_status)) {
@@ -302,7 +311,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to INSERT and UPDATE
           schema: 'public',
           table: 'user_profiles',
           filter: `user_id=eq.${userId}`
@@ -315,7 +324,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to INSERT and UPDATE
           schema: 'public',
           table: 'business_profiles',
           filter: `user_id=eq.${userId}`
@@ -328,7 +337,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to INSERT and UPDATE
           schema: 'public',
           table: 'communication_preferences',
           filter: `user_id=eq.${userId}`
@@ -658,37 +667,78 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     setIsSending(true)
     try {
       const userId = user?.id || user?.user_id
-      const messageText = editedMessage || generatedMessage
 
       if (!recipientUrl) {
         toast.error('No recipient LinkedIn URL found')
         return
       }
 
-      // Call Supabase Edge Function to send message via Unipile
-      const { data, error } = await supabase.functions.invoke('linkedin-send-message', {
-        body: {
-          user_id: userId,
-          message_log_id: currentLogId,
-          recipient_linkedin_url: recipientUrl,
-          message_text: messageText
-        }
-      })
-
-      if (error) throw error
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send message')
+      // Parse research data for prospect details
+      const researchData = {
+        name: 'LinkedIn User',
+        headline: '',
+        company: ''
       }
 
-      toast.success('Message sent successfully via LinkedIn!')
+      // Step 1: Get or create an active outreach sequence for manual sends
+      const { data: sequenceId, error: seqError } = await supabase
+        .rpc('get_or_create_manual_outreach_sequence', {
+          p_user_id: userId
+        })
+
+      if (seqError || !sequenceId) {
+        console.error('Error getting/creating sequence:', seqError)
+        toast.error('Failed to create outreach sequence')
+        setIsSending(false)
+        return
+      }
+
+      // Step 2: Create sequence_prospects entry with pending_scheduled status
+      const scheduledFor = new Date()
+      scheduledFor.setMinutes(scheduledFor.getMinutes() + 1) // Schedule for 1 minute from now
+
+      const { data: prospectId, error: prospectError } = await supabase
+        .rpc('create_sequence_prospect', {
+          p_user_id: userId,
+          p_sequence_id: sequenceId,
+          p_message_log_id: currentLogId,
+          p_linkedin_url: recipientUrl,
+          p_linkedin_public_id: recipientUrl.match(/linkedin\.com\/in\/([\w%-]+)\/?/)?.[1] || '',
+          p_prospect_name: researchData.name,
+          p_prospect_headline: researchData.headline,
+          p_prospect_company: researchData.company,
+          p_prospect_data: researchData,
+          p_status: 'pending_scheduled',
+          p_scheduled_for: scheduledFor.toISOString(),
+        })
+
+      if (prospectError || !prospectId) {
+        console.error('Error creating sequence prospect:', prospectError)
+        toast.error('Failed to schedule message')
+        setIsSending(false)
+        return
+      }
+
+      // Step 3: Update message_generation_logs to mark as pending_scheduled
+      await supabase
+        .from('message_generation_logs')
+        .update({
+          message_status: 'pending_scheduled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentLogId)
+
+      toast.success('Message queued! Scheduler will process within 5 minutes.')
+
+      // Wait for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Reset widget to Ready state
       resetWidget()
 
     } catch (error: any) {
-      console.error('❌ Error sending message:', error)
-      toast.error(error.message || 'Failed to send message. Please try again.')
+      console.error('❌ Error scheduling message:', error)
+      toast.error(error.message || 'Failed to schedule message. Please try again.')
     } finally {
       setIsSending(false)
     }
@@ -848,6 +898,16 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                    setupStatus.linkedin ? 'border-green-500 bg-green-500/20' : 'border-gray-500'
+                  }`}>
+                    <span className={setupStatus.linkedin ? 'text-green-400' : 'text-gray-500'}>✓</span>
+                  </div>
+                  <span className={setupStatus.linkedin ? 'text-gray-300' : 'text-gray-400'}>
+                    Connect LinkedIn Account
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                     setupStatus.product ? 'border-green-500 bg-green-500/20' : 'border-gray-500'
                   }`}>
                     <span className={setupStatus.product ? 'text-green-400' : 'text-gray-500'}>✓</span>
@@ -864,16 +924,6 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   </div>
                   <span className={setupStatus.icp ? 'text-gray-300' : 'text-gray-400'}>
                     Create an ICP with Cold AI
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    setupStatus.linkedin ? 'border-green-500 bg-green-500/20' : 'border-gray-500'
-                  }`}>
-                    <span className={setupStatus.linkedin ? 'text-green-400' : 'text-gray-500'}>✓</span>
-                  </div>
-                  <span className={setupStatus.linkedin ? 'text-gray-300' : 'text-gray-400'}>
-                    Connect LinkedIn Account
                   </span>
                 </div>
               </div>
@@ -951,7 +1001,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
               <div className="flex gap-3">
                 <button className="flex-1 bg-gray-700/30 text-gray-600 font-semibold py-3 px-6 rounded-xl text-sm flex items-center justify-center space-x-2 cursor-not-allowed" disabled>
                   <Send className="w-5 h-5" />
-                  <span>Send Message</span>
+                  <span>Schedule Message</span>
                 </button>
               </div>
             </div>
@@ -1118,12 +1168,12 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             {isSending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Sending...</span>
+                <span>Scheduling...</span>
               </>
             ) : (
               <>
                 <Send className="w-5 h-5" />
-                <span>Send Message</span>
+                <span>Schedule Message</span>
               </>
             )}
           </button>
@@ -1553,12 +1603,12 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   {isSending ? (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>Sending...</span>
+                      <span>Scheduling...</span>
                     </div>
                   ) : (
                     <>
                       <Send className="w-5 h-5" />
-                      <span>Send Message</span>
+                      <span>Schedule Message</span>
                     </>
                   )}
                 </button>

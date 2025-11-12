@@ -180,6 +180,33 @@ export const LoginPage = () => {
       }
 
       if (isSignUp) {
+        // Check if this email was previously deleted
+        let history = null
+        try {
+          const { data: deletionHistory, error: historyError } = await supabase.rpc('check_email_deletion_history', {
+            p_email: email
+          })
+
+          if (historyError) {
+            console.warn('⚠️ Failed to check deletion history:', historyError)
+            // Continue with signup even if check fails
+          } else {
+            history = deletionHistory?.[0]
+          }
+
+          if (history?.previously_deleted && history?.within_limit_period) {
+            // Account was deleted within 30 days - allow recovery
+            toast.info(
+              `Welcome back! Your account has been recovered. Your previous usage limits have been restored.`,
+              { duration: 6000 }
+            )
+            // Continue with signup - they're recovering their account
+          }
+        } catch (e) {
+          console.warn('⚠️ Deletion history check failed, continuing with signup:', e)
+          // Continue with signup even if check fails
+        }
+
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
@@ -190,6 +217,11 @@ export const LoginPage = () => {
               terms_accepted: termsAccepted,
               terms_version: '2024-10-16',
               privacy_version: '2024-10-16',
+              // Store previous usage if account was deleted before
+              previous_usage: history?.previously_deleted ? {
+                messages_sent: history.messages_used || 0,
+                deleted_at: history.deleted_at
+              } : null
             },
             captchaToken, // Include captcha token
           },
@@ -197,14 +229,33 @@ export const LoginPage = () => {
 
         if (error) throw error;
 
+        console.log('✅ Signup successful, data:', data)
+
+        // Show warning if re-signing up after deletion (outside 30-day period)
+        if (history?.previously_deleted && !history?.within_limit_period) {
+          toast.info(
+            'Welcome back! Your usage limits have been restored from your previous account.',
+            { duration: 6000 }
+          )
+        }
+
         // Only show OTP verification for email/password signups (not OAuth)
-        const isEmailPasswordSignup = data?.user && !data.user.app_metadata?.provider;
+        // Provider will be 'email' for email/password, or 'google'/'github' etc for OAuth
+        const isEmailPasswordSignup = data?.user && data.user.app_metadata?.provider === 'email';
+
+        console.log('🔍 Checking if should show OTP:', {
+          isEmailPasswordSignup,
+          hasUser: !!data?.user,
+          provider: data?.user?.app_metadata?.provider
+        })
 
         if (isEmailPasswordSignup) {
+          console.log('📧 Setting OTP verification with email:', email)
           setVerificationEmail(email);
           setShowOtpVerification(true);
           toast.success("Verification code sent! Check your email.");
         } else {
+          console.log('⚠️ Not showing OTP - OAuth signup or no user')
           toast.success("Account created successfully!");
         }
 
@@ -283,11 +334,50 @@ export const LoginPage = () => {
           throw error;
         }
 
-        // Success - the AuthContext will handle updating the user state
-        // and the App will automatically show the dashboard
+        // Success - check if account was pending deletion and recover it
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          const { data: userProfile } = await supabase
+            .from('user_profiles')
+            .select('account_status, deletion_requested_at')
+            .eq('user_id', user.id)
+            .single()
+
+          // If account was pending deletion, recover it
+          if (userProfile?.account_status === 'pending_deletion') {
+            await supabase
+              .from('user_profiles')
+              .update({
+                account_status: 'active',
+                deletion_requested_at: null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id)
+
+            // Remove from deleted_accounts tracking
+            const emailHash = await crypto.subtle.digest(
+              'SHA-256',
+              new TextEncoder().encode(email.toLowerCase())
+            )
+            const emailHashHex = Array.from(new Uint8Array(emailHash))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+
+            await supabase
+              .from('deleted_accounts')
+              .delete()
+              .eq('email_hash', emailHashHex)
+
+            toast.success("Welcome back! Your account has been recovered.", { duration: 5000 })
+            console.log('✅ Account recovered from pending deletion')
+          } else {
+            toast.success("Welcome back!")
+          }
+        }
+
         console.log('✅ Login successful');
         setLockoutInfo(null); // Clear any lockout info
-        toast.success("Welcome back!");
       }
     } catch (error: any) {
       console.error('💥 Auth error:', error);

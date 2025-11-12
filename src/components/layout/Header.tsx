@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { LogOut, User, MessageSquare, Users } from 'lucide-react'
+import { LogOut, User, MessageSquare, Users, Trash2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   DropdownMenu,
@@ -9,10 +10,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { DeleteAccountModal } from '@/components/modals/DeleteAccountModal'
+import { supabase } from '@/integrations/supabase/client'
 
 export function Header() {
   const { user, signOut } = useAuth()
   const location = useLocation()
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [profileImage, setProfileImage] = useState<string | null>(null)
+
+  // Fetch user profile image on mount and when user changes
+  useEffect(() => {
+    const fetchProfileImage = async () => {
+      if (!user) return
+
+      const userId = user.id || user.user_id
+
+      // First, try to get Google profile picture from auth metadata
+      const { data: authUser } = await supabase.auth.getUser()
+      const googleAvatar = authUser.user?.user_metadata?.avatar_url
+
+      if (googleAvatar) {
+        setProfileImage(googleAvatar)
+        return
+      }
+
+      // Fallback to LinkedIn profile picture
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('linkedin_profile_data')
+        .eq('user_id', userId)
+        .single()
+
+      const linkedinData = userProfile?.linkedin_profile_data as any
+      const linkedinAvatar = linkedinData?.profile_picture_url
+
+      if (linkedinAvatar) {
+        setProfileImage(linkedinAvatar)
+      }
+    }
+
+    fetchProfileImage()
+  }, [user])
 
   return (
     <header
@@ -136,8 +175,21 @@ export function Header() {
           {/* Profile Dropdown - Clean Circle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 text-gray-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
-                <User className="h-4 w-4" />
+              <button className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 text-gray-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 overflow-hidden">
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to User icon if image fails to load
+                      e.currentTarget.style.display = 'none'
+                      setProfileImage(null)
+                    }}
+                  />
+                ) : (
+                  <User className="h-4 w-4" />
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-[#0C1725] border-orange-500/30">
@@ -152,8 +204,22 @@ export function Header() {
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-orange-500/20" />
+              <DropdownMenuItem
+                onClick={() => setShowDeleteModal(true)}
+                className="hover:bg-red-500/20 cursor-pointer text-red-400 focus:bg-red-500/20 focus:text-red-300"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Account
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Delete Account Modal */}
+          <DeleteAccountModal
+            isOpen={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+          />
         </div>
       </div>
       

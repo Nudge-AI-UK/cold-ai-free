@@ -1,5 +1,6 @@
 // supabase/functions/unipile-delete-account/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,8 @@ const corsHeaders = {
 interface DeleteAccountRequest {
   account_id: string
   user_id: string
+  action?: 'disconnected' | 'blocked_by_cold'  // Action type for history tracking
+  error_message?: string  // Error message for blocked connections
 }
 
 serve(async (req) => {
@@ -18,6 +21,11 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     // Get Unipile API credentials from Supabase secrets
     const unipileApiUrl = Deno.env.get('UNIPILE_API_URL') || 'https://api.unipile.com'
     const unipileApiKey = Deno.env.get('UNIPILE_API_KEY')
@@ -31,8 +39,8 @@ serve(async (req) => {
     const body: DeleteAccountRequest = await req.json()
     console.log('🗑️ Deleting Unipile account:', body.account_id, 'for user:', body.user_id)
 
-    if (!body.account_id) {
-      throw new Error('account_id is required')
+    if (!body.account_id || !body.user_id) {
+      throw new Error('account_id and user_id are required')
     }
 
     // Call Unipile API to delete the account
@@ -69,6 +77,50 @@ serve(async (req) => {
     }
 
     console.log('✅ Unipile account deleted successfully')
+
+    // Get user's current linkedin_public_identifier and history before clearing
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('linkedin_public_identifier, linkedin_connection_history')
+      .eq('user_id', body.user_id)
+      .single()
+
+    const linkedinIdentifier = userProfile?.linkedin_public_identifier
+
+    // Determine the action type (defaults to 'disconnected' for backward compatibility)
+    const action = body.action || 'disconnected'
+
+    // Get current history and append event
+    const currentHistory = (userProfile?.linkedin_connection_history as any[]) || []
+    const newHistoryEntry = {
+      identifier: linkedinIdentifier,
+      event: action,
+      timestamp: new Date().toISOString(),
+      ...(body.error_message && { error_message: body.error_message })  // Include error if provided
+    }
+
+    // Update user_profiles to record event
+    const updateData: any = {
+      linkedin_connected: false,
+      unipile_account_id: null,
+      linkedin_connection_history: [...currentHistory, newHistoryEntry],
+      updated_at: new Date().toISOString()
+    }
+
+    // If this is a blocked attempt, set the error message for the widget to display
+    if (action === 'blocked_by_cold' && body.error_message) {
+      updateData.linkedin_connection_error = body.error_message
+    } else if (action === 'disconnected') {
+      // Clear error on successful disconnection
+      updateData.linkedin_connection_error = null
+    }
+
+    await supabase
+      .from('user_profiles')
+      .update(updateData)
+      .eq('user_id', body.user_id)
+
+    console.log(`✅ LinkedIn ${action} event recorded in history`)
 
     // Return success response
     return new Response(
