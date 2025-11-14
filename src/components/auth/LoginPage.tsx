@@ -32,6 +32,11 @@ export const LoginPage = () => {
   const turnstileWidgetId = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
 
+  // Password reset Turnstile state
+  const [resetCaptchaToken, setResetCaptchaToken] = useState<string | null>(null);
+  const resetTurnstileRef = useRef<HTMLDivElement>(null);
+  const resetTurnstileWidgetId = useRef<string | null>(null);
+
   // Fetch real-time message count
   const { count: messageCount, isLoading: isLoadingCount } = useMessageCount();
 
@@ -164,6 +169,58 @@ export const LoginPage = () => {
       }
     };
   }, [isSignUp, showEmailForm, turnstileReady]);
+
+  // Render Turnstile widget for password reset modal
+  useEffect(() => {
+    if (!turnstileReady || !showPasswordReset || !resetTurnstileRef.current) {
+      return;
+    }
+
+    // Small delay to ensure DOM is ready
+    const renderTimeout = setTimeout(() => {
+      if (resetTurnstileRef.current && window.turnstile) {
+        // Clear previous widget if it exists
+        if (resetTurnstileWidgetId.current) {
+          try {
+            window.turnstile.remove(resetTurnstileWidgetId.current);
+          } catch (e) {
+            console.warn('Failed to remove previous reset turnstile widget:', e);
+          }
+          resetTurnstileWidgetId.current = null;
+        }
+
+        // Reset captcha token
+        setResetCaptchaToken(null);
+
+        // Render new widget
+        try {
+          resetTurnstileWidgetId.current = window.turnstile.render(resetTurnstileRef.current, {
+            sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+            callback: (token: string) => {
+              setResetCaptchaToken(token);
+            },
+            'error-callback': () => {
+              toast.error('CAPTCHA verification failed. Please try again.');
+            },
+          });
+        } catch (e) {
+          console.error('Failed to render reset Turnstile widget:', e);
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(renderTimeout);
+      if (resetTurnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.remove(resetTurnstileWidgetId.current);
+        } catch (e) {
+          console.warn('Failed to remove reset turnstile widget on cleanup:', e);
+        }
+        resetTurnstileWidgetId.current = null;
+      }
+    };
+  }, [showPasswordReset, turnstileReady]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -464,6 +521,12 @@ export const LoginPage = () => {
 
   const handlePasswordReset = async (resetEmail: string) => {
     try {
+      // Check captcha token
+      if (!resetCaptchaToken) {
+        toast.error("Please complete the CAPTCHA verification.");
+        return;
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -477,6 +540,7 @@ export const LoginPage = () => {
 
       toast.success("Password reset link sent! Check your email.");
       setShowPasswordReset(false);
+      setResetCaptchaToken(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to send reset email.");
     }
@@ -1001,6 +1065,27 @@ export const LoginPage = () => {
                 </div>
               </div>
 
+              {/* Turnstile CAPTCHA Widget */}
+              <div className="space-y-2 mb-4">
+                <Label className="text-gray-300">Verify you're human</Label>
+                <div className="relative min-h-[65px] flex justify-center items-center">
+                  {/* Loading spinner - shows while CAPTCHA loads */}
+                  {!resetCaptchaToken && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-6 h-6 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin"></div>
+                        <p className="text-xs text-gray-500">Loading verification...</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Turnstile widget container */}
+                  <div
+                    ref={resetTurnstileRef}
+                    className="flex justify-center"
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <Button
                   type="button"
@@ -1011,7 +1096,8 @@ export const LoginPage = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
+                  disabled={!resetCaptchaToken}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed">
                   Send Reset Link
                 </Button>
               </div>

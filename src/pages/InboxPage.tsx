@@ -348,7 +348,18 @@ export function InboxPage() {
             <div className="w-[400px] flex-shrink-0 bg-white/5 rounded-xl border border-white/10 overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto">
                 {conversations.map((conversation, index) => {
+                  // Parse research_data if it's a string
+                  let researchData = conversation.messages?.[0]?.research_cache?.research_data
+                  if (typeof researchData === 'string') {
+                    try {
+                      researchData = JSON.parse(researchData)
+                    } catch (e) {
+                      researchData = {}
+                    }
+                  }
+
                   const profilePicture = conversation.messages?.[0]?.research_cache?.profile_picture_url ||
+                    researchData?.profile_picture_url ||
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.prospect_name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
 
                   return (
@@ -417,15 +428,30 @@ export function InboxPage() {
                   <div className="p-6 border-b border-white/10">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-start gap-4">
-                        <img
-                          src={selectedConversation.messages?.[0]?.research_cache?.profile_picture_url ||
-                               `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
-                          alt={selectedConversation.prospect_name}
-                          className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
-                          onError={(e) => {
-                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`
-                          }}
-                        />
+                        {(() => {
+                          // Parse research_data if it's a string
+                          let researchData = selectedConversation.messages?.[0]?.research_cache?.research_data
+                          if (typeof researchData === 'string') {
+                            try {
+                              researchData = JSON.parse(researchData)
+                            } catch (e) {
+                              researchData = {}
+                            }
+                          }
+
+                          return (
+                            <img
+                              src={selectedConversation.messages?.[0]?.research_cache?.profile_picture_url ||
+                                   researchData?.profile_picture_url ||
+                                   `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
+                              alt={selectedConversation.prospect_name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
+                              onError={(e) => {
+                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`
+                              }}
+                            />
+                          )
+                        })()}
                         <div>
                           <h2 className="text-2xl font-bold text-white mb-1">
                             {selectedConversation.prospect_name}

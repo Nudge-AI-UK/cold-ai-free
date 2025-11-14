@@ -607,6 +607,12 @@ export function ProspectModal({
                     src={prevProspect.avatar}
                     alt={prevProspect.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      if (target.src.includes('ui-avatars.com')) return
+                      const name = prevProspect.name || 'Unknown'
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=FBAE1C&color=fff&size=56&rounded=true`
+                    }}
                   />
                 </div>
               </button>
@@ -640,6 +646,12 @@ export function ProspectModal({
                     src={nextProspect.avatar}
                     alt={nextProspect.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      if (target.src.includes('ui-avatars.com')) return
+                      const name = nextProspect.name || 'Unknown'
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=FBAE1C&color=fff&size=56&rounded=true`
+                    }}
                   />
                 </div>
               </button>
@@ -667,9 +679,13 @@ export function ProspectModal({
               <div className="flex items-center gap-4 pr-12">
                 <img
                   src={researchCache.profile_picture_url ||
+                       researchData?.profile_picture_url ||
                        `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData?.name || 'Unknown')}&background=FBAE1C&color=fff&size=60&rounded=true`}
                   alt={researchData?.name || 'Prospect'}
                   className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
+                  onError={(e) => {
+                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData?.name || 'Unknown')}&background=FBAE1C&color=fff&size=60&rounded=true`
+                  }}
                 />
                 <div>
                   <h2 className="text-xl font-bold text-white mb-1">

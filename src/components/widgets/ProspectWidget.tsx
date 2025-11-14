@@ -516,6 +516,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
             }
           }
           const profilePicture = cache.profile_picture_url ||
+                                researchData.profile_picture_url ||
                                 `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
 
           return (

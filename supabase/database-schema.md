@@ -148,6 +148,21 @@ CREATE TABLE public.connection_requests (
   CONSTRAINT connection_requests_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
   CONSTRAINT connection_requests_prospect_id_fkey FOREIGN KEY (prospect_id) REFERENCES public.sequence_prospects(id)
 );
+CREATE TABLE public.deleted_accounts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  email_hash text NOT NULL UNIQUE,
+  original_user_id uuid NOT NULL,
+  deleted_at timestamp with time zone NOT NULL DEFAULT now(),
+  soft_delete_until timestamp with time zone NOT NULL DEFAULT (now() + '30 days'::interval),
+  messages_sent_total integer DEFAULT 0,
+  icps_created_total integer DEFAULT 0,
+  knowledge_entries_total integer DEFAULT 0,
+  prospects_created_total integer DEFAULT 0,
+  deletion_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  hard_deleted boolean DEFAULT false,
+  CONSTRAINT deleted_accounts_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.error_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -351,7 +366,7 @@ CREATE TABLE public.message_generation_logs (
   team_id character varying,
   generated_message text,
   edited_message text,
-  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text])),
+  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text, 'analysing_conversation'::character varying::text])),
   ai_model_used character varying,
   generation_cost numeric,
   sent_at timestamp with time zone,
@@ -671,6 +686,12 @@ CREATE TABLE public.user_profiles (
   linkedin_profile_scraped_at timestamp with time zone,
   linkedin_profile_hash character varying,
   linkedin_premium boolean,
+  url_list text,
+  linkedin_public_identifier text,
+  linkedin_connection_history jsonb DEFAULT '[]'::jsonb,
+  linkedin_connection_error text,
+  account_status text DEFAULT 'active'::text CHECK (account_status = ANY (ARRAY['active'::text, 'pending_deletion'::text, 'deleted'::text])),
+  deletion_requested_at timestamp with time zone,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
@@ -728,6 +749,10 @@ CREATE TABLE public.users (
   ready_for_outreach boolean DEFAULT false,
   profile_completion jsonb DEFAULT '{"company": false, "product": false, "personal": false, "percentage": 0, "communication": false}'::jsonb,
   email_verified boolean DEFAULT false,
+  terms_accepted_at timestamp with time zone,
+  terms_version text DEFAULT '2024-10-16'::text,
+  privacy_accepted_at timestamp with time zone,
+  privacy_version text DEFAULT '2024-10-16'::text,
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
 CREATE TABLE public.webhook_events (

@@ -275,7 +275,7 @@ export function ProspectsPage() {
               researchCacheId: cacheId,
               id: mostRecent.id,
               name: researchData.name || 'Unknown',
-              avatar: cache.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name || 'U')}&background=${getAvatarColor(index)}&color=fff&size=128`,
+              avatar: cache.profile_picture_url || researchData.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name || 'U')}&background=${getAvatarColor(index)}&color=fff&size=128`,
               linkedinUrl: cache.profile_url || '',
               jobTitle: researchData.headline || 'No job title',
               company: researchData.company || 'No company',
@@ -796,6 +796,13 @@ export function ProspectsPage() {
                               src={prospect.avatar}
                               alt={prospect.name}
                               className="w-10 h-10 rounded-full object-cover"
+                              onError={(e) => {
+                                const target = e.currentTarget
+                                if (target.src.includes('ui-avatars.com')) return
+                                const name = prospect.name || 'Unknown'
+                                const bgColor = ['FBAE1C', 'FC9109', '8B5CF6', '3B82F6', '10B981'][Math.abs(prospect.id) % 5]
+                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=128&rounded=true`
+                              }}
                             />
                             <div>
                               <div className="text-sm font-medium text-white">{prospect.name}</div>

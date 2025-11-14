@@ -106,18 +106,30 @@ export function OutreachPage() {
         if (error) throw error
 
         // Map to Prospect interface with all properties
-        const allMessages = (data || []).map((msg: any) => ({
-          id: msg.id,
-          name: msg.recipient_name || msg.research_cache?.research_data?.name || 'Unknown',
-          avatar: msg.research_cache?.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.recipient_name || 'U')}`,
-          status: msg.message_status,
-          linkedinUrl: msg.research_cache?.profile_url || '',
-          jobTitle: msg.research_cache?.research_data?.headline || '',
-          company: msg.research_cache?.research_data?.company || '',
-          researchCacheId: msg.research_cache_id,
-          createdAt: new Date(msg.created_at),
-          updatedAt: msg.updated_at ? new Date(msg.updated_at) : new Date(msg.created_at),
-        }))
+        const allMessages = (data || []).map((msg: any) => {
+          // Parse research_data if it's a string
+          let researchData = msg.research_cache?.research_data
+          if (typeof researchData === 'string') {
+            try {
+              researchData = JSON.parse(researchData)
+            } catch (e) {
+              researchData = {}
+            }
+          }
+
+          return {
+            id: msg.id,
+            name: msg.recipient_name || researchData?.name || 'Unknown',
+            avatar: msg.research_cache?.profile_picture_url || researchData?.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.recipient_name || 'U')}`,
+            status: msg.message_status,
+            linkedinUrl: msg.research_cache?.profile_url || '',
+            jobTitle: researchData?.headline || '',
+            company: researchData?.company || '',
+            researchCacheId: msg.research_cache_id,
+            createdAt: new Date(msg.created_at),
+            updatedAt: msg.updated_at ? new Date(msg.updated_at) : new Date(msg.created_at),
+          }
+        })
 
         // Filter out ALL messages for prospects who were contacted before this week
         // For 'sent' status, check updated_at (when it was sent), not created_at
@@ -656,6 +668,13 @@ export function OutreachPage() {
           src={prospect.avatar}
           alt={prospect.name}
           className="w-8 h-8 rounded-full object-cover"
+          onError={(e) => {
+            const target = e.currentTarget
+            if (target.src.includes('ui-avatars.com')) return
+            const name = prospect.name || 'Unknown'
+            const bgColor = ['FBAE1C', 'FC9109', '8B5CF6', '3B82F6', '10B981'][Math.abs(prospect.id) % 5]
+            target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=40&rounded=true`
+          }}
         />
         <div className="text-xs font-medium text-white flex-1">{prospect.name}</div>
         {isPending && (
@@ -809,7 +828,18 @@ export function OutreachPage() {
                 title={`Scheduled for ${timeLabel}`}
               >
                 <div className="flex items-center gap-2">
-                  <img src={prospect.avatar} alt={prospect.name} className="w-6 h-6 rounded-full flex-shrink-0" />
+                  <img
+                    src={prospect.avatar}
+                    alt={prospect.name}
+                    className="w-6 h-6 rounded-full flex-shrink-0"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      if (target.src.includes('ui-avatars.com')) return
+                      const name = prospect.name || 'Unknown'
+                      const bgColor = ['FBAE1C', 'FC9109', '8B5CF6', '3B82F6', '10B981'][Math.abs(prospect.id) % 5]
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=40&rounded=true`
+                    }}
+                  />
                   <div className="text-xs text-white flex-1 truncate">{prospect.name}</div>
                   {isLocked && <span className="text-xs">🔒</span>}
                   {isReplySent && (
@@ -959,7 +989,18 @@ export function OutreachPage() {
                         isLocked ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:scale-105'
                       } ${isDragging ? 'opacity-50 scale-95' : ''} ${isSwapTarget ? 'ring-2 ring-[#FBAE1C] ring-offset-2 ring-offset-gray-900' : ''}`}
                     >
-                      <img src={prospect.avatar} alt={prospect.name} className="w-8 h-8 rounded-full" />
+                      <img
+                        src={prospect.avatar}
+                        alt={prospect.name}
+                        className="w-8 h-8 rounded-full"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          if (target.src.includes('ui-avatars.com')) return
+                          const name = prospect.name || 'Unknown'
+                          const bgColor = ['FBAE1C', 'FC9109', '8B5CF6', '3B82F6', '10B981'][Math.abs(prospect.id) % 5]
+                          target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=40&rounded=true`
+                        }}
+                      />
                       <div className="text-xs text-white">{prospect.name}</div>
                       {isLocked && <span className="text-xs">🔒</span>}
                       {isReplySent && (
@@ -1228,6 +1269,13 @@ export function OutreachPage() {
                     src={prospect.avatar}
                     alt={prospect.name}
                     className="w-16 h-16 rounded-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      if (target.src.includes('ui-avatars.com')) return
+                      const name = prospect.name || 'Unknown'
+                      const bgColor = ['FBAE1C', 'FC9109', '8B5CF6', '3B82F6', '10B981'][Math.abs(prospect.id) % 5]
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=64&rounded=true`
+                    }}
                   />
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-white">{prospect.name}</h3>
