@@ -7,6 +7,12 @@ import { unipileService } from '@/services/unipileService'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useProspectModal } from '@/components/modals/ProspectModalManager'
 import { WidgetStateTransition } from '@/components/ui/widget-state-transition'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface MessageWidgetProps {
   forceEmpty?: boolean
@@ -814,16 +820,30 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     const messageToCopy = editedMessage || generatedMessage
     navigator.clipboard.writeText(messageToCopy)
 
-    // Save edited version if it's different from original
-    if (editedMessage && editedMessage !== generatedMessage && currentLogId) {
-      console.log('💾 Saving edited message on copy...')
-      await supabase
+    if (currentLogId) {
+      // Mark message as 'copied' to track manual sends
+      const { error } = await supabase
         .from('message_generation_logs')
-        .update({ edited_message: editedMessage })
+        .update({
+          edited_message: editedMessage && editedMessage !== generatedMessage ? editedMessage : null,
+          message_status: 'copied',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', currentLogId)
+
+      if (error) {
+        console.error('❌ Failed to update message status:', error)
+      } else {
+        console.log('✅ Message marked as copied (manual send)')
+      }
     }
 
-    toast.success('Message copied to clipboard!')
+    toast.success('Message copied! Marked as manually sent.')
+
+    // Reset widget after a short delay
+    setTimeout(() => {
+      resetWidget()
+    }, 1500)
   }
 
   const handleViewResearch = () => {
@@ -1135,13 +1155,21 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             <span className="pointer-events-none">View Research</span>
           </button>
 
-          <button
-            onClick={copyToClipboard}
-            className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 transition-all duration-200"
-            title="Copy to clipboard"
-          >
-            <Copy className="w-5 h-5" />
-          </button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={copyToClipboard}
+                  className="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 transition-all duration-200"
+                >
+                  <Copy className="w-5 h-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Copy message and mark as manually sent</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           <button
             onClick={handleArchiveMessage}

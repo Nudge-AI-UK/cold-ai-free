@@ -5,6 +5,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { AnimatedModalBackground } from './AnimatedModalBackground'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface ProspectModalProps {
   prospectId: number
@@ -1184,14 +1190,47 @@ export function ProspectModal({
 
                           return null
                         })()}
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(displayMessage || '')
-                            toast.success('Message copied to clipboard!')
-                          }}
-                          className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-gray-300 transition-all">
-                          Copy Message
-                        </button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={async () => {
+                                  navigator.clipboard.writeText(displayMessage || '')
+
+                                  // Mark message as 'copied' to track manual sends
+                                  if (currentMessage.id) {
+                                    const { error } = await supabase
+                                      .from('message_generation_logs')
+                                      .update({
+                                        edited_message: editedMessage && editedMessage !== generatedMessage ? editedMessage : null,
+                                        message_status: 'copied',
+                                        updated_at: new Date().toISOString()
+                                      })
+                                      .eq('id', currentMessage.id)
+
+                                    if (error) {
+                                      console.error('❌ Failed to update message status:', error)
+                                    } else {
+                                      console.log('✅ Message marked as copied (manual send)')
+                                    }
+                                  }
+
+                                  toast.success('Message copied! Marked as manually sent.')
+
+                                  // Refresh the prospect data to show updated status
+                                  setTimeout(() => {
+                                    window.location.reload()
+                                  }, 1500)
+                                }}
+                                className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-gray-300 transition-all">
+                                Copy Message
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Copy message and mark as manually sent</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </div>
                   )
