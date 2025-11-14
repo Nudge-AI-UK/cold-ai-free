@@ -103,7 +103,18 @@ export const LoginPage = () => {
           setTurnstileReady(true);
         }
       }, 100);
-      return () => clearInterval(checkTurnstile);
+
+      // Add timeout after 10 seconds
+      const timeout = setTimeout(() => {
+        clearInterval(checkTurnstile);
+        console.error('Turnstile script failed to load within 10 seconds');
+        toast.error('Security verification failed to load. Please refresh the page or disable ad blockers.');
+      }, 10000);
+
+      return () => {
+        clearInterval(checkTurnstile);
+        clearTimeout(timeout);
+      };
     }
 
     // Load the script
@@ -149,10 +160,20 @@ export const LoginPage = () => {
             },
             'error-callback': () => {
               toast.error('CAPTCHA verification failed. Please try again.');
+              setCaptchaToken(null);
+            },
+            'timeout-callback': () => {
+              toast.error('CAPTCHA verification timed out. Please try again.');
+              setCaptchaToken(null);
+            },
+            'expired-callback': () => {
+              console.log('CAPTCHA token expired, resetting...');
+              setCaptchaToken(null);
             },
           });
         } catch (e) {
           console.error('Failed to render Turnstile widget:', e);
+          toast.error('Failed to load security verification. Please refresh the page.');
         }
       }
     }, 100);
@@ -201,10 +222,20 @@ export const LoginPage = () => {
             },
             'error-callback': () => {
               toast.error('CAPTCHA verification failed. Please try again.');
+              setResetCaptchaToken(null);
+            },
+            'timeout-callback': () => {
+              toast.error('CAPTCHA verification timed out. Please try again.');
+              setResetCaptchaToken(null);
+            },
+            'expired-callback': () => {
+              console.log('Password reset CAPTCHA token expired, resetting...');
+              setResetCaptchaToken(null);
             },
           });
         } catch (e) {
           console.error('Failed to render reset Turnstile widget:', e);
+          toast.error('Failed to load security verification. Please refresh the page.');
         }
       }
     }, 100);
