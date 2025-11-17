@@ -7,6 +7,7 @@ import { unipileService } from '@/services/unipileService'
 import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useProspectModal } from '@/components/modals/ProspectModalManager'
 import { WidgetStateTransition } from '@/components/ui/widget-state-transition'
+import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 import {
   Tooltip,
   TooltipContent,
@@ -126,6 +127,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const { user } = useAuth()
   const { openModal } = useModalFlow()
   const { openProspectModal } = useProspectModal()
+  const { setActiveMessage, setActiveResearch } = useActiveFeedbackItem()
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [generatedMessage, setGeneratedMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -143,6 +145,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [outreachGoal, setOutreachGoal] = useState('meeting')
   const [progressStatus, setProgressStatus] = useState<string>('')
   const [currentLogId, setCurrentLogId] = useState<number | null>(null)
+  const [currentResearchId, setCurrentResearchId] = useState<string | null>(null)
   const [editedMessage, setEditedMessage] = useState<string>('')
   const [isSending, setIsSending] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
@@ -168,6 +171,20 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       checkForInProgressGeneration()
     }
   }, [user, forceEmpty])
+
+  // Set active message for feedback widget when message is generated
+  useEffect(() => {
+    if (generatedMessage && currentLogId) {
+      setActiveMessage(String(currentLogId))
+    }
+  }, [generatedMessage, currentLogId, setActiveMessage])
+
+  // Set active research for feedback widget when research is loaded
+  useEffect(() => {
+    if (currentResearchId) {
+      setActiveResearch(currentResearchId)
+    }
+  }, [currentResearchId, setActiveResearch])
 
   // Check if user is Admin
   const checkUserRole = async () => {
@@ -212,7 +229,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, prospect_data')
+      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, prospect_data, research_cache_id')
       .eq('user_id', userId)
       .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
       .order('created_at', { ascending: false })
@@ -227,6 +244,11 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     if (existingLog) {
       console.log('📝 Found existing message log:', existingLog)
       setCurrentLogId(existingLog.id)
+
+      // Set research cache ID if available
+      if (existingLog.research_cache_id) {
+        setCurrentResearchId(existingLog.research_cache_id)
+      }
 
       // Extract LinkedIn URL from prospect_data
       if (existingLog.prospect_data && typeof existingLog.prospect_data === 'object') {

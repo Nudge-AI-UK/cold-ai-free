@@ -9,6 +9,7 @@ import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
 import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
+import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 import type { Database } from '@/types/supabase'
 
 type KnowledgeEntry = Database['public']['Tables']['knowledge_base']['Row']
@@ -23,6 +24,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
   const { currentStep: onboardingStep, status: onboardingStatus } = useOnboardingState()
+  const { setActiveProduct } = useActiveFeedbackItem()
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(2)
@@ -119,11 +121,18 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
     }
   }, [user, forceEmpty])
 
+  // Set active product for feedback widget when product is loaded
+  useEffect(() => {
+    if (entry?.id) {
+      setActiveProduct(entry.id)
+    }
+  }, [entry?.id, setActiveProduct])
+
   const fetchKnowledge = async () => {
     if (!user) return
 
     const userId = user?.id
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('knowledge_base')
       .select('*')
       .eq('created_by', userId)

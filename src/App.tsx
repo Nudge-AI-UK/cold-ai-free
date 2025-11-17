@@ -14,6 +14,8 @@ import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
 import { ProspectModalProvider } from '@/components/modals/ProspectModalManager'
 import { MobileBlocker } from '@/components/MobileBlocker'
 import { MaintenanceBlocker } from '@/components/MaintenanceBlocker'
+import { FeedbackWidget } from '@/components/feedback/FeedbackWidget'
+import { FeedbackProvider } from '@/contexts/FeedbackContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 
@@ -44,14 +46,17 @@ function AppContent() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<WidgetDashboard />} />
-      <Route path="/outreach" element={<OutreachPage />} />
-      <Route path="/prospects" element={<ProspectsPage />} />
-      {/* <Route path="/inbox" element={<InboxPage />} /> */}
-      <Route path="/reset-password" element={<PasswordResetPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<WidgetDashboard />} />
+        <Route path="/outreach" element={<OutreachPage />} />
+        <Route path="/prospects" element={<ProspectsPage />} />
+        {/* <Route path="/inbox" element={<InboxPage />} /> */}
+        <Route path="/reset-password" element={<PasswordResetPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <FeedbackWidget />
+    </>
   )
 }
 
@@ -60,25 +65,27 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <LoadingProvider>
-          <ModalFlowProvider>
-            <ProspectModalProvider>
-              <MobileBlocker />
-              <MaintenanceBlocker />
-              <AppContent />
-              <Toaster
-                position="bottom-right"
-                toastOptions={{
-                  style: {
-                    background: 'hsl(222 41% 11%)',
-                    border: '1px solid hsl(217 33% 18%)',
-                    color: 'hsl(210 20% 95%)',
-                  },
-                }}
-              />
-              <Analytics />
-              <SpeedInsights />
-            </ProspectModalProvider>
-          </ModalFlowProvider>
+          <FeedbackProvider>
+            <ModalFlowProvider>
+              <ProspectModalProvider>
+                <MobileBlocker />
+                <MaintenanceBlocker />
+                <AppContent />
+                <Toaster
+                  position="bottom-right"
+                  toastOptions={{
+                    style: {
+                      background: 'hsl(222 41% 11%)',
+                      border: '1px solid hsl(217 33% 18%)',
+                      color: 'hsl(210 20% 95%)',
+                    },
+                  }}
+                />
+                <Analytics />
+                <SpeedInsights />
+              </ProspectModalProvider>
+            </ModalFlowProvider>
+          </FeedbackProvider>
         </LoadingProvider>
       </AuthProvider>
     </BrowserRouter>

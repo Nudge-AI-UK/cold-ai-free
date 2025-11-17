@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { AnimatedModalBackground } from './AnimatedModalBackground'
+import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 import {
   Tooltip,
   TooltipContent,
@@ -203,6 +204,7 @@ export function ProspectModal({
   onNavigatePrevious
 }: ProspectModalProps) {
   const { user } = useAuth()
+  const { setActiveResearch } = useActiveFeedbackItem()
   const [researchCache, setResearchCache] = useState<ResearchCache | null>(null)
   const [prospectMessages, setProspectMessages] = useState<ProspectMessage[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
@@ -219,6 +221,13 @@ export function ProspectModal({
       fetchAdjacentProspects()
     }
   }, [prospectId])
+
+  // Set active research for feedback widget when prospect is loaded
+  useEffect(() => {
+    if (researchCache?.id) {
+      setActiveResearch(String(researchCache.id))
+    }
+  }, [researchCache?.id, setActiveResearch])
 
   // Reset edited message when selected message changes
   useEffect(() => {

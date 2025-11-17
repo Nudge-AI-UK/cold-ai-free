@@ -9,6 +9,7 @@ import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
 import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
+import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 
 interface ICPWidgetProps {
   className?: string
@@ -24,6 +25,7 @@ export function ICPWidget({ className }: ICPWidgetProps) {
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
   const { currentStep: onboardingStep } = useOnboardingState()
+  const { setActiveICP } = useActiveFeedbackItem()
   const [icp, setIcp] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [icpState, setIcpState] = useState<ICPState>('empty')
@@ -106,6 +108,13 @@ export function ICPWidget({ className }: ICPWidgetProps) {
       checkApprovedProducts()
     }
   }, [user])
+
+  // Set active ICP for feedback widget when ICP is loaded
+  useEffect(() => {
+    if (icp?.id) {
+      setActiveICP(String(icp.id))
+    }
+  }, [icp?.id, setActiveICP])
 
   const checkApprovedProducts = async () => {
     if (!user) return
