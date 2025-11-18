@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ export const PasswordResetPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
+  const validationCompleteRef = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,12 +23,15 @@ export const PasswordResetPage = () => {
       console.log('🔐 Auth event:', event, session ? 'has session' : 'no session');
       if (event === "PASSWORD_RECOVERY") {
         console.log('✅ Password recovery event detected');
+        validationCompleteRef.current = true;
         setIsValidToken(true);
-      } else if (event === "SIGNED_IN" && session) {
+      } else if (event === "SIGNED_IN" && session && !validationCompleteRef.current) {
         // Also accept SIGNED_IN with a session (recovery token was processed)
         console.log('✅ Signed in with recovery session');
+        validationCompleteRef.current = true;
         setIsValidToken(true);
       }
+      // Ignore other events like TOKEN_REFRESHED, USER_UPDATED etc.
     });
 
     // Check for token in URL hash first
@@ -42,9 +46,12 @@ export const PasswordResetPage = () => {
     } else {
       // No token in URL, check if we already have a session
       supabase.auth.getSession().then(({ data: { session } }) => {
+        if (validationCompleteRef.current) return; // Already validated via auth event
+
         if (session) {
           // Already have a session, likely from a processed recovery
           console.log('✅ Existing session found');
+          validationCompleteRef.current = true;
           setIsValidToken(true);
         } else {
           // No token and no session = invalid
@@ -56,7 +63,7 @@ export const PasswordResetPage = () => {
 
     // Timeout fallback - if no event fires within 5 seconds, something's wrong
     const timeout = setTimeout(() => {
-      if (isValidToken === null) {
+      if (!validationCompleteRef.current) {
         console.warn('⏰ Token validation timed out');
         setIsValidToken(false);
       }
