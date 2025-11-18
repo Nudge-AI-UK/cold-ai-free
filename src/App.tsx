@@ -21,12 +21,15 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, isPasswordRecovery } = useAuth()
   const isResetPasswordPage = window.location.pathname === '/reset-password'
 
   // Check if this is a password recovery redirect (token in URL hash)
   const hashParams = new URLSearchParams(window.location.hash.substring(1))
   const isRecoveryRedirect = hashParams.get('type') === 'recovery' || hashParams.get('error_code') === 'otp_expired'
+
+  // Show password reset page if recovery detected via auth event or URL hash
+  const shouldShowPasswordReset = isResetPasswordPage || isRecoveryRedirect || isPasswordRecovery
 
   if (loading) {
     return (
@@ -42,7 +45,7 @@ function AppContent() {
   }
 
   // Handle password reset page - show regardless of auth state if recovery redirect
-  if (isResetPasswordPage || isRecoveryRedirect) {
+  if (shouldShowPasswordReset) {
     return <PasswordResetPage />
   }
 

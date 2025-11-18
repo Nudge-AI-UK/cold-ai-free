@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 interface AuthContextType {
   user: User | null
   loading: boolean
+  isPasswordRecovery: boolean
+  clearPasswordRecovery: () => void
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -17,6 +19,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
+
+  const clearPasswordRecovery = () => setIsPasswordRecovery(false)
 
   const ensureFreeSubscription = async (userId: string) => {
     // Skipping subscription setup - will be handled by microservices
@@ -42,6 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthContext: Auth state changed:', event)
       setUser(session?.user ?? null)
+
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('AuthContext: Password recovery detected')
+        setIsPasswordRecovery(true)
+      }
+
       if (session?.user && event === 'SIGNED_IN') {
         // Skip subscription setup - will be handled by microservices
       }
@@ -106,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, loading, isPasswordRecovery, clearPasswordRecovery, signIn, signUp, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )
