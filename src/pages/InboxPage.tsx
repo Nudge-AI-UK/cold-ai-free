@@ -378,6 +378,7 @@ export function InboxPage() {
                           src={profilePicture}
                           alt={conversation.prospect_name}
                           className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.prospect_name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
                           }}
@@ -446,6 +447,7 @@ export function InboxPage() {
                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
                               alt={selectedConversation.prospect_name}
                               className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
+                              referrerPolicy="no-referrer"
                               onError={(e) => {
                                 e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.prospect_name)}&background=FBAE1C&color=fff&size=60&rounded=true`
                               }}

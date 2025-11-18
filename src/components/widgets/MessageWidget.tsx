@@ -14,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useOnboardingContext } from '@/contexts/OnboardingContext'
 
 interface MessageWidgetProps {
   forceEmpty?: boolean
@@ -128,6 +129,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const { openModal } = useModalFlow()
   const { openProspectModal } = useProspectModal()
   const { setActiveMessage, setActiveResearch } = useActiveFeedbackItem()
+  const { status: onboardingStatus } = useOnboardingContext()
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [generatedMessage, setGeneratedMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -171,6 +173,23 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       checkForInProgressGeneration()
     }
   }, [user, forceEmpty])
+
+  // Update setup status when onboarding context changes
+  useEffect(() => {
+    if (user && !forceEmpty) {
+      // Use onboarding context status to update setup status
+      const isComplete =
+        onboardingStatus.settings.personal &&
+        onboardingStatus.settings.company &&
+        onboardingStatus.settings.communication &&
+        onboardingStatus.product &&
+        onboardingStatus.icp &&
+        onboardingStatus.linkedin
+
+      setSetupStatus(onboardingStatus)
+      setSetupComplete(isComplete)
+    }
+  }, [user, forceEmpty, onboardingStatus])
 
   // Set active message for feedback widget when message is generated
   useEffect(() => {

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { unipileService } from '@/services/unipileService'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { useOnboardingContext } from '@/contexts/OnboardingContext'
 import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 
 interface LinkedInWidgetProps {
@@ -36,6 +37,7 @@ interface LinkedInProfile {
 export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
   const { user } = useAuth()
   const { currentStep: onboardingStep } = useOnboardingState()
+  const { refresh: refreshOnboarding } = useOnboardingContext()
   const [isConnected, setIsConnected] = useState(false)
   const [profile, setProfile] = useState<LinkedInProfile | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -52,6 +54,32 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
       checkLinkedInStatus()
     }
   }, [user, forceEmpty])
+
+  // Handle Unipile callback query parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const unipileStatus = urlParams.get('unipile')
+
+    if (unipileStatus) {
+      // Clean up the URL
+      const cleanUrl = window.location.pathname
+      window.history.replaceState({}, '', cleanUrl)
+
+      if (unipileStatus === 'success') {
+        toast.success('LinkedIn connection successful!')
+        // Refresh status to pick up the new connection
+        setTimeout(() => {
+          checkLinkedInStatus()
+          refreshOnboarding()
+        }, 1000)
+      } else if (unipileStatus === 'failure') {
+        toast.error(
+          'LinkedIn connection failed. If using a password manager like 1Password, try again in an incognito/private window.',
+          { duration: 8000 }
+        )
+      }
+    }
+  }, [])
 
   const checkLinkedInStatus = async () => {
     if (!user) return
@@ -223,9 +251,10 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
             setIsConnecting(false)
             toast.success('LinkedIn connected successfully!')
 
-            // Refresh connection status
+            // Refresh connection status and global onboarding state
             setTimeout(() => {
               checkLinkedInStatus()
+              refreshOnboarding() // Refresh all widgets via shared context
             }, 1000)
           }
         }
@@ -243,6 +272,7 @@ export function LinkedInWidget({ forceEmpty, className }: LinkedInWidgetProps) {
             // Refresh connection status after auth window closes
             setTimeout(() => {
               checkLinkedInStatus()
+              refreshOnboarding() // Refresh all widgets via shared context
             }, 1000)
           }
         }, 1000)

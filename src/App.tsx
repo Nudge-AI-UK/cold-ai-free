@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoadingProvider } from '@/contexts/LoadingContext'
+import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
 import { OutreachPage } from '@/pages/OutreachPage'
 import { ProspectsPage } from '@/pages/ProspectsPage'
@@ -65,12 +66,13 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <LoadingProvider>
-          <FeedbackProvider>
-            <ModalFlowProvider>
-              <ProspectModalProvider>
-                <MobileBlocker />
-                <MaintenanceBlocker />
-                <AppContent />
+          <OnboardingProvider>
+            <FeedbackProvider>
+              <ModalFlowProvider>
+                <ProspectModalProvider>
+                  <MobileBlocker />
+                  <MaintenanceBlocker />
+                  <AppContent />
                 <Toaster
                   position="bottom-right"
                   toastOptions={{
@@ -81,11 +83,12 @@ function App() {
                     },
                   }}
                 />
-                <Analytics />
-                <SpeedInsights />
-              </ProspectModalProvider>
-            </ModalFlowProvider>
-          </FeedbackProvider>
+                  <Analytics />
+                  <SpeedInsights />
+                </ProspectModalProvider>
+              </ModalFlowProvider>
+            </FeedbackProvider>
+          </OnboardingProvider>
         </LoadingProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -43,8 +43,8 @@ class UnipileService {
         api_url: 'https://api.unipile.com', // This will be handled by Edge Function
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         userId,
-        success_url: `${window.location.origin}/auth/unipile/success`,
-        failure_url: `${window.location.origin}/auth/unipile/failure`,
+        success_url: `${window.location.origin}?unipile=success`,
+        failure_url: `${window.location.origin}?unipile=failure`,
         webhook_url: `https://hagtgdeyvogjkcjwacla.supabase.co/functions/v1/server-unipile-callback`
       };
 

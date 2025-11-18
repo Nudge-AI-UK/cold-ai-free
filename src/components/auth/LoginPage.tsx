@@ -28,14 +28,20 @@ export const LoginPage = () => {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [turnstileReady, setTurnstileReady] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
 
   // Password reset Turnstile state
   const [resetCaptchaToken, setResetCaptchaToken] = useState<string | null>(null);
+  const [isResetVerifying, setIsResetVerifying] = useState(false);
   const resetTurnstileRef = useRef<HTMLDivElement>(null);
   const resetTurnstileWidgetId = useRef<string | null>(null);
+
+  // Refs for token callbacks (to handle async execution)
+  const tokenResolveRef = useRef<((token: string) => void) | null>(null);
+  const resetTokenResolveRef = useRef<((token: string) => void) | null>(null);
 
   // Fetch real-time message count
   const { count: messageCount, isLoading: isLoadingCount } = useMessageCount();
@@ -129,7 +135,7 @@ export const LoginPage = () => {
     document.body.appendChild(script);
   }, []);
 
-  // Render Turnstile widget for both sign-up and login
+  // Render Turnstile widget in execution mode (invisible until executed)
   useEffect(() => {
     if (!turnstileReady || !showEmailForm || !turnstileRef.current) {
       return;
@@ -151,23 +157,35 @@ export const LoginPage = () => {
         // Reset captcha token when switching modes
         setCaptchaToken(null);
 
-        // Render new widget
+        // Render widget in execution mode (invisible, waits for execute() call)
         try {
           turnstileWidgetId.current = window.turnstile.render(turnstileRef.current, {
             sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+            execution: 'execute', // Don't run until we call execute()
+            appearance: 'execute', // Keep widget invisible
             callback: (token: string) => {
               setCaptchaToken(token);
+              setIsVerifying(false);
+              // Resolve any pending promise
+              if (tokenResolveRef.current) {
+                tokenResolveRef.current(token);
+                tokenResolveRef.current = null;
+              }
             },
             'error-callback': () => {
               toast.error('CAPTCHA verification failed. Please try again.');
               setCaptchaToken(null);
+              setIsVerifying(false);
+              setIsLoading(false);
             },
             'timeout-callback': () => {
               toast.error('CAPTCHA verification timed out. Please try again.');
               setCaptchaToken(null);
+              setIsVerifying(false);
+              setIsLoading(false);
             },
             'expired-callback': () => {
-              console.log('CAPTCHA token expired, resetting...');
+              console.log('CAPTCHA token expired, will re-verify on next submit');
               setCaptchaToken(null);
             },
           });
@@ -191,7 +209,7 @@ export const LoginPage = () => {
     };
   }, [isSignUp, showEmailForm, turnstileReady]);
 
-  // Render Turnstile widget for password reset modal
+  // Render Turnstile widget for password reset modal in execution mode
   useEffect(() => {
     if (!turnstileReady || !showPasswordReset || !resetTurnstileRef.current) {
       return;
@@ -213,23 +231,33 @@ export const LoginPage = () => {
         // Reset captcha token
         setResetCaptchaToken(null);
 
-        // Render new widget
+        // Render widget in execution mode (invisible, waits for execute() call)
         try {
           resetTurnstileWidgetId.current = window.turnstile.render(resetTurnstileRef.current, {
             sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+            execution: 'execute', // Don't run until we call execute()
+            appearance: 'execute', // Keep widget invisible
             callback: (token: string) => {
               setResetCaptchaToken(token);
+              setIsResetVerifying(false);
+              // Resolve any pending promise
+              if (resetTokenResolveRef.current) {
+                resetTokenResolveRef.current(token);
+                resetTokenResolveRef.current = null;
+              }
             },
             'error-callback': () => {
               toast.error('CAPTCHA verification failed. Please try again.');
               setResetCaptchaToken(null);
+              setIsResetVerifying(false);
             },
             'timeout-callback': () => {
               toast.error('CAPTCHA verification timed out. Please try again.');
               setResetCaptchaToken(null);
+              setIsResetVerifying(false);
             },
             'expired-callback': () => {
-              console.log('Password reset CAPTCHA token expired, resetting...');
+              console.log('Password reset CAPTCHA token expired, will re-verify on next submit');
               setResetCaptchaToken(null);
             },
           });
@@ -258,18 +286,56 @@ export const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      // Check captcha for both sign up and login
-      if (!captchaToken) {
-        toast.error("Please complete the CAPTCHA verification");
-        setIsLoading(false);
-        return;
-      }
-
       // Check terms acceptance for sign up
       if (isSignUp && !termsAccepted) {
         toast.error("Please accept the Terms & Conditions to continue");
         setIsLoading(false);
         return;
+      }
+
+      // Execute Turnstile verification when button is clicked
+      let token = captchaToken;
+      if (!token) {
+        if (!turnstileWidgetId.current || !window.turnstile) {
+          toast.error("Security verification not ready. Please wait or refresh the page.");
+          setIsLoading(false);
+          return;
+        }
+
+        setIsVerifying(true);
+
+        // Execute Turnstile and wait for token
+        try {
+          token = await new Promise<string>((resolve, reject) => {
+            // Set up the resolver for the callback
+            tokenResolveRef.current = resolve;
+
+            // Set timeout
+            const timeout = setTimeout(() => {
+              tokenResolveRef.current = null;
+              reject(new Error('Verification timed out'));
+            }, 30000);
+
+            // Execute Turnstile
+            window.turnstile.execute(turnstileRef.current, {});
+
+            // Clear timeout when resolved (handled in callback)
+            const originalResolve = resolve;
+            tokenResolveRef.current = (t: string) => {
+              clearTimeout(timeout);
+              originalResolve(t);
+            };
+          });
+        } catch (error) {
+          setIsVerifying(false);
+          setIsLoading(false);
+          toast.error("CAPTCHA verification failed. Please try again.");
+          // Reset the widget for retry
+          if (turnstileWidgetId.current && window.turnstile) {
+            window.turnstile.reset(turnstileWidgetId.current);
+          }
+          return;
+        }
       }
 
       if (isSignUp) {
@@ -316,7 +382,7 @@ export const LoginPage = () => {
                 deleted_at: history.deleted_at
               } : null
             },
-            captchaToken, // Include captcha token
+            captchaToken: token, // Include captcha token
           },
         });
 
@@ -387,7 +453,7 @@ export const LoginPage = () => {
           email,
           password,
           options: {
-            captchaToken, // Include captcha token for login
+            captchaToken: token, // Include captcha token for login
           },
         });
 
@@ -552,10 +618,47 @@ export const LoginPage = () => {
 
   const handlePasswordReset = async (resetEmail: string) => {
     try {
-      // Check captcha token
-      if (!resetCaptchaToken) {
-        toast.error("Please complete the CAPTCHA verification.");
-        return;
+      // Execute Turnstile verification when button is clicked
+      let token = resetCaptchaToken;
+      if (!token) {
+        if (!resetTurnstileWidgetId.current || !window.turnstile) {
+          toast.error("Security verification not ready. Please wait or refresh the page.");
+          return;
+        }
+
+        setIsResetVerifying(true);
+
+        // Execute Turnstile and wait for token
+        try {
+          token = await new Promise<string>((resolve, reject) => {
+            // Set up the resolver for the callback
+            resetTokenResolveRef.current = resolve;
+
+            // Set timeout
+            const timeout = setTimeout(() => {
+              resetTokenResolveRef.current = null;
+              reject(new Error('Verification timed out'));
+            }, 30000);
+
+            // Execute Turnstile
+            window.turnstile.execute(resetTurnstileRef.current, {});
+
+            // Clear timeout when resolved (handled in callback)
+            const originalResolve = resolve;
+            resetTokenResolveRef.current = (t: string) => {
+              clearTimeout(timeout);
+              originalResolve(t);
+            };
+          });
+        } catch (error) {
+          setIsResetVerifying(false);
+          toast.error("CAPTCHA verification failed. Please try again.");
+          // Reset the widget for retry
+          if (resetTurnstileWidgetId.current && window.turnstile) {
+            window.turnstile.reset(resetTurnstileWidgetId.current);
+          }
+          return;
+        }
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
@@ -572,8 +675,10 @@ export const LoginPage = () => {
       toast.success("Password reset link sent! Check your email.");
       setShowPasswordReset(false);
       setResetCaptchaToken(null);
+      setIsResetVerifying(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to send reset email.");
+      setIsResetVerifying(false);
     }
   };
 
@@ -856,36 +961,18 @@ export const LoginPage = () => {
                     </div>
                   )}
 
-                  {/* Turnstile CAPTCHA Widget - Show for both sign up and login */}
-                  <div className="space-y-2">
-                    <Label className="text-gray-300">Verify you're human</Label>
-                    <div className="relative min-h-[65px] flex justify-center items-center">
-                      {/* Loading spinner - shows while CAPTCHA loads */}
-                      {!captchaToken && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="w-6 h-6 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin"></div>
-                            <p className="text-xs text-gray-500">Loading verification...</p>
-                          </div>
-                        </div>
-                      )}
-                      {/* Turnstile widget container */}
-                      <div
-                        ref={turnstileRef}
-                        className="flex justify-center"
-                      />
-                    </div>
-                  </div>
+                  {/* Hidden Turnstile widget container (execution mode) */}
+                  <div ref={turnstileRef} className="hidden" />
 
                   <Button
                     type="submit"
-                    disabled={isLoading || !captchaToken}
+                    disabled={isLoading || isVerifying}
                     className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium py-2 transition-all duration-300 group"
                   >
-                    {isLoading ? (
+                    {isLoading || isVerifying ? (
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Processing...</span>
+                        <span>{isVerifying ? "Verifying..." : "Processing..."}</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
@@ -1096,40 +1183,30 @@ export const LoginPage = () => {
                 </div>
               </div>
 
-              {/* Turnstile CAPTCHA Widget */}
-              <div className="space-y-2 mb-4">
-                <Label className="text-gray-300">Verify you're human</Label>
-                <div className="relative min-h-[65px] flex justify-center items-center">
-                  {/* Loading spinner - shows while CAPTCHA loads */}
-                  {!resetCaptchaToken && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-6 h-6 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin"></div>
-                        <p className="text-xs text-gray-500">Loading verification...</p>
-                      </div>
-                    </div>
-                  )}
-                  {/* Turnstile widget container */}
-                  <div
-                    ref={resetTurnstileRef}
-                    className="flex justify-center"
-                  />
-                </div>
-              </div>
+              {/* Hidden Turnstile widget container (execution mode) */}
+              <div ref={resetTurnstileRef} className="hidden" />
 
               <div className="flex gap-3">
                 <Button
                   type="button"
                   onClick={() => setShowPasswordReset(false)}
                   variant="outline"
-                  className="flex-1 bg-gray-900/50 border-gray-700 text-gray-300 hover:bg-gray-800/50">
+                  className="flex-1 bg-gray-900/50 border-gray-700 text-gray-300 hover:bg-gray-800/50"
+                  disabled={isResetVerifying}>
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!resetCaptchaToken}
+                  disabled={isResetVerifying}
                   className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-                  Send Reset Link
+                  {isResetVerifying ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Verifying...</span>
+                    </div>
+                  ) : (
+                    "Send Reset Link"
+                  )}
                 </Button>
               </div>
             </form>

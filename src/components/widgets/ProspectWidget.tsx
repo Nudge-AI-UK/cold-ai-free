@@ -540,6 +540,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                     src={profilePicture}
                     alt={researchData.name}
                     className="w-10 h-10 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
                     onError={(e) => {
                       // Fallback to UI avatars if LinkedIn image fails
                       e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`

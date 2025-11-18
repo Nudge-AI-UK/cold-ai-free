@@ -8,6 +8,7 @@ import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { useOnboardingContext } from '@/contexts/OnboardingContext'
 import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 import type { Database } from '@/types/supabase'
@@ -24,6 +25,7 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
   const { currentStep: onboardingStep, status: onboardingStatus } = useOnboardingState()
+  const { refresh: refreshOnboarding } = useOnboardingContext()
   const { setActiveProduct } = useActiveFeedbackItem()
   const [entry, setEntry] = useState<KnowledgeEntry | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -140,12 +142,25 @@ export function KnowledgeWidget({ forceEmpty, className }: KnowledgeWidgetProps)
       .single()
 
     if (data) {
+      // Check if product just became ready (was processing, now reviewing/active with approval)
+      // Must match OnboardingContext logic: workflow_status in ['reviewing', 'active'] && review_status === 'approved'
+      const wasNotReady = isGenerating || (entry && entry.review_status !== 'approved')
+      const isNowReady = (
+        (data.workflow_status === 'reviewing' || data.workflow_status === 'active') &&
+        data.review_status === 'approved'
+      )
+
       setEntry(data)
       // Check if entry is still processing and show generating state
       if (data.workflow_status === 'processing') {
         setIsGenerating(true)
       } else {
         setIsGenerating(false)
+
+        // Refresh onboarding context when product becomes ready
+        if (wasNotReady && isNowReady) {
+          refreshOnboarding()
+        }
       }
     }
   }

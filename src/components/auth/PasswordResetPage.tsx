@@ -18,25 +18,54 @@ export const PasswordResetPage = () => {
 
   useEffect(() => {
     // Check if we have a valid reset token
-    supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth event:', event, session ? 'has session' : 'no session');
       if (event === "PASSWORD_RECOVERY") {
+        console.log('✅ Password recovery event detected');
+        setIsValidToken(true);
+      } else if (event === "SIGNED_IN" && session) {
+        // Also accept SIGNED_IN with a session (recovery token was processed)
+        console.log('✅ Signed in with recovery session');
         setIsValidToken(true);
       }
     });
 
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // No active session, check for token in URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const type = hashParams.get('type');
+    // Check for token in URL hash first
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
 
-        if (!accessToken || type !== 'recovery') {
+    if (accessToken && type === 'recovery') {
+      // Token is in URL, Supabase will process it and fire PASSWORD_RECOVERY event
+      console.log('🔑 Recovery token found in URL, waiting for Supabase to process...');
+      // Don't set isValidToken yet, wait for the auth event
+    } else {
+      // No token in URL, check if we already have a session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          // Already have a session, likely from a processed recovery
+          console.log('✅ Existing session found');
+          setIsValidToken(true);
+        } else {
+          // No token and no session = invalid
+          console.log('❌ No recovery token or session found');
           setIsValidToken(false);
         }
+      });
+    }
+
+    // Timeout fallback - if no event fires within 5 seconds, something's wrong
+    const timeout = setTimeout(() => {
+      if (isValidToken === null) {
+        console.warn('⏰ Token validation timed out');
+        setIsValidToken(false);
       }
-    });
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handlePasswordReset = async (e: React.FormEvent) => {

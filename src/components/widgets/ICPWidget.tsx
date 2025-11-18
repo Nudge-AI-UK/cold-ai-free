@@ -8,6 +8,7 @@ import { useModalFlow } from '@/components/modals/ModalFlowManager'
 import { useSimpleSubscription } from '@/hooks/useSimpleSubscription'
 import { HoverTooltip } from '@/components/ui/HoverTooltip'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
+import { useOnboardingContext } from '@/contexts/OnboardingContext'
 import { OnboardingArrow } from '@/components/ui/onboarding-arrow'
 import { useActiveFeedbackItem } from '@/contexts/FeedbackContext'
 
@@ -25,6 +26,7 @@ export function ICPWidget({ className }: ICPWidgetProps) {
   const { openModal } = useModalFlow()
   const { planType } = useSimpleSubscription(user?.id)
   const { currentStep: onboardingStep } = useOnboardingState()
+  const { refresh: refreshOnboarding } = useOnboardingContext()
   const { setActiveICP } = useActiveFeedbackItem()
   const [icp, setIcp] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -207,26 +209,40 @@ export function ICPWidget({ className }: ICPWidgetProps) {
 
 
       if (data) {
+        // Track previous state to detect transitions
+        const previousState = icpState
+
         setIcp(data)
 
         // Determine state based on workflow_status first (most specific)
+        let newState: ICPState = 'empty'
         if (data.workflow_status === 'draft') {
-          setIcpState('draft')
+          newState = 'draft'
         } else if (data.workflow_status === 'generating' || data.workflow_status === 'form') {
-          setIcpState('generating')
+          newState = 'generating'
         } else if (data.workflow_status === 'reviewing') {
-          setIcpState('reviewing')
+          newState = 'reviewing'
         } else if (data.workflow_status === 'approved') {
-          setIcpState('active')
+          newState = 'active'
         }
         // Fall back to is_active check if workflow_status doesn't tell us
         else if (data.is_active === false) {
-          setIcpState('generating')
+          newState = 'generating'
         } else if (data.is_active === true) {
-          setIcpState('active')
-        } else {
-          // No workflow_status and no is_active, default to empty
-          setIcpState('empty')
+          newState = 'active'
+        }
+
+        setIcpState(newState)
+
+        // Refresh onboarding context when ICP becomes ready for messaging
+        // Must match OnboardingContext logic: (reviewing && approved) || is_active
+        const wasNotReady = previousState === 'empty' || previousState === 'generating' || previousState === 'draft'
+        const isNowReady = (
+          (newState === 'reviewing' && data.review_status === 'approved') ||
+          data.is_active === true
+        )
+        if (wasNotReady && isNowReady) {
+          refreshOnboarding()
         }
       } else if (!error) {
         setIcpState('empty')
