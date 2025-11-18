@@ -41,13 +41,14 @@ function AppContent() {
     )
   }
 
-  // Allow unauthenticated access to password reset page or recovery redirect
-  if (!user && !isResetPasswordPage && !isRecoveryRedirect) {
-    return <LoginPage />
+  // Handle password reset page - show regardless of auth state if recovery redirect
+  if (isResetPasswordPage || isRecoveryRedirect) {
+    return <PasswordResetPage />
   }
 
-  if (!user && (isResetPasswordPage || isRecoveryRedirect)) {
-    return <PasswordResetPage />
+  // Show login page for unauthenticated users
+  if (!user) {
+    return <LoginPage />
   }
 
   return (
