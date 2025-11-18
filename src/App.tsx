@@ -24,6 +24,10 @@ function AppContent() {
   const { user, loading } = useAuth()
   const isResetPasswordPage = window.location.pathname === '/reset-password'
 
+  // Check if this is a password recovery redirect (token in URL hash)
+  const hashParams = new URLSearchParams(window.location.hash.substring(1))
+  const isRecoveryRedirect = hashParams.get('type') === 'recovery' || hashParams.get('error_code') === 'otp_expired'
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -37,12 +41,12 @@ function AppContent() {
     )
   }
 
-  // Allow unauthenticated access to password reset page
-  if (!user && !isResetPasswordPage) {
+  // Allow unauthenticated access to password reset page or recovery redirect
+  if (!user && !isResetPasswordPage && !isRecoveryRedirect) {
     return <LoginPage />
   }
 
-  if (!user && isResetPasswordPage) {
+  if (!user && (isResetPasswordPage || isRecoveryRedirect)) {
     return <PasswordResetPage />
   }
 
