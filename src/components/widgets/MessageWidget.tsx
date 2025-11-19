@@ -868,6 +868,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         .update({
           edited_message: editedMessage && editedMessage !== generatedMessage ? editedMessage : null,
           message_status: 'copied',
+          sent_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', currentLogId)

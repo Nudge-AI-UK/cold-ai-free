@@ -617,7 +617,9 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
       className="knowledge-modal-large !max-w-[95vw] !h-[90vh]"
     >
       <TooltipProvider delayDuration={0}>
-        <div className="flex h-full overflow-hidden">
+        <div className="flex flex-col h-full">
+        {/* Main Content Area */}
+        <div className="flex flex-1 overflow-hidden">
         {/* Left Content Area */}
         <div className="flex-1 overflow-y-auto pr-6 space-y-6">
           {isDraftPending ? (
@@ -1334,24 +1336,6 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
             </div>
           )}
 
-          {/* Metadata */}
-          <div className="pt-4 border-t border-gray-700">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2 text-gray-400">
-                <Calendar className="w-4 h-4" />
-                <span>Created: {safeFormatDate(entry.created_at, 'dd MMM yyyy')}</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <Calendar className="w-4 h-4" />
-                <span>Updated: {safeFormatDate(entry.updated_at, 'dd MMM yyyy')}</span>
-              </div>
-            </div>
-            {metadata.enhanced && (
-              <Badge variant="outline" className="mt-3 bg-purple-500/20 text-purple-300 border-purple-500/30">
-                AI Enhanced
-              </Badge>
-            )}
-          </div>
         </div>
 
         {/* AI Summary Panel - Show for draft/pending and view modes */}
@@ -1536,19 +1520,22 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
         )}
       </div>
 
-      {/* Action Buttons for Draft/Pending Mode */}
-      {isDraftPending && (
-        <div className="mt-6 pt-6 border-t border-gray-700 flex items-center justify-end">
-          {/* TODO: Re-enable delete button with abuse prevention
-          <button
-            onClick={handleReject}
-            disabled={isSaving}
-            className="px-4 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/10 hover:border-red-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Delete Entry
-          </button>
-          */}
+      {/* Unified Static Footer */}
+      <div className="mt-4 pt-4 border-t border-gray-700 flex items-center justify-between">
+        {/* Left side - Dates */}
+        <div className="flex items-center gap-6 text-sm text-gray-400">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            <span>Created: {safeFormatDate(entry.created_at, 'dd/MM/yyyy')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            <span>Updated: {safeFormatDate(entry.updated_at, 'dd/MM/yyyy')}</span>
+          </div>
+        </div>
 
+        {/* Right side - Action Buttons (only for draft/pending mode) */}
+        {isDraftPending && (
           <button
             onClick={handleApprove}
             disabled={isSaving}
@@ -1556,8 +1543,9 @@ export const KnowledgeDetailsModal = ({ entry, mode }: KnowledgeDetailsModalProp
           >
             {isSaving ? 'Approving...' : 'Approve & Submit'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
+      </div>
       </TooltipProvider>
     </BaseModal>
   );

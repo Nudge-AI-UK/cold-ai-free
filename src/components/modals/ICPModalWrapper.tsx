@@ -7,6 +7,47 @@ import { ICPUnifiedModal } from '../icps/ICPUnifiedModal/index'
 import { useModalFlow } from './ModalFlowManager'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
+import { CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+
+// Helper function to get status badge based on ICP status
+const getStatusBadge = (icp: any, mode: string) => {
+  // Determine the actual mode based on ICP status if not explicitly set
+  let effectiveMode = mode
+  if (!mode || mode === 'view') {
+    if (icp?.workflow_status === 'reviewing') {
+      effectiveMode = 'review'
+    } else if (icp?.workflow_status === 'draft' || icp?.review_status !== 'approved') {
+      effectiveMode = 'edit'
+    } else {
+      effectiveMode = 'view'
+    }
+  }
+
+  switch (effectiveMode) {
+    case 'edit':
+      return (
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 text-xs font-medium">
+          <AlertCircle className="w-3 h-3" />
+          Draft
+        </div>
+      )
+    case 'review':
+      return (
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 text-xs font-medium">
+          <Clock className="w-3 h-3" />
+          Reviewing
+        </div>
+      )
+    case 'view':
+    default:
+      return (
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 border border-green-500/20 text-xs font-medium">
+          <CheckCircle2 className="w-3 h-3" />
+          Active
+        </div>
+      )
+  }
+}
 
 // ICP Creation Modal Wrapper - renders ICPCreationModalV2 inside BaseModal
 export function ICPCreationModalWrapper({
@@ -217,6 +258,7 @@ export function ICPUnifiedModalWrapper({
       title={mode === 'edit' ? "Edit Ideal Customer Profile" : "View Ideal Customer Profile"}
       description={mode === 'edit' ? "Review and approve your ICP" : "Review your ideal customer profile details"}
       className="icp-modal-large"
+      headerRight={getStatusBadge(icpData, mode)}
     >
       <ICPUnifiedModal
         isOpen={true}

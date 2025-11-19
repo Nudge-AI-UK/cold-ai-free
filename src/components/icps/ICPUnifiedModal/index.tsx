@@ -232,24 +232,8 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
   // Define the modal content
   const modalContent = (
     <div className={`${renderWithoutDialog ? 'w-full h-full' : 'max-w-[95vw] w-[1400px] h-[90vh]'} bg-gray-900 border-gray-700 p-0 flex flex-col rounded-lg`}>
-        {/* Header */}
-        {renderWithoutDialog ? (
-          <div className="px-6 py-4 border-b border-gray-700 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold text-white">
-                  {getModalTitle()}
-                </h2>
-                {getStatusBadge()}
-                {hasChanges && (
-                  <Badge variant="outline" className="text-yellow-500 border-yellow-500">
-                    {changedFields.length} unsaved changes
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
+        {/* Header - only show when not wrapped by BaseModal */}
+        {!renderWithoutDialog && (
           <DialogHeader className="px-6 py-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">

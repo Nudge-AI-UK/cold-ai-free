@@ -292,7 +292,7 @@ export function ProspectModal({
 
       setResearchCache(prospectData.research_cache as ResearchCache)
 
-      // Now fetch all messages for this prospect
+      // Now fetch all messages for this prospect (filtered by user_id)
       const { data: messages, error: messagesError } = await supabase
         .from('message_generation_logs')
         .select(`
@@ -309,6 +309,7 @@ export function ProspectModal({
           message_type
         `)
         .eq('research_cache_id', prospectData.research_cache_id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
 
       if (messagesError) throw messagesError
@@ -1163,8 +1164,8 @@ export function ProspectModal({
                       {/* Action Buttons */}
                       <div className="flex gap-3 pt-4 border-t border-white/10">
                         {(() => {
-                          // Check if any message has been sent to this prospect
-                          const hasBeenSent = prospectMessages.some((m: any) => m.sent_at !== null)
+                          // Check if any message has been sent to this prospect (use message_status for consistency with prospects page)
+                          const hasBeenSent = prospectMessages.some((m: any) => ['sent', 'copied', 'reply_received', 'reply_sent'].includes(m.message_status))
                           const canSend = ['generated', 'archived'].includes(currentMessage.message_status)
 
                           if (hasBeenSent) {
@@ -1213,6 +1214,7 @@ export function ProspectModal({
                                       .update({
                                         edited_message: editedMessage && editedMessage !== generatedMessage ? editedMessage : null,
                                         message_status: 'copied',
+                                        sent_at: new Date().toISOString(),
                                         updated_at: new Date().toISOString()
                                       })
                                       .eq('id', currentMessage.id)

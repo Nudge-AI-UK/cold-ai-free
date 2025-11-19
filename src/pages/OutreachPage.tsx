@@ -90,6 +90,7 @@ export function OutreachPage() {
             research_cache_id,
             created_at,
             updated_at,
+            hidden,
             research_cache!inner (
               id,
               profile_url,
@@ -100,7 +101,8 @@ export function OutreachPage() {
           `)
           .eq('user_id', userId)
           .is('research_cache.deleted_at', null)
-          .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled', 'scheduled', 'sent'])
+          .or('hidden.is.null,hidden.eq.false')
+          .in('message_status', ['generated', 'archived', 'approved', 'pending_scheduled', 'scheduled', 'sent', 'copied'])
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -142,10 +144,10 @@ export function OutreachPage() {
         thisWeekMonday.setDate(now.getDate() - daysFromMonday)
         thisWeekMonday.setHours(0, 0, 0, 0)
 
-        // First, identify all prospects who have sent messages from before this week
+        // First, identify all prospects who have sent/copied messages from before this week
         const prospectsContactedBeforeThisWeek = new Set<number>()
         allMessages.forEach(msg => {
-          if (msg.status === 'sent' && msg.updatedAt && msg.updatedAt < thisWeekMonday) {
+          if ((msg.status === 'sent' || msg.status === 'copied') && msg.updatedAt && msg.updatedAt < thisWeekMonday) {
             if (msg.researchCacheId) {
               prospectsContactedBeforeThisWeek.add(msg.researchCacheId)
             }
@@ -282,7 +284,7 @@ export function OutreachPage() {
     generated: prospects.filter(p => p.status === 'generated').length,
     pending_scheduled: prospects.filter(p => p.status === 'pending_scheduled').length,
     scheduled: prospects.filter(p => p.status === 'scheduled').length,
-    sent: prospects.filter(p => p.status === 'sent').length,
+    sent: prospects.filter(p => p.status === 'sent' || p.status === 'copied').length,
     'reply-received': prospects.filter(p => p.status === 'reply-received').length,
     'reply-sent': prospects.filter(p => p.status === 'reply-sent').length,
     archived: prospects.filter(p => p.status === 'archived').length,
@@ -291,9 +293,13 @@ export function OutreachPage() {
   const statusCounts = getStatusCounts()
 
   // Filter prospects - if 'all' is selected or no filters, show all
+  // Treat 'copied' status same as 'sent' for filtering
   const filteredProspects = activeFilters.includes('all') || activeFilters.length === 0
     ? prospects
-    : prospects.filter(p => activeFilters.includes(p.status as StatusFilter))
+    : prospects.filter(p => {
+        const status = p.status === 'copied' ? 'sent' : p.status
+        return activeFilters.includes(status as StatusFilter)
+      })
 
   // Check if current state matches original state
   const checkForChanges = (currentMessages: ScheduledMessage[]) => {
