@@ -4,12 +4,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { Header } from '@/components/layout/Header'
 import { toast } from 'sonner'
-import { Users, ExternalLink, Calendar, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, SlidersHorizontal, X, MoreVertical, Trash2 } from 'lucide-react'
+import { Users, ExternalLink, Calendar, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, SlidersHorizontal, X, MoreVertical, Trash2, EyeOff, Eye, Send } from 'lucide-react'
 import { useProspectModal } from '@/components/modals/ProspectModalManager'
 
 type SortColumn = 'name' | 'jobTitle' | 'status' | 'messages' | 'added' | 'scheduled'
 type SortDirection = 'asc' | 'desc'
-type StatusFilter = 'all' | 'analysing_prospect' | 'researching_product' | 'analysing_icp' | 'generating_message' | 'generated' | 'pending_scheduled' | 'scheduled' | 'sent' | 'reply_received' | 'reply_sent' | 'archived' | 'failed'
+type StatusFilter = 'all' | 'analysing_prospect' | 'researching_product' | 'analysing_icp' | 'generating_message' | 'generated' | 'pending_scheduled' | 'scheduled' | 'sent' | 'reply_received' | 'reply_sent' | 'archived' | 'failed' | 'hidden'
 
 const PROSPECTS_PER_PAGE = 50
 
@@ -66,6 +66,7 @@ interface MessageLog {
   research_cache: ResearchCache | null
   created_at: string
   updated_at: string
+  hidden?: boolean
   sequence_prospects?: Array<{ scheduled_for: string }>
 }
 
@@ -83,6 +84,7 @@ interface ProspectRow {
   scheduledFor?: Date
   messageCount: number
   allStatuses: string[] // All status history for this prospect
+  isHidden: boolean
 }
 
 const getStatusBadge = (status: string) => {
@@ -182,8 +184,17 @@ export function ProspectsPage() {
   })
   const [showRulesModal, setShowRulesModal] = useState(false)
   const [openMenuProspectId, setOpenMenuProspectId] = useState<number | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [deleteConfirmProspect, setDeleteConfirmProspect] = useState<{ id: number; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [markAsSentModal, setMarkAsSentModal] = useState<{
+    prospectName: string
+    researchCacheId: number
+    messages: Array<{ id: number; message: string; createdAt: string }>
+  } | null>(null)
+  const [selectedMessageId, setSelectedMessageId] = useState<number | 'other' | null>(null)
+  const [customMessage, setCustomMessage] = useState('')
+  const [isMarkingAsSent, setIsMarkingAsSent] = useState(false)
 
   const fetchProspects = async () => {
     if (!user) return
@@ -201,6 +212,7 @@ export function ProspectsPage() {
             research_cache_id,
             created_at,
             updated_at,
+            hidden,
             research_cache!inner (
               id,
               profile_url,
@@ -223,6 +235,7 @@ export function ProspectsPage() {
             'pending_scheduled',
             'scheduled',
             'sent',
+            'copied',
             'reply_received',
             'reply_sent',
             'archived',
@@ -252,7 +265,7 @@ export function ProspectsPage() {
         const mappedProspects: ProspectRow[] = Array.from(prospectMap.entries())
           .map(([cacheId, messages], index) => {
             // Filter out archived messages if there are active messages for this prospect
-            const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent']
+            const activeStatuses = ['pending_scheduled', 'scheduled', 'sent', 'copied', 'reply_received', 'reply_sent']
             const hasActiveMessage = messages.some(m => activeStatuses.includes(m.message_status))
 
             const filteredMessages = hasActiveMessage
@@ -286,7 +299,8 @@ export function ProspectsPage() {
               updatedAt: new Date(mostRecent.updated_at),
               scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined,
               messageCount: filteredMessages.length, // Use filtered count, not all messages
-              allStatuses: messages.map(m => m.message_status) // All status history (before filtering)
+              allStatuses: messages.map(m => m.message_status), // All status history (before filtering)
+              isHidden: messages.some(m => m.hidden === true) // Hidden if any message is hidden
             }
           })
           .filter((p): p is ProspectRow => p !== null)
@@ -342,20 +356,23 @@ export function ProspectsPage() {
 
   // Get status counts for filter chips
   const getStatusCounts = () => {
+    const visibleProspects = prospects.filter(p => !p.isHidden)
+    const hiddenProspects = prospects.filter(p => p.isHidden)
     return {
-      all: prospects.length,
-      analysing_prospect: prospects.filter(p => p.messageStatus === 'analysing_prospect').length,
-      researching_product: prospects.filter(p => p.messageStatus === 'researching_product').length,
-      analysing_icp: prospects.filter(p => p.messageStatus === 'analysing_icp').length,
-      generating_message: prospects.filter(p => p.messageStatus === 'generating_message').length,
-      generated: prospects.filter(p => p.messageStatus === 'generated').length,
-      pending_scheduled: prospects.filter(p => p.messageStatus === 'pending_scheduled').length,
-      scheduled: prospects.filter(p => p.messageStatus === 'scheduled').length,
-      sent: prospects.filter(p => p.messageStatus === 'sent').length,
-      reply_received: prospects.filter(p => p.messageStatus === 'reply_received').length,
-      reply_sent: prospects.filter(p => p.messageStatus === 'reply_sent').length,
-      archived: prospects.filter(p => p.messageStatus === 'archived').length,
-      failed: prospects.filter(p => p.messageStatus === 'failed').length,
+      all: visibleProspects.length,
+      analysing_prospect: visibleProspects.filter(p => p.messageStatus === 'analysing_prospect').length,
+      researching_product: visibleProspects.filter(p => p.messageStatus === 'researching_product').length,
+      analysing_icp: visibleProspects.filter(p => p.messageStatus === 'analysing_icp').length,
+      generating_message: visibleProspects.filter(p => p.messageStatus === 'generating_message').length,
+      generated: visibleProspects.filter(p => p.messageStatus === 'generated').length,
+      pending_scheduled: visibleProspects.filter(p => p.messageStatus === 'pending_scheduled').length,
+      scheduled: visibleProspects.filter(p => p.messageStatus === 'scheduled').length,
+      sent: visibleProspects.filter(p => p.messageStatus === 'sent' || p.messageStatus === 'copied').length,
+      reply_received: visibleProspects.filter(p => p.messageStatus === 'reply_received').length,
+      reply_sent: visibleProspects.filter(p => p.messageStatus === 'reply_sent').length,
+      archived: visibleProspects.filter(p => p.messageStatus === 'archived').length,
+      failed: visibleProspects.filter(p => p.messageStatus === 'failed').length,
+      hidden: hiddenProspects.length,
     }
   }
 
@@ -401,7 +418,7 @@ export function ProspectsPage() {
     }
 
     if (rules.activeOutreach) {
-      const isActive = ['scheduled', 'sent'].includes(prospect.messageStatus)
+      const isActive = ['scheduled', 'sent', 'copied'].includes(prospect.messageStatus)
       const notReplied = !['reply_received', 'reply_sent'].includes(prospect.messageStatus)
       return isActive && notReplied
     }
@@ -413,7 +430,7 @@ export function ProspectsPage() {
       // Show archived messages for prospects who have never been scheduled or contacted
       if (prospect.messageStatus === 'archived') {
         const hasBeenContactedOrScheduled = prospect.allStatuses.some(s =>
-          ['scheduled', 'pending_scheduled', 'sent', 'reply_received', 'reply_sent'].includes(s)
+          ['scheduled', 'pending_scheduled', 'sent', 'copied', 'reply_received', 'reply_sent'].includes(s)
         )
         return !hasBeenContactedOrScheduled
       }
@@ -422,9 +439,9 @@ export function ProspectsPage() {
     }
 
     if (rules.coldLeads) {
-      // For sent messages, check when it was sent (updatedAt), not when prospect was added
+      // For sent/copied messages, check when it was sent (updatedAt), not when prospect was added
       const is14DaysOld = prospect.updatedAt.getTime() < now.getTime() - (14 * 24 * 60 * 60 * 1000)
-      const isSent = prospect.messageStatus === 'sent'
+      const isSent = prospect.messageStatus === 'sent' || prospect.messageStatus === 'copied'
       const noReply = !['reply_received', 'reply_sent'].includes(prospect.messageStatus)
       return is14DaysOld && isSent && noReply
     }
@@ -453,7 +470,7 @@ export function ProspectsPage() {
     if (rules.hideAllArchived && prospect.messageStatus === 'archived') return false
 
     if (rules.onlyAwaitingReply) {
-      const isSent = prospect.messageStatus === 'sent'
+      const isSent = prospect.messageStatus === 'sent' || prospect.messageStatus === 'copied'
       const noReply = !['reply_received', 'reply_sent'].includes(prospect.messageStatus)
       if (!(isSent && noReply)) return false
     }
@@ -481,13 +498,25 @@ export function ProspectsPage() {
   // Filter and sort prospects
   const filteredAndSortedProspects = prospects
     .filter(p => {
+      // Hidden filter - special handling
+      const showingHidden = activeFilters.includes('hidden')
+      if (showingHidden) {
+        // Only show hidden prospects when hidden filter is active
+        if (!p.isHidden) return false
+      } else {
+        // Hide hidden prospects by default
+        if (p.isHidden) return false
+      }
+
       // Search filter
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            p.jobTitle.toLowerCase().includes(searchQuery.toLowerCase())
 
-      // Status filter
+      // Status filter - treat 'copied' same as 'sent'
+      const effectiveStatus = p.messageStatus === 'copied' ? 'sent' : p.messageStatus
       const matchesStatus = activeFilters.includes('all') || activeFilters.length === 0 ||
-                           activeFilters.includes(p.messageStatus as StatusFilter)
+                           activeFilters.includes('hidden') || // Show all statuses when viewing hidden
+                           activeFilters.includes(effectiveStatus as StatusFilter)
 
       // Rules filter
       const matchesRules = applyRules(p)
@@ -574,6 +603,133 @@ export function ProspectsPage() {
       toast.error('Failed to remove prospect')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  // Handle prospect hide/unhide
+  const handleToggleHideProspect = async (researchCacheId: number, hide: boolean) => {
+    if (!user) return
+
+    try {
+      const userId = user.id || user.user_id
+
+      // Update all messages for this prospect
+      const { error } = await supabase
+        .from('message_generation_logs')
+        .update({ hidden: hide })
+        .eq('research_cache_id', researchCacheId)
+        .eq('user_id', userId)
+
+      if (error) throw error
+
+      toast.success(hide ? 'Prospect hidden' : 'Prospect unhidden')
+      // Refresh the prospects list
+      fetchProspects()
+    } catch (error) {
+      console.error('Error hiding prospect:', error)
+      toast.error('Failed to update prospect')
+    }
+  }
+
+  // Handle opening Mark as Sent modal
+  const handleOpenMarkAsSent = async (prospect: ProspectRow) => {
+    if (!user) return
+
+    try {
+      const userId = user.id || user.user_id
+
+      // Fetch all generated/archived messages for this prospect
+      const { data, error } = await supabase
+        .from('message_generation_logs')
+        .select('id, generated_message, edited_message, created_at')
+        .eq('user_id', userId)
+        .eq('research_cache_id', prospect.researchCacheId)
+        .in('message_status', ['generated', 'archived'])
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      const messages = (data || []).map(msg => ({
+        id: msg.id,
+        message: msg.edited_message || msg.generated_message || '',
+        createdAt: msg.created_at
+      }))
+
+      if (messages.length === 0) {
+        toast.error('No generated messages found')
+        return
+      }
+
+      // If only one message, mark it directly
+      if (messages.length === 1) {
+        await handleMarkAsSent(messages[0].id)
+        return
+      }
+
+      // Multiple messages - show modal
+      setMarkAsSentModal({
+        prospectName: prospect.name,
+        researchCacheId: prospect.researchCacheId,
+        messages
+      })
+      setSelectedMessageId(messages[0].id)
+      setCustomMessage('')
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+      toast.error('Failed to load messages')
+    }
+  }
+
+  // Handle marking a message as sent
+  const handleMarkAsSent = async (messageId: number, customText?: string) => {
+    if (!user) return
+
+    setIsMarkingAsSent(true)
+    try {
+      const updateData: any = {
+        message_status: 'sent',
+        sent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      if (customText) {
+        updateData.edited_message = customText
+      }
+
+      const { error } = await supabase
+        .from('message_generation_logs')
+        .update(updateData)
+        .eq('id', messageId)
+
+      if (error) throw error
+
+      toast.success('Message marked as sent')
+      setMarkAsSentModal(null)
+      setSelectedMessageId(null)
+      setCustomMessage('')
+      fetchProspects()
+    } catch (error) {
+      console.error('Error marking as sent:', error)
+      toast.error('Failed to mark as sent')
+    } finally {
+      setIsMarkingAsSent(false)
+    }
+  }
+
+  // Handle confirming Mark as Sent from modal
+  const handleConfirmMarkAsSent = async () => {
+    if (!markAsSentModal || !selectedMessageId) return
+
+    if (selectedMessageId === 'other') {
+      if (!customMessage.trim()) {
+        toast.error('Please enter the message you sent')
+        return
+      }
+      // Use the most recent message ID and update with custom text
+      const mostRecentId = markAsSentModal.messages[0].id
+      await handleMarkAsSent(mostRecentId, customMessage.trim())
+    } else {
+      await handleMarkAsSent(selectedMessageId)
     }
   }
 
@@ -684,6 +840,7 @@ export function ProspectsPage() {
               { key: 'reply_sent', label: 'Reply Sent', color: 'bg-[#10B981]' },
               { key: 'archived', label: 'Archived', color: 'bg-[#6B7280]' },
               { key: 'failed', label: 'Failed', color: 'bg-[#EF4444]' },
+              { key: 'hidden', label: 'Hidden', color: 'bg-[#9CA3AF]' },
             ] as Array<{ key: StatusFilter; label: string; color: string }>)
               .filter(filter => {
                 // Hide pending_scheduled if count is 0
@@ -741,8 +898,8 @@ export function ProspectsPage() {
 
         {/* Table */}
         <div className="max-w-[1800px] mx-auto">
-          <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-white/5 border border-white/10 rounded-xl overflow-visible">
+            <div className="overflow-x-auto overflow-y-visible">
               <table className="w-full">
                 <thead className="bg-white/5 border-b border-white/10">
                   <tr className="group">
@@ -790,7 +947,7 @@ export function ProspectsPage() {
                       <tr
                         key={prospect.id}
                         onClick={() => handleProspectClick(prospect.id)}
-                        className="hover:bg-white/5 transition-colors cursor-pointer"
+                        className={`hover:bg-white/5 transition-colors cursor-pointer ${prospect.isHidden ? 'opacity-50' : ''}`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
@@ -848,27 +1005,41 @@ export function ProspectsPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="relative inline-block">
+                          <div className="relative inline-block" style={{ opacity: 1 }}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setOpenMenuProspectId(openMenuProspectId === prospect.id ? null : prospect.id)
+                                if (openMenuProspectId === prospect.id) {
+                                  setOpenMenuProspectId(null)
+                                  setMenuPosition(null)
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  setMenuPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.right - 192 // 192px = w-48
+                                  })
+                                  setOpenMenuProspectId(prospect.id)
+                                }
                               }}
                               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
                             >
                               <MoreVertical className="h-4 w-4 text-gray-400" />
                             </button>
 
-                            {openMenuProspectId === prospect.id && (
+                            {openMenuProspectId === prospect.id && menuPosition && (
                               <>
                                 <div
-                                  className="fixed inset-0 z-10"
+                                  className="fixed inset-0 z-40"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setOpenMenuProspectId(null)
+                                    setMenuPosition(null)
                                   }}
                                 />
-                                <div className="absolute right-0 mt-1 w-48 bg-[#1a1f36] border border-white/10 rounded-lg shadow-xl z-20 overflow-hidden">
+                                <div
+                                  className="fixed w-48 bg-[#1a1f36] border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden"
+                                  style={{ top: menuPosition.top, left: menuPosition.left, opacity: 1 }}
+                                >
                                   <a
                                     href={prospect.linkedinUrl}
                                     target="_blank"
@@ -882,6 +1053,41 @@ export function ProspectsPage() {
                                     <ExternalLink className="h-4 w-4" />
                                     View Profile
                                   </a>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenMenuProspectId(null)
+                                      handleToggleHideProspect(prospect.researchCacheId, !prospect.isHidden)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/10 transition-colors w-full text-left"
+                                  >
+                                    {prospect.isHidden ? (
+                                      <>
+                                        <Eye className="h-4 w-4" />
+                                        Unhide Prospect
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EyeOff className="h-4 w-4" />
+                                        Hide Prospect
+                                      </>
+                                    )}
+                                  </button>
+                                  {/* Show Mark as Sent only if prospect has generated/archived but no sent/copied messages */}
+                                  {(prospect.allStatuses.some(s => ['generated', 'archived'].includes(s)) &&
+                                    !prospect.allStatuses.some(s => ['sent', 'copied'].includes(s))) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOpenMenuProspectId(null)
+                                        handleOpenMarkAsSent(prospect)
+                                      }}
+                                      className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/10 transition-colors w-full text-left"
+                                    >
+                                      <Send className="h-4 w-4" />
+                                      Mark as Sent
+                                    </button>
+                                  )}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -1283,6 +1489,122 @@ export function ProspectsPage() {
                       </>
                     ) : (
                       'Remove'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Sent Modal */}
+      {markAsSentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setMarkAsSentModal(null)}>
+          <div className="bg-gradient-to-br from-[#0C1725] to-[#1a1f36] border border-white/10 rounded-2xl max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <Send className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-1">Mark as Sent</h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Select which message you sent to <span className="font-semibold text-white">{markAsSentModal.prospectName}</span>
+                </p>
+
+                {/* Message Options */}
+                <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
+                  {markAsSentModal.messages.map((msg) => (
+                    <label
+                      key={msg.id}
+                      className={`block p-3 rounded-lg border cursor-pointer transition-all ${
+                        selectedMessageId === msg.id
+                          ? 'border-[#FBAE1C] bg-[#FBAE1C]/10'
+                          : 'border-white/10 bg-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          name="messageSelect"
+                          checked={selectedMessageId === msg.id}
+                          onChange={() => setSelectedMessageId(msg.id)}
+                          className="mt-1 w-4 h-4 text-[#FBAE1C] focus:ring-[#FBAE1C] focus:ring-offset-0 bg-white/10 border-gray-600"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-gray-400 mb-1">
+                            {new Date(msg.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <p className="text-sm text-gray-300 line-clamp-3">{msg.message}</p>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+
+                  {/* Other Option */}
+                  <label
+                    className={`block p-3 rounded-lg border cursor-pointer transition-all ${
+                      selectedMessageId === 'other'
+                        ? 'border-[#FBAE1C] bg-[#FBAE1C]/10'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="messageSelect"
+                        checked={selectedMessageId === 'other'}
+                        onChange={() => setSelectedMessageId('other')}
+                        className="mt-1 w-4 h-4 text-[#FBAE1C] focus:ring-[#FBAE1C] focus:ring-offset-0 bg-white/10 border-gray-600"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-300">Other (custom message)</span>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Custom Message Textarea */}
+                {selectedMessageId === 'other' && (
+                  <textarea
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    placeholder="Enter the message you sent..."
+                    rows={4}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FBAE1C] focus:border-transparent mb-4 text-sm resize-none"
+                  />
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setMarkAsSentModal(null)
+                      setSelectedMessageId(null)
+                      setCustomMessage('')
+                    }}
+                    disabled={isMarkingAsSent}
+                    className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmMarkAsSent}
+                    disabled={isMarkingAsSent || !selectedMessageId}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] hover:from-[#FC9109] hover:to-[#DD6800] rounded-lg text-sm text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isMarkingAsSent ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Marking...
+                      </>
+                    ) : (
+                      'Mark as Sent'
                     )}
                   </button>
                 </div>

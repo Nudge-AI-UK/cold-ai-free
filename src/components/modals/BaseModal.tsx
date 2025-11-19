@@ -10,9 +10,10 @@ interface BaseModalProps {
   description: string
   className?: string
   dismissible?: boolean // Allow closing via X, ESC, backdrop click
+  headerRight?: React.ReactNode // Optional content for right side of header
 }
 
-export function BaseModal({ children, title, description, className = '', dismissible = true }: BaseModalProps) {
+export function BaseModal({ children, title, description, className = '', dismissible = true, headerRight }: BaseModalProps) {
   const {
     state,
     closeModal,
@@ -268,8 +269,17 @@ export function BaseModal({ children, title, description, className = '', dismis
                 </button>
               )}
 
-              <h2 className="text-xl font-bold mb-1 pr-12">{title}</h2>
-              <p className="text-sm text-gray-400">{description}</p>
+              <div className="flex items-start justify-between pr-12">
+                <div>
+                  <h2 className="text-xl font-bold mb-1">{title}</h2>
+                  <p className="text-sm text-gray-400">{description}</p>
+                </div>
+                {headerRight && (
+                  <div className="flex-shrink-0 ml-4">
+                    {headerRight}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal Body */}
