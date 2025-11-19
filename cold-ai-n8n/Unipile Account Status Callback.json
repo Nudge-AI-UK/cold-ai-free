@@ -1,0 +1,932 @@
+{
+  "name": "Cold: Unipile-callback",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "unipile-callback",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -48
+      ],
+      "id": "90c49472-5a3d-4b9f-b400-78e2dbd08e80",
+      "name": "Webhook",
+      "webhookId": "9ed0e146-7832-4f0d-8097-097e89d6693e"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "CREATION_SUCCESS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3c92ad42-4c28-409c-a6c3-feee5fcf6073"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Connected"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d844630e-1f4b-4bac-9a7a-bb0619a81546",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "RECONNECTED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Reconnected"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4fc74c4e-a270-4b53-979b-2a86316c0da5",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "SYNC_SUCCESS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Synced"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6e604a6a-ab47-45a8-9174-b32bf7645a0e",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "OK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c5d3785c-d921-4e3c-9255-04398b259e05",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "DELETED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Deleted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "646d0eb1-c939-49d7-94a3-aa66a44cc788",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "ERROR/STOPPED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "484c561d-1339-4441-97eb-225d275133a4",
+                    "leftValue": "={{ $json.body.AccountStatus.message }}",
+                    "rightValue": "CREDENTIALS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Disconnected"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown Action"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        -144
+      ],
+      "id": "020d24d4-72a4-4a0a-abe7-e088b41d2834",
+      "name": "Event Switch"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO user_profiles (\n    user_id,\n    linkedin_connected,\n    unipile_account_id,\n    updated_at\n  ) VALUES (\n    $1,\n    true,\n    $2,\n    NOW()\n  )\n  ON CONFLICT (user_id) DO UPDATE SET\n    linkedin_connected = true,\n    unipile_account_id = EXCLUDED.unipile_account_id,\n    updated_at = NOW();\n",
+        "options": {
+          "queryReplacement": "={{ $json.body.name }}, {{ $json.body.account_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        -432
+      ],
+      "id": "7d940163-5d68-4809-99aa-230feb448e18",
+      "name": "Connected",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/me?account_id={{ $('Webhook').item.json.body.account_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        -432
+      ],
+      "id": "11da6b60-66e2-48c8-a9b2-669b3df1cd07",
+      "name": "Get User LinkedIn URL",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE user_profiles\nSET \n  linkedin_connected = true, \n  updated_at = NOW()\nWHERE unipile_account_id = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.AccountStatus.account_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        -240
+      ],
+      "id": "db4ef6b3-5841-4c8f-aadf-0b9402964d7c",
+      "name": "Reconnected",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE user_profiles\nSET \n  linkedin_connected = false, \n  unipile_account_id = null,\n  updated_at = NOW()\nWHERE unipile_account_id = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.AccountStatus.account_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        144
+      ],
+      "id": "e355d1de-5fee-4297-8acd-172574481817",
+      "name": "Deleted",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE user_profiles\nSET \n  linkedin_connected = false, \n  updated_at = NOW()\nWHERE unipile_account_id = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.AccountStatus.account_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        336
+      ],
+      "id": "63faa6b6-ac19-47d2-8889-0c002ce19059",
+      "name": "Error",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api15.unipile.com:14579/api/v1/users/{{ $json.provider_id }}/posts?limit=20&account_id={{ $('Webhook').item.json.body.account_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        -368
+      ],
+      "id": "c6b72d87-14a5-486b-aa02-3a309c932eb1",
+      "name": "Get User Posts",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uTW1EC0cOSFT8F5k",
+          "name": "Unipile Phil Testing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE user_profiles\nSET \n  linkedin_connected = true, \n  updated_at = NOW()\nWHERE unipile_account_id = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.AccountStatus.account_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        -48
+      ],
+      "id": "9e1babd1-63b0-4df7-990e-65540f1d45b0",
+      "name": "Synced/OK",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInputs = $input.all();\nconst profileData = allInputs[0].json;  // First item = profile\nconst postsData = allInputs[1].json;    // Second item = posts\n\n// Extract actual data (handle array wrapping)\nconst profile = Array.isArray(profileData) ? profileData[0] : profileData;\nconst posts = Array.isArray(postsData) ? postsData[0] : postsData;\n\n// Clean posts and filter for original content only\nconst allCleanedPosts = (posts.items || []).map(post => ({\n  date: post.date,\n  text: post.text,\n  engagement: {\n    reactions: post.reaction_counter || 0,\n    comments: post.comment_counter || 0,\n    impressions: post.impressions_counter || 0\n  },\n  is_repost: post.is_repost || false,\n  author: post.is_repost ? post.reposted_by?.name : post.author?.name\n}));\n\n// Filter to get only original posts, then take top 5\nconst originalPosts = allCleanedPosts\n  .filter(post => !post.is_repost)\n  .slice(0, 5);\n\n// Build rich research data for research_cache table\nconst researchData = {\n  // Basic profile info\n  name: `${profile.first_name} ${profile.last_name}`,\n  occupation: profile.occupation,\n  location: profile.location,\n  email: profile.email,\n  public_identifier: profile.public_identifier,\n\n  // User-specific fields\n  organizations: profile.organizations,\n  premium: profile.premium,\n  profile_picture_url: profile.profile_picture_url,\n\n  // Posts data - only original posts\n  recent_posts: originalPosts,\n  post_count: originalPosts.length,\n  research_metadata: {\n    timestamp: new Date().toISOString(),\n    total_posts_fetched: posts.items?.length || 0,\n    original_posts_found: originalPosts.length,\n    reposts_filtered_out: allCleanedPosts.filter(post => post.is_repost).length,\n    research_depth: \"standard\"\n  }\n};\n\n// Build basic profile data for user_profiles.linkedin_profile_data column\n// This matches what unipileService.checkLinkedInStatus() expects\nconst basicProfileData = {\n  first_name: profile.first_name,\n  last_name: profile.last_name,\n  occupation: profile.occupation,\n  location: profile.location,\n  profile_picture_url: profile.profile_picture_url,\n  public_identifier: profile.public_identifier,\n  organizations: profile.organizations, // For organization display in widget\n  email: profile.email\n};\n\n// Output both datasets\nreturn [\n  {\n    json: {\n      json: {\n        // For research_cache table\n        research_cache_user_data: {\n          profile_url: `https://linkedin.com/in/${profile.public_identifier}/`,\n          profile_type: \"personal_user\",\n          research_data: researchData,\n          research_depth: \"standard\",\n          last_researched_at: new Date().toISOString()\n        },\n        // For user_profiles.linkedin_profile_data column\n        user_profile_data: basicProfileData,\n        // For messaging capability validation\n        user_linkedin_premium: profile.premium || false\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        -432
+      ],
+      "id": "688c8184-4f2c-42cd-b9cb-44712c579f81",
+      "name": "Clean User Data"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        -432
+      ],
+      "id": "98b31ec8-55f6-4bb1-8e7c-d444509e87ef",
+      "name": "User Research Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO research_cache (\n  profile_url,\n  profile_type,\n  research_data,\n  research_depth,\n  last_researched_at,\n  created_at\n) VALUES (\n  $1, $2, $3, $4, $5, NOW()\n)\nON CONFLICT (profile_url)\nDO UPDATE SET\n  research_data = EXCLUDED.research_data,\n  research_depth = EXCLUDED.research_depth,\n  last_researched_at = EXCLUDED.last_researched_at,\n  research_version = research_cache.research_version + 1;\n\nUPDATE user_profiles\nSET\n  linkedin_profile_data = $6,\n  linkedin_profile_scraped_at = NOW(),\n  updated_at = NOW(),\n  linkedin_premium = $7\nWHERE user_id = $8;",
+        "options": {
+          "queryReplacement": "={{ $json.json.research_cache_user_data.profile_url }}, {{ $json.json.research_cache_user_data.profile_type }}, {{ $json.json.research_cache_user_data.research_data }}, {{ $json.json.research_cache_user_data.research_depth }}, {{ $json.json.research_cache_user_data.last_researched_at }}, {{ $json.json.user_profile_data }}, {{ $json.json.user_linkedin_premium }},{{ $('Webhook').first().json.body.name }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1584,
+        -432
+      ],
+      "id": "80787f38-861b-4f15-8de4-7dc003835bdd",
+      "name": "Save User LinkedIn URL & Data",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.phillyte.xyz",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36",
+            "content-length": "113",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, br",
+            "accept-language": "en-US",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "51.159.101.190",
+            "cf-ipcountry": "FR",
+            "cf-ray": "98851d9b6f2099a8-CDG",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "a2435c7e-096f-40b9-b867-80bc4f93919b",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "priority": "u=1, i",
+            "sec-ch-ua": "\"Not.A/Brand\";v=\"99\", \"Chromium\";v=\"136\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Linux\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "51.159.101.190",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "status": "CREATION_SUCCESS",
+            "account_id": "xXqAZqvLREqIqgKACS-2sA",
+            "name": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02"
+          },
+          "webhookUrl": "https://n8n.phillyte.xyz/webhook/unipile-callback",
+          "executionMode": "production"
+        }
+      }
+    ],
+    "Get User Posts": [
+      {
+        "json": {
+          "object": "PostList",
+          "items": [
+            {
+              "object": "Post",
+              "provider": "LINKEDIN",
+              "social_id": "urn:li:ugcPost:7335600404669386752",
+              "share_url": "https://www.linkedin.com/posts/philip-m-smith_aiengineering-conversationalai-googleads-activity-7335600405831217153-4gWy?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+              "date": "3mo",
+              "comment_counter": 5,
+              "impressions_counter": 1937,
+              "reaction_counter": 44,
+              "repost_counter": 4,
+              "permissions": {
+                "can_post_comments": true,
+                "can_react": true,
+                "can_share": true
+              },
+              "text": "I'm happy to share that I'm working freelance as an AI Engineer for Nudge AI!\nBig thank you to Tom Palmer GMBPsS ♞ and the team at Nudge AI who have provided the opportunity to build something truly innovative in the Google Ads space.\n\n🚀 What I'm Building: An intelligent Slack AI agent that guides businesses through profitable Google Ads campaign creation via a sophisticated three-phase conversational system:\n\nPhase 1: Expert Consultation - AI-powered customer service that provides strategic Google Ads guidance and builds user confidence\nPhase 2: Creative Ideation - Generates custom campaign concepts tailored to each business, with intelligent selection tracking\nPhase 3: Professional Copywriting - Creates multiple ad variations for approved campaigns with A/B testing optimisation\n\n🛠️ Technical Highlights:\n- Built with n8n workflow orchestration, OpenAI GPT-4, Claude Opus-4 and PostgreSQL\n- Advanced conversation state management across multiple user sessions\n- Dynamic prompt engineering that adapts based on user expertise level\n- Real-time Slack integration with intelligent webhook processing\n- Scalable database architecture supporting complex AI memory systems.\n\nThe goal? Transform how businesses approach Google Ads by combining AI expertise with practical campaign creation. Instead of generic advice, users get personaliaed strategies, creative concepts, and professional ad copy - all through natural conversation.\n\nReally excited to be working at the intersection of conversational AI and digital marketing automation. There's something powerful about making expert knowledge accessible through intelligent conversation flows. Lots of advanced features in the pipeline too!\n\n#AIEngineering #ConversationalAI #GoogleAds #Automation #FreelanceLife",
+              "mentions": [
+                {
+                  "url": "https://www.linkedin.com/company/nudgeaiuk/",
+                  "length": 8,
+                  "start": 68
+                },
+                {
+                  "url": "https://www.linkedin.com/in/ACoAAB7B_cYBesKlJ2cOO3IiaCsgPh-qNxdNFL0",
+                  "length": 19,
+                  "start": 95
+                }
+              ],
+              "attachments": [],
+              "author": {
+                "public_identifier": "philip-m-smith",
+                "id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                "name": "Phil Smith",
+                "is_company": false,
+                "headline": "Physics PhD (Nuclear Materials) 👨🏻‍🎓 | AI Engineer - Conversational AI & Automation Specialist"
+              },
+              "id": "7335600405831217153",
+              "is_repost": false,
+              "parsed_datetime": "2025-06-03T09:37:05.615Z"
+            },
+            {
+              "object": "Post",
+              "provider": "LINKEDIN",
+              "social_id": "urn:li:ugcPost:7305927214271778816",
+              "share_url": "https://www.linkedin.com/posts/devon-lowndes_the-student-wellness-lab-ugcPost-7305927214271778816-xJmv?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+              "date": "6mo",
+              "comment_counter": 2,
+              "impressions_counter": 0,
+              "reaction_counter": 27,
+              "repost_counter": 5,
+              "user_reacted": "LIKE",
+              "permissions": {
+                "can_post_comments": true,
+                "can_react": true,
+                "can_share": true
+              },
+              "text": "Please share this if you have students in your network or pass along to those who are in full or part time education that may find this useful. An affordable and practice guide to your mental health and study.\n\nMorning session: https://lnkd.in/epysWHRG\n\nAfternoon session: https://lnkd.in/e6Hyxzi9\n\nUniversity of Bristol University of the West of England The Open University",
+              "mentions": [
+                {
+                  "url": "https://www.linkedin.com/company/university-of-bristol/",
+                  "length": 21,
+                  "start": 299
+                },
+                {
+                  "url": "https://www.linkedin.com/company/university-of-the-west-of-england/",
+                  "length": 33,
+                  "start": 321
+                },
+                {
+                  "url": "https://www.linkedin.com/company/theopenuniversity/",
+                  "length": 19,
+                  "start": 355
+                }
+              ],
+              "attachments": [
+                {
+                  "type": "file",
+                  "id": "D4E1FAQFbHm4nKtSGeQ",
+                  "file_name": "The Student Wellness Lab",
+                  "file_size": 0,
+                  "mimetype": "application/pdf",
+                  "unavailable": false,
+                  "url": "https://media.licdn.com/dms/document/media/v2/D4E1FAQFbHm4nKtSGeQ/feedshare-document-sanitized-pdf/B4EZg2.D4mGUAA-/0/1753268895367?e=1760025600&v=beta&t=K3vYaUm0V3aWCUure9nsR83MiF-gzrgTOntYSsYFqFE",
+                  "url_expires_at": 1760025600000
+                }
+              ],
+              "author": {
+                "public_identifier": "devon-lowndes",
+                "id": "ACoAACqPgwsBv8XBVfZrOHaYj7M52NJGuKuLL1s",
+                "name": "Devon Lowndes",
+                "is_company": false,
+                "headline": "Specialist EDI & Neurodiversity Consultant 🧠 | Founder & Director of Self Agency | Bristol City Council Neurodiversity Champion 🏆 🧠"
+              },
+              "id": "7305927214271778816",
+              "is_repost": true,
+              "repost_id": "7313241177577717762",
+              "parsed_datetime": "2025-03-13T12:26:25.446Z",
+              "reposted_by": {
+                "public_identifier": "philip-m-smith",
+                "id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                "name": "Phil Smith",
+                "is_company": false
+              }
+            },
+            {
+              "object": "Post",
+              "provider": "LINKEDIN",
+              "social_id": "urn:li:ugcPost:7285308309585199106",
+              "share_url": "https://www.linkedin.com/posts/philip-m-smith_opentowork-activity-7285308310335942657-nNSg?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+              "date": "8mo",
+              "comment_counter": 4,
+              "impressions_counter": 1878,
+              "reaction_counter": 37,
+              "repost_counter": 2,
+              "permissions": {
+                "can_post_comments": true,
+                "can_react": true,
+                "can_share": true
+              },
+              "text": "Hi everyone! I recently handed in my Physics PhD thesis, and after enjoying a nice break, I'm actively seeking a new role and would appreciate your support. If you hear of any opportunities or want to catch up, please message me or comment below. I’d love to reconnect! #OpenToWork\n\nAbout me & what I’m looking for:\n💼 I’m open to relevant opportunities and have listed Materials Scientist, Technical Consultant, Technical Specialist, Postdoctoral Researcher, and Nuclear Engineer roles to give you a feel for me.\n🌎 I’m looking to stay in Bristol or find hybrid roles by commute. Also happy to relocate for the right role!\n🎓 I’ve been researching nuclear fission fuel materials at the University of Bristol and am an award-winner for leading interdisciplinary projects!\n⭐ Particularly excited by propulsion 🚀",
+              "mentions": [],
+              "attachments": [],
+              "author": {
+                "public_identifier": "philip-m-smith",
+                "id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                "name": "Phil Smith",
+                "is_company": false,
+                "headline": "Physics PhD (Nuclear Materials) 👨🏻‍🎓 | AI Engineer - Conversational AI & Automation Specialist"
+              },
+              "id": "7285308310335942657",
+              "is_repost": false,
+              "parsed_datetime": "2025-01-15T14:54:15.667Z"
+            },
+            {
+              "object": "Post",
+              "provider": "LINKEDIN",
+              "social_id": "urn:li:activity:7202219663944990720",
+              "share_url": "https://www.linkedin.com/posts/hafren-jones-171030260_last-night-i-had-the-lovely-pleasure-of-attending-activity-7202219663944990720-8N-D?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+              "date": "1yr",
+              "comment_counter": 4,
+              "impressions_counter": 0,
+              "reaction_counter": 32,
+              "repost_counter": 3,
+              "user_reacted": "LIKE",
+              "permissions": {
+                "can_post_comments": true,
+                "can_react": true,
+                "can_share": true
+              },
+              "text": "Last night I had the lovely pleasure of attending University of Bristol Students'​ Union \"Bristol SU: 50 Most Influential Students\" celebration with colleagues. \n\nA huge shout-out to Antonia  Charlie Gazzard, Lucy Loades, Philip Smith and incoming Faculty Rep Yogadhveep Arora - all AMAZING Faculty Representatives who ended up on the list 🎉  \n\nWe know our hard working, dedicated students don't do this for awards. But it's sure nice to recognise them. \n\nAnyway I'm on a week after today, glad this event was in just before then!",
+              "mentions": [
+                {
+                  "url": "https://www.linkedin.com/company/bristolsu/",
+                  "length": 38,
+                  "start": 50
+                },
+                {
+                  "url": "https://www.linkedin.com/in/ACoAADPz74IB3BJdPogGIqeYw0nrHwvqQ5mJWlk",
+                  "length": 15,
+                  "start": 192
+                },
+                {
+                  "url": "https://www.linkedin.com/in/ACoAAESD-3ABQxjVhu3HNhRf-k000LFiGgzgvqI",
+                  "length": 11,
+                  "start": 209
+                },
+                {
+                  "url": "https://www.linkedin.com/in/ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                  "length": 12,
+                  "start": 222
+                },
+                {
+                  "url": "https://www.linkedin.com/in/ACoAAETiNE0B59AkpVr2rS5vlESx0pSbbxnFqSs",
+                  "length": 16,
+                  "start": 260
+                }
+              ],
+              "attachments": [
+                {
+                  "id": "D4E22AQHKeUFNPCt9cA",
+                  "sticker": false,
+                  "size": {
+                    "height": 598,
+                    "width": 800
+                  },
+                  "unavailable": false,
+                  "type": "img",
+                  "url": "https://media.licdn.com/dms/image/v2/D4E22AQHKeUFNPCt9cA/feedshare-shrink_800/feedshare-shrink_800/0/1717142977133?e=1762387200&v=beta&t=JTRNnuNhFq_eANoVTKGGua2qIlHSN6lUVtbkU2IVMIc"
+                }
+              ],
+              "author": {
+                "public_identifier": "hafren-jones-171030260",
+                "id": "ACoAAEATc-UByhFbRmXJCVX3kOa8fyYrSm1_FS0",
+                "name": "Hafren Jones",
+                "is_company": false,
+                "headline": "senior academic representation coordinator at bristol su | membership-based organisations worker | volunteer | governance nerd | su hack"
+              },
+              "id": "7202219663944990720",
+              "is_repost": true,
+              "repost_id": "7208824032765378560",
+              "parsed_datetime": "2024-05-31T08:09:38.655Z",
+              "reposted_by": {
+                "public_identifier": "philip-m-smith",
+                "id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                "name": "Phil Smith",
+                "is_company": false
+              }
+            },
+            {
+              "object": "Post",
+              "provider": "LINKEDIN",
+              "social_id": "urn:li:activity:7199061902268735488",
+              "share_url": "https://www.linkedin.com/posts/philip-m-smith_i-am-thrilled-to-announce-that-i-have-been-activity-7199061902268735488-SEnn?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+              "date": "1yr",
+              "comment_counter": 9,
+              "impressions_counter": 1944,
+              "reaction_counter": 75,
+              "repost_counter": 0,
+              "permissions": {
+                "can_post_comments": true,
+                "can_react": true,
+                "can_share": true
+              },
+              "text": "I am thrilled to announce that I have been selected by the University of Bristol Students'​ Union as one of their 50 Most Influential in 2024. 🎓 🙌 \n\nOver the past three years, I have proudly represented my postgraduate student community and been involved in projects to create data-driven arguments for national and local problems. My focus has been on personal finance and addressing the challenges of low stipends in a cost-of-living crisis to create a more inclusive research environment. My work has led to discussions with the URKI, University executive committees and members, and an invitation to participate as a panellist alongside CEOs, Vice-Chancellors, and the Shadow Minister for Education. Most importantly, I have engaged with students affected by the current system. While the University of Bristol is a great place to be, necessary changes must occur to continue striving towards excellence through equity, diversity, and inclusivity. I hope that my contributions have made a positive impact on at least one person, and I am committed to continuing to work for a better future. Thank you! 😊 🍾 \n\nhttps://lnkd.in/eD6YDQX5",
+              "mentions": [
+                {
+                  "url": "https://www.linkedin.com/company/bristolsu/",
+                  "length": 38,
+                  "start": 59
+                },
+                {
+                  "url": "https://www.linkedin.com/company/university-of-bristol/",
+                  "length": 21,
+                  "start": 793
+                }
+              ],
+              "attachments": [
+                {
+                  "id": "D4E22AQE8YcixsSKhwQ",
+                  "sticker": false,
+                  "size": {
+                    "height": 418,
+                    "width": 800
+                  },
+                  "unavailable": false,
+                  "type": "img",
+                  "url": "https://media.licdn.com/dms/image/v2/D4E22AQE8YcixsSKhwQ/feedshare-shrink_800/feedshare-shrink_800/0/1716390107980?e=1762387200&v=beta&t=Cy-gf4ivepCT-tHKyj2SmN0oa62csTBRBLiixTxaxxQ"
+                }
+              ],
+              "author": {
+                "public_identifier": "philip-m-smith",
+                "id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+                "name": "Phil Smith",
+                "is_company": false,
+                "headline": "Physics PhD (Nuclear Materials) 👨🏻‍🎓 | AI Engineer - Conversational AI & Automation Specialist"
+              },
+              "id": "7199061902268735488",
+              "is_repost": false,
+              "parsed_datetime": "2024-05-22T15:01:49.603Z"
+            }
+          ],
+          "cursor": "eyJwYWdpbmF0aW9uX3Rva2VuIjoiZFhKdU9teHBPbUZqZEdsMmFYUjVPamN4T1Rrd05qRTVNREl5TmpnM016VTBPRGd0TVRjeE5qTTVNREV3T1RVM01RPT0iLCJzdGFydCI6NX0=",
+          "paging": {
+            "page_count": 5
+          }
+        }
+      }
+    ],
+    "Get User LinkedIn URL": [
+      {
+        "json": {
+          "object": "AccountOwnerProfile",
+          "provider": "LINKEDIN",
+          "provider_id": "ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+          "entity_urn": "urn:li:fsd_profile:ACoAACwJSz4Bh0P5NHCj9uDPajL8o0ti4sMbW_Q",
+          "object_urn": "urn:li:member:738806590",
+          "first_name": "Phil",
+          "last_name": "Smith",
+          "profile_picture_url": "https://media.licdn.com/dms/image/v2/D4E03AQHnzf7Pr_F5_w/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1718633136259?e=1762387200&v=beta&t=40jDl1PO5AqPiKqtaGDTKdUIH5b-gyN0iy2QRWWLHk0",
+          "public_identifier": "philip-m-smith",
+          "occupation": "Physics PhD (Nuclear Materials) 👨🏻‍🎓 | AI Engineer - Conversational AI & Automation Specialist",
+          "premium": false,
+          "open_profile": false,
+          "location": "Bristol, England, United Kingdom",
+          "email": "philip.smith@bristol.ac.uk",
+          "organizations": [
+            {
+              "id": "108363936",
+              "mailbox_id": "79995039",
+              "name": "Cold AI"
+            }
+          ],
+          "recruiter": null,
+          "sales_navigator": null
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Event Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Switch": {
+      "main": [
+        [
+          {
+            "node": "Connected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reconnected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Synced/OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Synced/OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected": {
+      "main": [
+        [
+          {
+            "node": "Get User LinkedIn URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User LinkedIn URL": {
+      "main": [
+        [
+          {
+            "node": "Get User Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "User Research Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Posts": {
+      "main": [
+        [
+          {
+            "node": "User Research Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "User Research Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean User Data": {
+      "main": [
+        [
+          {
+            "node": "Save User LinkedIn URL & Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "655205e0-450d-4f72-9abd-9931232ad27b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "wl1FpGPBO483XpHi",
+  "tags": []
+}

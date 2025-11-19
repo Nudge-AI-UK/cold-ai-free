@@ -1,0 +1,1287 @@
+{
+  "name": "Cold: Review ICP",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.icps SET\n  metadata = convert_from(decode($2, 'base64'), 'UTF8')::jsonb,\n  workflow_status = $3::icp_workflow_status,\n  is_active = $4,\n  reviewed_at = CURRENT_TIMESTAMP,\n  updated_at = CURRENT_TIMESTAMP\nWHERE id = $1\nRETURNING id, icp_name, workflow_status;",
+        "options": {
+          "queryReplacement": "={{ $json.icp_id }},\n{{ $json.metadata_encoded }},\n{{ $json.workflow_status }},\n{{ true }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        -992
+      ],
+      "id": "88896aa0-d2e5-4aa7-8534-744cdd237c9b",
+      "name": "Save Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract Review Metadata Only\nconst aiResponse = $input.item.json.content?.[0]?.text || $input.item.json.output || $input.item.json;\nconst originalData = $('Prepare ICP Review').first().json;\n\ntry {\n  // Parse AI response\n  let reviewMetadata;\n  if (typeof aiResponse === 'string') {\n    const jsonMatch = aiResponse.match(/```json\\n?([\\s\\S]*?)\\n?```/) ||\n                      aiResponse.match(/\\{[\\s\\S]*\\}$/);\n    reviewMetadata = JSON.parse(jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse);\n  } else {\n    reviewMetadata = aiResponse;\n  }\n\n  return {\n    json: {\n      icp_id: originalData.icp_id,\n      webhook_event_id: originalData.webhook_event_id,\n      metadata: reviewMetadata.metadata,\n      workflow_status: 'approved'\n    }\n  };\n\n} catch (error) {\n  return {\n    json: {\n      success: false,\n      error: `Failed to parse AI review: ${error.message}`,\n      icp_id: originalData.icp_id,\n      webhook_event_id: originalData.webhook_event_id\n    }\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -992
+      ],
+      "id": "1e160078-1be1-4601-b966-7a705a10a092",
+      "name": "Extract and Structure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare minimal update - just metadata and status\nconst data = $input.item.json;\n\nreturn {\n  json: {\n    icp_id: data.icp_id,\n    webhook_event_id: data.webhook_event_id,\n    metadata: data.metadata,\n    workflow_status: data.workflow_status\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -992
+      ],
+      "id": "3e77a759-8fa5-4c70-81cc-0bafeecaa5c0",
+      "name": "Prepare for Supabase"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1,\n  status = $2,\n  updated_at = $3,\n  completed_at = $3\nWHERE id = $4 ",
+        "options": {
+          "queryReplacement": "={{ true }}, {{ 'completed' }} {{ $now }}, {{ $('Prepare ICP Review').first().json.webhook_event_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        928,
+        -800
+      ],
+      "id": "ece8b763-c7ef-48e8-a4cc-0eea12525f23",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Review this user approved ICP entry. Before now, the user has received an AI generated ICP and had the opportunity to edit the data before submitting as approved. You are receiving the original version {{ JSON.stringify($json.current_icp) }} including the previous AI suggestions for improving the quality scoring: {{ JSON.stringify($json.previous_ai_feedback) }}.\n\nYour job is to update the AI suggestions and quality scoring for the user's ideal customer profile based upon the edits they have approved, edited field(s) for this user ICP is/are: {{ JSON.stringify($json.changed_fields) }}.\n\nIMPORTANT:\nOnly update suggestions and scoring if meaningful change has occurred. You do not have to change anything if you think the original feedback is still relevant and useful. You may change as many or as few suggestions by assessing user changes, keeping relevant feedback when necessary. Do not increase the number of suggestions.\n\nPREVIOUS QUALITY SCORES:\n- Overall: {{ $json.previous_ai_feedback.quality_scores.overall }}%\n- Completeness: {{ $json.previous_ai_feedback.quality_scores.completeness }}%\n- Targeting Precision: {{ $json.previous_ai_feedback.quality_scores.specificity }}%\n- Sales Readiness: {{ $json.previous_ai_feedback.quality_scores.actionability }}%\n\nTHE USER HAS SUBMITTED AND APPROVED THEIR ICP. YOU ARE ONLY UPDATING AI SUGGESTIONS."
+            }
+          ]
+        },
+        "options": {
+          "system": "=You are reviewing user-approved ICP entries to update quality scores and document improvements.\nYour Task:\nReturn the COMPLETE ICP with all fields, updating only the quality assessment metadata based on changes.\nImportant:\n\nThis ICP has been APPROVED by the user\nIf no changes detected, return everything unchanged\nDO NOT hallucinate changes or create new content\nKeep all user-provided content exactly as submitted\n\nOutput Format:\nReturn the COMPLETE ICP JSON structure exactly like Create ICP Entry:\njson{\n  \"metadata\": {\n    \"personas\": [\"only update existing personas if necessary\"],\n    \"qualification_criteria\": {\"keep existing\"},\n    \"messaging_guidelines\": {\"keep existing\"},\n    \"generated_at\": \"update timestamp\",\n    \"confidence_score\": \"update if changes made\",\n    \"quality_assessment\": {\n      \"scores\": {\n        \"overall\": \"update based on changes or keep same\",\n        \"completeness\": \"update based on changes or keep same\",\n        \"specificity\": \"update based on changes or keep same\",\n        \"actionability\": \"update based on changes or keep same\"\n      },\n      \"top_3_gaps\": [\"keep same if no changes\"]\n    },\n    \"improvement_priorities\": {\n      \"critical\": [\"update based on changes or keep same\"],\n      \"important\": [\"update based on changes or keep same\"],\n      \"optional\": [\"update based on changes or keep same\"]\n    },\n    \"ai_summary\": \"Update to reflect approval status\",\n    \"review_notes\": {\n      \"changes_detected\": true/false,\n      \"changes_made\": [\"list changes or 'No changes - approved as is'\"],\n      \"approved_at\": \"timestamp\",\n      \"approved_by\": \"user\"\n    }\n  }\n}\n\nCritical Rules:\n\nALL user content fields MUST be preserved exactly as submitted\nOnly update metadata.quality_assessment scores if changes detected\nAdd metadata.review_notes to document the approval\nIf no changes, keep EVERYTHING the same except approval timestamp\nReturn just just the review metadata",
+          "maxTokens": 800,
+          "temperature": 0.2,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        -992
+      ],
+      "id": "9365c076-b42a-4d4d-bafb-d3e07bf487ee",
+      "name": "Approve ICP Entry",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only encode what we're updating\nconst encode = (value) => {\n  if (value === null || value === undefined) {\n    return Buffer.from('').toString('base64');\n  }\n  if (typeof value === 'object') {\n    return Buffer.from(JSON.stringify(value)).toString('base64');\n  }\n  return Buffer.from(String(value)).toString('base64');\n};\n\nreturn {\n  icp_id: $json.icp_id,\n  webhook_event_id: $json.webhook_event_id,\n  metadata_encoded: encode($json.metadata),\n  workflow_status: $json.workflow_status\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -992
+      ],
+      "id": "62e0d62f-0dec-4656-b2ce-1586141f0e81",
+      "name": "Base64 Encoding"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2048,
+        -704
+      ],
+      "id": "b1544ef3-1910-4273-b626-7007736d9850",
+      "name": "Mark Each Event"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1648,
+        -848
+      ],
+      "id": "7cf88cd1-6a18-40cf-bfba-f2aa3ea33ee0",
+      "name": "Review Loop"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Mark duplicates directly in the database\nWITH duplicates AS (\n  SELECT \n    id,\n    idempotency_key,\n    ROW_NUMBER() OVER (\n      PARTITION BY idempotency_key \n      ORDER BY created_at ASC, id ASC\n    ) as rn\n  FROM webhook_events \n  WHERE event_type = 'icp_review' \n    AND processed = false\n    AND retry_count < 3\n    AND status = 'pending'\n    AND idempotency_key IS NOT NULL\n)\nUPDATE webhook_events \nSET \n  status = 'skipped_duplicate',\n  processed = true,\n  result = jsonb_build_object(\n    'reason', 'Duplicate idempotency_key detected in batch',\n    'skipped_at', NOW()\n  ),\n  completed_at = NOW()\nWHERE id IN (\n  SELECT id FROM duplicates WHERE rn > 1\n)\nRETURNING id, idempotency_key;\n\n-- Then fetch the clean list\nSELECT \n  id,\n  idempotency_key,\n  created_at\nFROM webhook_events \nWHERE event_type = 'icp_review' \n  AND processed = false\n  AND retry_count < 3\n  AND status = 'pending'\nORDER BY created_at ASC\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2368,
+        -704
+      ],
+      "id": "facfd5a7-2911-4333-9559-7d7c097692d1",
+      "name": "Find Unprocessed Events",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "notes": "Cleans duplicate entries and fetches queue list"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM webhook_events \nWHERE id = $1",
+        "options": {
+          "queryReplacement": "={{ $json.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1424,
+        -816
+      ],
+      "id": "7a8ffcb4-654d-41fa-b7c7-460a9be0ec74",
+      "name": "Get Updated Entry",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  status = 'processing',\n  updated_at = NOW()\nWHERE id = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1824,
+        -656
+      ],
+      "id": "b0352568-da26-42cb-a4c3-626433cdd100",
+      "name": "Mark Events as Processing",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        -1008
+      ],
+      "id": "5f301012-24b0-4445-8bea-00a575d1593c",
+      "name": "Finished"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code Node: Prepare ICP for AI Review\nconst webhookEvent = $input.item.json;\nconst payload = webhookEvent.payload;\n\n// Extract the key data\nconst icpForReview = {\n  // Essential identifiers\n  webhook_event_id: webhookEvent.id,\n  icp_id: payload.icp_id,\n  approved_at: payload.approved_at,\n  \n  // Current ICP data (after user edits)\n  current_icp: {\n    id: payload.original_data.id,\n    icp_name: payload.original_data.icp_name,\n    description: payload.original_data.description,\n    pain_points: payload.original_data.pain_points,\n    job_titles: payload.original_data.job_titles,\n    industry_focus: payload.original_data.industry_focus,\n    geographic_focus: payload.original_data.geographic_focus,\n    company_size_range: payload.original_data.company_size_range,\n    budget_range: payload.original_data.budget_range,\n    technology_stack: payload.original_data.technology_stack,\n    value_drivers: payload.original_data.value_drivers,\n    success_metrics: payload.original_data.success_metrics,\n    objections_and_concerns: payload.original_data.objections_and_concerns,\n    competitive_alternatives: payload.original_data.competitive_alternatives,\n    preferred_communication_channels: payload.original_data.preferred_communication_channels,\n    sales_cycle_length: payload.original_data.sales_cycle_length,\n    decision_making_process: payload.original_data.decision_making_process,\n    company_characteristics: payload.original_data.company_characteristics,\n    // New fields the user added\n    product_name: payload.original_data.product_name,\n    competitive_landscape: payload.original_data.competitive_landscape,\n    market_trends: payload.original_data.market_trends\n  },\n  \n  // What changed (if anything)\n  changed_fields: payload.changed_fields || [],\n  \n  // Previous AI feedback to avoid repetition\n  previous_ai_feedback: payload.ai_suggestions ? {\n    summary: payload.ai_suggestions.summary,\n    suggestions: payload.ai_suggestions.suggestions,\n    quality_scores: payload.ai_suggestions.quality_assessment?.scores\n  } : null,\n  \n  // Instructions for AI\n  review_instructions: {\n    task: payload.changed_fields.length > 0 \n      ? \"Review the ICP with focus on the changed fields and provide updated recommendations\"\n      : \"Provide fresh comprehensive review and enrichment suggestions\",\n    avoid_repeating: payload.ai_suggestions ? \n      \"Previous suggestions have been noted. Provide new insights.\" : \n      \"First review - provide comprehensive analysis\"\n  }\n};\n\nreturn {\n  json: icpForReview\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -816
+      ],
+      "id": "2e8bf29e-de4e-42b4-a385-230a85230ad9",
+      "name": "Prepare ICP Review"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "87ed308c-43a3-4992-a5f8-85f1d7d16227",
+              "leftValue": "={{ $json.changed_fields.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -992,
+        -816
+      ],
+      "id": "1d31af36-e23b-497e-9237-61be92a6ea83",
+      "name": "Updates Made"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.icps SET\n  workflow_status = $1,\n  reviewed_at = CURRENT_TIMESTAMP,\n  updated_at = CURRENT_TIMESTAMP\nWHERE id = $2\nRETURNING id, icp_name, workflow_status;",
+        "options": {
+          "queryReplacement": "={{ 'approved' }}, {{ $('Get Updated Entry').item.json.payload.icp_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        -800
+      ],
+      "id": "82d3d593-f4b3-4d7f-bec5-10feae63eeaf",
+      "name": "Update Review Status",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2608,
+        -704
+      ],
+      "id": "24e43bbc-4752-4180-aff2-4c0108fcfcff",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {
+    "Get Updated Entry": [
+      {
+        "json": {
+          "id": 48,
+          "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+          "event_type": "icp_review",
+          "source": "other",
+          "status": "processing",
+          "payload": {
+            "icp_id": 4,
+            "approved_at": "2025-09-12T13:23:30.452Z",
+            "original_data": {
+              "id": 4,
+              "team_id": null,
+              "icp_name": "B2B Sales Teams Using LinkedIn for Lead Generation",
+              "metadata": {
+                "source": "ai_generated",
+                "original": {
+                  "id": 4,
+                  "team_id": null,
+                  "icp_name": "B2B Sales Teams Using LinkedIn for Lead Generation",
+                  "metadata": {
+                    "source": "ai_generated",
+                    "personas": [
+                      {
+                        "role": "Decision Maker",
+                        "title": "VP Sales / Head of Sales",
+                        "motivations": [
+                          "Team productivity",
+                          "Revenue growth",
+                          "Competitive advantage",
+                          "Scalable processes"
+                        ],
+                        "frustrations": [
+                          "Poor LinkedIn ROI",
+                          "Team inconsistency",
+                          "Manual processes",
+                          "Compliance risks"
+                        ]
+                      },
+                      {
+                        "role": "Influencer",
+                        "title": "Sales Operations Manager",
+                        "motivations": [
+                          "Process efficiency",
+                          "Data accuracy",
+                          "Tool integration",
+                          "Measurable results"
+                        ],
+                        "frustrations": [
+                          "Fragmented tech stack",
+                          "Poor adoption rates",
+                          "Lack of analytics",
+                          "Manual reporting"
+                        ]
+                      },
+                      {
+                        "role": "End User",
+                        "title": "Sales Development Representative",
+                        "motivations": [
+                          "Meeting quota",
+                          "Time efficiency",
+                          "Better response rates",
+                          "Career advancement"
+                        ],
+                        "frustrations": [
+                          "Generic message templates",
+                          "Time-consuming personalisation",
+                          "Low response rates",
+                          "Account restrictions"
+                        ]
+                      }
+                    ],
+                    "ai_feedback": {
+                      "summary": "88% sales-ready. Strong foundation with clear personas and pain points. Needs specific benchmarks and competitive positioning. 3-4 weeks to optimise for maximum conversion.",
+                      "suggestions": {
+                        "critical": [
+                          "Add specific response rate benchmarks by industry",
+                          "Create LinkedIn compliance guidelines",
+                          "Define integration requirements"
+                        ],
+                        "optional": [
+                          "Regional messaging variations",
+                          "Seasonal buying patterns",
+                          "Partnership channel strategy"
+                        ],
+                        "top_gaps": [
+                          "Specific ROI benchmarks by industry",
+                          "Competitive battle cards",
+                          "Integration requirements detail"
+                        ],
+                        "important": [
+                          "Develop competitive positioning against Outreach/SalesLoft",
+                          "Create industry-specific use cases",
+                          "Add team size recommendations"
+                        ]
+                      },
+                      "quality_assessment": {
+                        "scores": {
+                          "overall": 85,
+                          "specificity": 88,
+                          "completeness": 92,
+                          "actionability": 90
+                        },
+                        "top_3_gaps": [
+                          "Specific ROI benchmarks by industry",
+                          "Competitive battle cards",
+                          "Integration requirements detail"
+                        ]
+                      },
+                      "improvement_priorities": {
+                        "critical": [
+                          "Add specific response rate benchmarks by industry",
+                          "Create LinkedIn compliance guidelines",
+                          "Define integration requirements"
+                        ],
+                        "optional": [
+                          "Regional messaging variations",
+                          "Seasonal buying patterns",
+                          "Partnership channel strategy"
+                        ],
+                        "important": [
+                          "Develop competitive positioning against Outreach/SalesLoft",
+                          "Create industry-specific use cases",
+                          "Add team size recommendations"
+                        ]
+                      }
+                    },
+                    "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                    "generated_at": "2025-09-09T12:22:02.627Z",
+                    "review_notes": "Approved via UI",
+                    "buying_triggers": [
+                      "Poor LinkedIn response rates",
+                      "Sales team expansion",
+                      "New LinkedIn Sales Navigator investment",
+                      "Competitive pressure",
+                      "Missing quarterly targets",
+                      "Sales productivity initiatives",
+                      "Compliance concerns with current tools"
+                    ],
+                    "confidence_score": 88,
+                    "original_request": {
+                      "updated_at": "2025-09-09T12:22:02.656Z",
+                      "generated_via": "n8n_workflow",
+                      "workflow_run_id": "6720"
+                    },
+                    "original_input_type": "manual",
+                    "review_completed_at": "2025-09-10T10:55:49.950Z",
+                    "messaging_guidelines": {
+                      "words_to_use": [
+                        "Personalisation",
+                        "Response rates",
+                        "Compliance",
+                        "Efficiency",
+                        "Scale",
+                        "ROI",
+                        "Performance"
+                      ],
+                      "words_to_avoid": [
+                        "Spam",
+                        "Mass messaging",
+                        "Automation",
+                        "Cheap",
+                        "Easy",
+                        "Magic bullet"
+                      ],
+                      "value_props_that_resonate": [
+                        "10x your LinkedIn response rates",
+                        "Save 5+ hours per week per rep",
+                        "Stay LinkedIn compliant",
+                        "Scale personalisation"
+                      ]
+                    },
+                    "qualification_criteria": {
+                      "red_flags": [
+                        "B2C focus",
+                        "No LinkedIn presence",
+                        "Very small team (<5 people)",
+                        "Budget constraints",
+                        "Resistance to new technology"
+                      ],
+                      "must_haves": [
+                        "Active LinkedIn Sales Navigator",
+                        "Dedicated sales team",
+                        "B2B sales model",
+                        "Growth mindset"
+                      ],
+                      "nice_to_haves": [
+                        "Existing sales engagement platform",
+                        "Sales ops function",
+                        "Previous automation experience",
+                        "Compliance requirements"
+                      ]
+                    }
+                  },
+                  "is_active": false,
+                  "created_at": "2025-09-05T14:21:35.075777+00:00",
+                  "created_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                  "deleted_at": null,
+                  "job_titles": [
+                    "Sales Development Representative",
+                    "Account Executive",
+                    "Business Development Manager",
+                    "Sales Manager",
+                    "Head of Sales",
+                    "VP Sales",
+                    "Revenue Operations Manager",
+                    "Lead Generation Specialist"
+                  ],
+                  "last_error": null,
+                  "updated_at": "2025-09-10T10:55:49.95+00:00",
+                  "description": "High-growth B2B companies with dedicated sales teams who rely heavily on LinkedIn outreach for prospecting but struggle with low response rates due to generic messaging. These organisations have moved beyond basic cold calling and recognise LinkedIn as a primary channel, but lack the tools and expertise to personalise at scale whilst maintaining compliance.",
+                  "pain_points": [
+                    "LinkedIn response rates below 5%",
+                    "Hours wasted crafting individual messages",
+                    "Generic templates that sound robotic",
+                    "Fear of LinkedIn account restrictions",
+                    "Inability to scale personalised outreach",
+                    "Poor conversion from LinkedIn connections to meetings",
+                    "Lack of visibility into message performance",
+                    "Team inconsistency in messaging quality"
+                  ],
+                  "reviewed_at": "2025-09-10T10:55:49.95+00:00",
+                  "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                  "budget_range": "£200-£2,000 per month per sales team",
+                  "review_notes": "Approved via UI",
+                  "review_status": "pending",
+                  "value_drivers": [
+                    "Increased meeting bookings from LinkedIn",
+                    "Time savings on message creation",
+                    "Higher response rates and engagement",
+                    "Scalable personalisation",
+                    "Compliance and account safety",
+                    "Team productivity improvements",
+                    "Better ROI on LinkedIn Sales Navigator investment",
+                    "Competitive advantage in crowded markets"
+                  ],
+                  "industry_focus": [
+                    "B2B SaaS",
+                    "Technology Services",
+                    "Professional Services",
+                    "Management Consulting",
+                    "Digital Marketing Agencies",
+                    "Financial Services",
+                    "HR Technology",
+                    "Cybersecurity"
+                  ],
+                  "product_link_id": 10,
+                  "success_metrics": [
+                    "LinkedIn response rate improvement",
+                    "Meetings booked per rep",
+                    "Time saved on outreach activities",
+                    "Cost per qualified lead",
+                    "LinkedIn connection acceptance rate",
+                    "Pipeline generated from LinkedIn",
+                    "Sales velocity improvements"
+                  ],
+                  "workflow_status": "draft",
+                  "geographic_focus": [
+                    "UK",
+                    "Ireland",
+                    "US",
+                    "Canada",
+                    "Australia",
+                    "DACH region"
+                  ],
+                  "technology_stack": [
+                    "LinkedIn Sales Navigator",
+                    "CRM systems (Salesforce, HubSpot, Pipedrive)",
+                    "Sales engagement platforms",
+                    "Email marketing tools",
+                    "Analytics platforms",
+                    "Slack/Teams for collaboration"
+                  ],
+                  "can_restore_until": null,
+                  "company_size_range": "50-500 employees, £2M-£50M annual revenue",
+                  "sales_cycle_length": "30-60 days from initial contact to signed contract",
+                  "generation_attempts": 1,
+                  "company_characteristics": "Growth-stage companies with 50-500 employees, established sales processes, active LinkedIn Sales Navigator subscriptions, and dedicated sales development teams. Companies experiencing rapid growth who need to scale outreach efficiently whilst maintaining quality.",
+                  "decision_making_process": "Sales Manager identifies need, evaluates with RevOps/Sales Ops, trials with small team, presents ROI to VP Sales/CRO for approval. Decision typically involves 2-4 stakeholders with 30-60 day evaluation period.",
+                  "objections_and_concerns": [
+                    "LinkedIn compliance and account safety",
+                    "Message authenticity and brand voice",
+                    "Integration with existing sales stack",
+                    "ROI measurement and attribution",
+                    "Team adoption and training requirements",
+                    "Data privacy and GDPR compliance",
+                    "Cost per seat vs current tools"
+                  ],
+                  "competitive_alternatives": [
+                    "Manual LinkedIn outreach",
+                    "Generic automation tools like Expandi",
+                    "Sales engagement platforms like Outreach/SalesLoft",
+                    "LinkedIn Sales Navigator alone",
+                    "VA services for message writing",
+                    "Internal sales development teams"
+                  ],
+                  "preferred_communication_channels": [
+                    "LinkedIn (ironically)",
+                    "Email",
+                    "Sales-focused webinars",
+                    "Industry conferences",
+                    "Peer referrals",
+                    "Sales community forums"
+                  ]
+                },
+                "personas": [
+                  {
+                    "role": "Decision Maker",
+                    "title": "VP Sales / Head of Sales",
+                    "motivations": [
+                      "Team productivity",
+                      "Revenue growth",
+                      "Competitive advantage",
+                      "Scalable processes"
+                    ],
+                    "frustrations": [
+                      "Poor LinkedIn ROI",
+                      "Team inconsistency",
+                      "Manual processes",
+                      "Compliance risks"
+                    ]
+                  },
+                  {
+                    "role": "Influencer",
+                    "title": "Sales Operations Manager",
+                    "motivations": [
+                      "Process efficiency",
+                      "Data accuracy",
+                      "Tool integration",
+                      "Measurable results"
+                    ],
+                    "frustrations": [
+                      "Fragmented tech stack",
+                      "Poor adoption rates",
+                      "Lack of analytics",
+                      "Manual reporting"
+                    ]
+                  },
+                  {
+                    "role": "End User",
+                    "title": "Sales Development Representative",
+                    "motivations": [
+                      "Meeting quota",
+                      "Time efficiency",
+                      "Better response rates",
+                      "Career advancement"
+                    ],
+                    "frustrations": [
+                      "Generic message templates",
+                      "Time-consuming personalisation",
+                      "Low response rates",
+                      "Account restrictions"
+                    ]
+                  }
+                ],
+                "change_log": [
+                  {
+                    "new": [
+                      "LinkedIn",
+                      "Email",
+                      "Sales-focused webinars",
+                      "Industry conferences",
+                      "Peer referrals",
+                      "Sales community forums"
+                    ],
+                    "field": "preferred_communication_channels",
+                    "action": "modified",
+                    "previous": [
+                      "LinkedIn (ironically)",
+                      "Email",
+                      "Sales-focused webinars",
+                      "Industry conferences",
+                      "Peer referrals",
+                      "Sales community forums"
+                    ],
+                    "timestamp": "2025-09-10T16:57:04.359Z"
+                  }
+                ],
+                "ai_feedback": {
+                  "summary": "88% sales-ready. Strong foundation with clear personas and pain points. Needs specific benchmarks and competitive positioning. 3-4 weeks to optimise for maximum conversion.",
+                  "suggestions": {
+                    "critical": [
+                      "Add specific response rate benchmarks by industry",
+                      "Create LinkedIn compliance guidelines",
+                      "Define integration requirements"
+                    ],
+                    "optional": [
+                      "Regional messaging variations",
+                      "Seasonal buying patterns",
+                      "Partnership channel strategy"
+                    ],
+                    "top_gaps": [
+                      "Specific ROI benchmarks by industry",
+                      "Competitive battle cards",
+                      "Integration requirements detail"
+                    ],
+                    "important": [
+                      "Develop competitive positioning against Outreach/SalesLoft",
+                      "Create industry-specific use cases",
+                      "Add team size recommendations"
+                    ]
+                  },
+                  "quality_assessment": {
+                    "scores": {
+                      "overall": 85,
+                      "specificity": 88,
+                      "completeness": 92,
+                      "actionability": 90
+                    },
+                    "top_3_gaps": [
+                      "Specific ROI benchmarks by industry",
+                      "Competitive battle cards",
+                      "Integration requirements detail"
+                    ]
+                  },
+                  "improvement_priorities": {
+                    "critical": [
+                      "Add specific response rate benchmarks by industry",
+                      "Create LinkedIn compliance guidelines",
+                      "Define integration requirements"
+                    ],
+                    "optional": [
+                      "Regional messaging variations",
+                      "Seasonal buying patterns",
+                      "Partnership channel strategy"
+                    ],
+                    "important": [
+                      "Develop competitive positioning against Outreach/SalesLoft",
+                      "Create industry-specific use cases",
+                      "Add team size recommendations"
+                    ]
+                  }
+                },
+                "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                "user_edited": {
+                  "edited_at": "2025-09-10T17:26:57.433Z",
+                  "edited_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+                  "preferred_communication_channels": [
+                    "LinkedIn",
+                    "Email",
+                    "Sales-focused webinars",
+                    "Industry conferences",
+                    "Peer referrals",
+                    "Sales community forums"
+                  ]
+                },
+                "generated_at": "2025-09-09T12:22:02.627Z",
+                "review_notes": "Approved via UI",
+                "field_sources": {
+                  "team_id": "ai",
+                  "icp_name": "ai",
+                  "is_active": "ai",
+                  "created_by": "ai",
+                  "deleted_at": "ai",
+                  "job_titles": "ai",
+                  "last_error": "ai",
+                  "description": "ai",
+                  "pain_points": "ai",
+                  "reviewed_at": "ai",
+                  "reviewed_by": "ai",
+                  "budget_range": "ai",
+                  "review_notes": "ai",
+                  "review_status": "ai",
+                  "value_drivers": "ai",
+                  "industry_focus": "ai",
+                  "product_link_id": "ai",
+                  "success_metrics": "ai",
+                  "workflow_status": "ai",
+                  "geographic_focus": "ai",
+                  "technology_stack": "ai",
+                  "can_restore_until": "ai",
+                  "company_size_range": "ai",
+                  "sales_cycle_length": "ai",
+                  "generation_attempts": "ai",
+                  "company_characteristics": "ai",
+                  "decision_making_process": "ai",
+                  "objections_and_concerns": "ai",
+                  "competitive_alternatives": "ai",
+                  "preferred_communication_channels": "user"
+                },
+                "buying_triggers": [
+                  "Poor LinkedIn response rates",
+                  "Sales team expansion",
+                  "New LinkedIn Sales Navigator investment",
+                  "Competitive pressure",
+                  "Missing quarterly targets",
+                  "Sales productivity initiatives",
+                  "Compliance concerns with current tools"
+                ],
+                "confidence_score": 88,
+                "original_request": {
+                  "updated_at": "2025-09-09T12:22:02.656Z",
+                  "generated_via": "n8n_workflow",
+                  "workflow_run_id": "6720"
+                },
+                "original_input_type": "manual",
+                "review_completed_at": "2025-09-10T10:55:49.950Z",
+                "messaging_guidelines": {
+                  "words_to_use": [
+                    "Personalisation",
+                    "Response rates",
+                    "Compliance",
+                    "Efficiency",
+                    "Scale",
+                    "ROI",
+                    "Performance"
+                  ],
+                  "words_to_avoid": [
+                    "Spam",
+                    "Mass messaging",
+                    "Automation",
+                    "Cheap",
+                    "Easy",
+                    "Magic bullet"
+                  ],
+                  "value_props_that_resonate": [
+                    "10x your LinkedIn response rates",
+                    "Save 5+ hours per week per rep",
+                    "Stay LinkedIn compliant",
+                    "Scale personalisation"
+                  ]
+                },
+                "qualification_criteria": {
+                  "red_flags": [
+                    "B2C focus",
+                    "No LinkedIn presence",
+                    "Very small team (<5 people)",
+                    "Budget constraints",
+                    "Resistance to new technology"
+                  ],
+                  "must_haves": [
+                    "Active LinkedIn Sales Navigator",
+                    "Dedicated sales team",
+                    "B2B sales model",
+                    "Growth mindset"
+                  ],
+                  "nice_to_haves": [
+                    "Existing sales engagement platform",
+                    "Sales ops function",
+                    "Previous automation experience",
+                    "Compliance requirements"
+                  ]
+                }
+              },
+              "is_active": false,
+              "created_at": "2025-09-05T14:21:35.075777+00:00",
+              "created_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "deleted_at": null,
+              "job_titles": [
+                "Sales Development Representative",
+                "Account Executive",
+                "Business Development Manager",
+                "Sales Manager",
+                "Head of Sales",
+                "VP Sales",
+                "Revenue Operations Manager",
+                "Lead Generation Specialist"
+              ],
+              "last_error": null,
+              "updated_at": "2025-09-12T13:22:15.365+00:00",
+              "description": "High-growth B2B companies with dedicated sales teams who rely heavily on LinkedIn outreach for prospecting but struggle with low response rates due to generic messaging. These organisations have moved beyond basic cold calling and recognise LinkedIn as a primary channel, but lack the tools and expertise to personalise at scale whilst maintaining compliance.",
+              "pain_points": [
+                "LinkedIn response rates below 5%",
+                "Hours wasted crafting individual messages",
+                "Generic templates that sound robotic",
+                "Fear of LinkedIn account restrictions",
+                "Inability to scale personalised outreach",
+                "Poor conversion from LinkedIn connections to meetings",
+                "Lack of visibility into message performance",
+                "Team inconsistency in messaging quality"
+              ],
+              "reviewed_at": "2025-09-10T17:26:57.433+00:00",
+              "reviewed_by": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+              "budget_range": "£200-£2,000 per month per sales team",
+              "product_name": "\"Cold AI - LinkedIn Messages That Get Replies\"",
+              "review_notes": "Approved via UI",
+              "risk_factors": [],
+              "market_trends": "Companies moving towards AI automation for cost cutting and efficiency/growth boosts",
+              "review_status": "pending",
+              "value_drivers": [
+                "Increased meeting bookings from LinkedIn",
+                "Time savings on message creation",
+                "Higher response rates and engagement",
+                "Scalable personalisation",
+                "Compliance and account safety",
+                "Team productivity improvements",
+                "Better ROI on LinkedIn Sales Navigator investment",
+                "Competitive advantage in crowded markets"
+              ],
+              "buying_signals": [],
+              "call_to_action": "",
+              "industry_focus": [
+                "B2B SaaS",
+                "Technology Services",
+                "Professional Services",
+                "Management Consulting",
+                "Digital Marketing Agencies",
+                "Financial Services",
+                "HR Technology",
+                "Cybersecurity"
+              ],
+              "product_link_id": 10,
+              "success_metrics": [
+                "LinkedIn response rate improvement",
+                "Meetings booked per rep",
+                "Time saved on outreach activities",
+                "Cost per qualified lead",
+                "LinkedIn connection acceptance rate",
+                "Pipeline generated from LinkedIn",
+                "Sales velocity improvements"
+              ],
+              "workflow_status": "draft",
+              "geographic_focus": [
+                "UK",
+                "Ireland",
+                "US",
+                "Canada",
+                "Australia",
+                "DACH region"
+              ],
+              "technology_stack": [
+                "LinkedIn Sales Navigator",
+                "CRM systems (Salesforce, HubSpot, Pipedrive)",
+                "Sales engagement platforms",
+                "Email marketing tools",
+                "Analytics platforms",
+                "Slack/Teams for collaboration"
+              ],
+              "can_restore_until": null,
+              "company_size_range": "50-500 employees, £2M-£50M annual revenue",
+              "sales_cycle_length": "30-60 days from initial contact to signed contract",
+              "generation_attempts": 1,
+              "growth_opportunities": [],
+              "key_messaging_points": [],
+              "competitive_landscape": "Will always be competing against LLMs as Cold AI is a wrapper. However, by having the send and track in LinkedIn capabilities we are set apart.",
+              "company_characteristics": "Growth-stage companies with 50-500 employees, established sales processes, active LinkedIn Sales Navigator subscriptions, and dedicated sales development teams. Companies experiencing rapid growth who need to scale outreach efficiently whilst maintaining quality.",
+              "decision_making_process": "Sales Manager identifies need, evaluates with RevOps/Sales Ops, trials with small team, presents ROI to VP Sales/CRO for approval. Decision typically involves 2-4 stakeholders with 30-60 day evaluation period.",
+              "objections_and_concerns": [
+                "LinkedIn compliance and account safety",
+                "Message authenticity and brand voice",
+                "Integration with existing sales stack",
+                "ROI measurement and attribution",
+                "Team adoption and training requirements",
+                "Data privacy and GDPR compliance",
+                "Cost per seat vs current tools"
+              ],
+              "competitive_alternatives": [
+                "Manual LinkedIn outreach",
+                "Generic automation tools like Expandi",
+                "Sales engagement platforms like Outreach/SalesLoft",
+                "LinkedIn Sales Navigator alone",
+                "VA services for message writing",
+                "Internal sales development teams"
+              ],
+              "preferred_communication_channels": [
+                "LinkedIn",
+                "Email",
+                "Sales-focused webinars",
+                "Industry conferences",
+                "Peer referrals",
+                "Sales community forums"
+              ]
+            },
+            "ai_suggestions": {
+              "summary": "88% sales-ready. Strong foundation with clear personas and pain points. Needs specific benchmarks and competitive positioning. 3-4 weeks to optimise for maximum conversion.",
+              "suggestions": {
+                "critical": [
+                  "Add specific response rate benchmarks by industry",
+                  "Create LinkedIn compliance guidelines",
+                  "Define integration requirements"
+                ],
+                "optional": [
+                  "Regional messaging variations",
+                  "Seasonal buying patterns",
+                  "Partnership channel strategy"
+                ],
+                "top_gaps": [
+                  "Specific ROI benchmarks by industry",
+                  "Competitive battle cards",
+                  "Integration requirements detail"
+                ],
+                "important": [
+                  "Develop competitive positioning against Outreach/SalesLoft",
+                  "Create industry-specific use cases",
+                  "Add team size recommendations"
+                ]
+              },
+              "quality_assessment": {
+                "scores": {
+                  "overall": 85,
+                  "specificity": 88,
+                  "completeness": 92,
+                  "actionability": 90
+                },
+                "top_3_gaps": [
+                  "Specific ROI benchmarks by industry",
+                  "Competitive battle cards",
+                  "Integration requirements detail"
+                ]
+              },
+              "improvement_priorities": {
+                "critical": [
+                  "Add specific response rate benchmarks by industry",
+                  "Create LinkedIn compliance guidelines",
+                  "Define integration requirements"
+                ],
+                "optional": [
+                  "Regional messaging variations",
+                  "Seasonal buying patterns",
+                  "Partnership channel strategy"
+                ],
+                "important": [
+                  "Develop competitive positioning against Outreach/SalesLoft",
+                  "Create industry-specific use cases",
+                  "Add team size recommendations"
+                ]
+              }
+            },
+            "changed_fields": []
+          },
+          "result": null,
+          "error_message": null,
+          "processed": false,
+          "retry_count": 0,
+          "created_at": "2025-09-12T13:23:30.452Z",
+          "completed_at": null,
+          "updated_at": "2025-09-12T13:26:15.911Z",
+          "idempotency_key": "458d454a-c6bb-478b-9f1c-660ce31ab138"
+        }
+      }
+    ],
+    "Find Unprocessed Events": [
+      {
+        "json": {
+          "id": 48,
+          "idempotency_key": "458d454a-c6bb-478b-9f1c-660ce31ab138",
+          "created_at": "2025-09-12T13:23:30.452Z"
+        }
+      }
+    ],
+    "Mark Events as Processing": [
+      {
+        "json": {
+          "id": 48
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Save Entry": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract and Structure": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Supabase": {
+      "main": [
+        [
+          {
+            "node": "Base64 Encoding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve ICP Entry": {
+      "main": [
+        [
+          {
+            "node": "Extract and Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 Encoding": {
+      "main": [
+        [
+          {
+            "node": "Save Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Response": {
+      "main": [
+        [
+          {
+            "node": "Review Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Each Event": {
+      "main": [
+        [
+          {
+            "node": "Review Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Events as Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Loop": {
+      "main": [
+        [
+          {
+            "node": "Finished",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Updated Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Unprocessed Events": {
+      "main": [
+        [
+          {
+            "node": "Mark Each Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Updated Entry": {
+      "main": [
+        [
+          {
+            "node": "Prepare ICP Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Events as Processing": {
+      "main": [
+        [
+          {
+            "node": "Mark Each Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare ICP Review": {
+      "main": [
+        [
+          {
+            "node": "Updates Made",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Updates Made": {
+      "main": [
+        [
+          {
+            "node": "Approve ICP Entry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Review Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Review Status": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Find Unprocessed Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c56dad01-a1d5-4fa4-b1f0-f26e9c703910",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "LzM0uc4l1msIiZ2P",
+  "tags": [
+    {
+      "createdAt": "2025-07-03T14:41:16.741Z",
+      "updatedAt": "2025-07-03T14:41:16.741Z",
+      "id": "AfErn6zbWY41qrY9",
+      "name": "nudge cold"
+    },
+    {
+      "createdAt": "2025-07-22T15:09:00.765Z",
+      "updatedAt": "2025-07-22T15:09:00.765Z",
+      "id": "yrfp10HbhjmoX07s",
+      "name": "web-app"
+    }
+  ]
+}

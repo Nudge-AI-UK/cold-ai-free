@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Action Confirmation - Cold AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8fafc;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: #081726;
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .logo {
+            margin-bottom: 10px;
+        }
+        
+        .logo img {
+            max-width: 200px;
+            height: auto;
+            display: inline-block;
+        }
+        
+        .tagline {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 0;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .welcome-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .message {
+            font-size: 16px;
+            color: #555555;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .cta-button {
+            display: block;
+            width: fit-content;
+            margin: 30px auto;
+            padding: 16px 32px;
+            background: linear-gradient(90deg, #ff8c00 0%, #ff6b00 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .info-box {
+            background-color: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .info-box h3 {
+            color: #0c4a6e;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .info-box p {
+            color: #075985;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        .action-details {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .action-details h3 {
+            color: #1e293b;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .action-details .action-item {
+            background-color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #ff8c00;
+        }
+        
+        .action-details .action-item strong {
+            color: #ff8c00;
+        }
+        
+        .security-note {
+            background-color: #fff3e0;
+            border: 1px solid #ff8c00;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #994d00;
+        }
+        
+        .security-note strong {
+            color: #78350f;
+        }
+        
+        .footer {
+            background-color: #081726;
+            color: #cccccc;
+            padding: 30px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #ff8c00;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 0 10px;
+            }
+            
+            .header, .content, .footer {
+                padding: 25px 20px;
+            }
+            
+            .logo img {
+                max-width: 160px;
+            }
+            
+            .welcome-title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header with Cold AI branding -->
+        <div class="header">
+            <div class="logo">
+                <img src="https://free.coldai.uk/Cold_AI_Logo_Rectangle_Transparent.png" alt="Cold AI" />
+            </div>
+            <div class="tagline">AI-Powered LinkedIn, Email and Call Outreach Automation</div>
+        </div>
+        
+        <!-- Main content -->
+        <div class="content">
+            <h1 class="welcome-title">Account Action Required</h1>
+            
+            <p class="message">
+                You've requested to make changes to your Cold AI account. Please complete this step to proceed.
+            </p>
+            
+            <div class="info-box">
+                <h3>📋 Action Confirmation</h3>
+                <p>This step helps protect your account and ensures that only you can make important changes to your profile.</p>
+            </div>
+            
+            <a href="{{ .ConfirmationURL }}" class="cta-button">
+                ✅ Complete Action
+            </a>
+            
+            <div class="action-details">
+                <h3>📝 What's Next:</h3>
+                <div class="action-item">
+                    <strong>Step 1:</strong> Click the button above<br>
+                    <strong>Step 2:</strong> Complete the requested action<br>
+                    <strong>Step 3:</strong> Your changes will be applied
+                </div>
+            </div>
+            
+            <div class="security-note">
+                <strong>Note:</strong> This link expires in 15 minutes. If you didn't request this action, you can safely ignore this email or contact our support team for assistance.
+            </div>
+            
+            <p style="text-align: center; color: #666; font-size: 14px; margin-top: 30px;">
+                Having trouble with the button? Copy and paste this link into your browser:<br>
+                <span style="word-break: break-all; color: #ff8c00;">{{ .ConfirmationURL }}</span>
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Cold AI Team</strong></p>
+            <p>Transforming outreach with intelligent automation</p>
+            <p style="margin-top: 15px;">
+                <a href="https://nudgeai.uk">Visit our website</a> | 
+                <a href="mailto:admin@coldai.com">Contact Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

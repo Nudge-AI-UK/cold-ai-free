@@ -12,21 +12,24 @@ interface AnalyticsWidgetProps {
 export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps) {
   const { user } = useAuth()
   const [usage, setUsage] = useState<Usage | null>(null)
+  const [icpCount, setIcpCount] = useState(0)
+  const [productCount, setProductCount] = useState(0)
 
   useEffect(() => {
     if (user && !forceEmpty) {
       fetchUsage()
+      fetchResourceCounts()
     }
   }, [user, forceEmpty])
 
-  // Real-time subscription for usage tracking updates
+  // Real-time subscriptions for usage tracking, ICPs, and products
   useEffect(() => {
     if (!user) return
 
     const userId = user?.id || user?.user_id
 
     const channel = supabase
-      .channel('usage_tracking_updates')
+      .channel('analytics_updates')
       .on(
         'postgres_changes',
         {
@@ -40,8 +43,34 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
           fetchUsage()
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'icps',
+          filter: `created_by=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 ICP updated:', payload)
+          fetchResourceCounts()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'knowledge_base',
+          filter: `created_by=eq.${userId}`
+        },
+        (payload) => {
+          console.log('🔄 Knowledge base updated:', payload)
+          fetchResourceCounts()
+        }
+      )
       .subscribe((status) => {
-        console.log('🔌 Usage tracking subscription status:', status)
+        console.log('🔌 Analytics subscription status:', status)
       })
 
     return () => {
@@ -118,7 +147,44 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
     }
   }
 
-  const usagePercentage = usage 
+  const fetchResourceCounts = async () => {
+    if (!user) return
+
+    const userId = user?.id || user?.user_id
+
+    try {
+      // Count ICPs
+      const { count: icps, error: icpError } = await supabase
+        .from('icps')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', userId)
+
+      if (icpError) {
+        console.warn('Error fetching ICP count:', icpError)
+      } else {
+        setIcpCount(icps || 0)
+      }
+
+      // Count approved products
+      const { count: products, error: productError } = await supabase
+        .from('knowledge_base')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', userId)
+        .eq('review_status', 'approved')
+
+      if (productError) {
+        console.warn('Error fetching product count:', productError)
+      } else {
+        setProductCount(products || 0)
+      }
+
+      console.log('📊 Resource counts:', { icps, products })
+    } catch (error) {
+      console.warn('Error fetching resource counts:', error)
+    }
+  }
+
+  const usagePercentage = usage
     ? (usage.messages_sent / FREE_TIER_LIMITS.MAX_MESSAGES) * 100
     : 0
 
@@ -147,7 +213,7 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
         <span className="text-xs text-gray-400">Free Plan</span>
       </div>
 
-      {/* Usage Counter */}
+      {/* Usage Counter - Messages */}
       <div className="mb-3">
         <div className="flex items-baseline justify-between mb-2">
           <div>
@@ -158,24 +224,71 @@ export function AnalyticsWidget({ forceEmpty, className }: AnalyticsWidgetProps)
           </div>
           <span className="text-xs text-gray-500">messages</span>
         </div>
-        
+
         {/* Progress Bar */}
-        <div className="w-full bg-white/10 rounded-full h-2">
+        <div className="w-full bg-white/10 rounded-full h-2 mb-3">
           <div className="h-2 rounded-full transition-all duration-300"
                style={{
                  width: forceEmpty ? '0%' : `${usagePercentage}%`,
                  background: 'linear-gradient(90deg, #FBAE1C 0%, #FC9109 50%, #DD6800 100%)'
                }}></div>
         </div>
+
+        {/* Resource Limits */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* ICPs */}
+          <div className="bg-white/5 rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500">ICPs</span>
+              <span className="text-[10px] text-gray-600">Free: 1</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-white">
+                {forceEmpty ? '0' : icpCount}
+              </span>
+              <span className="text-sm text-gray-400">/ 1</span>
+            </div>
+          </div>
+
+          {/* Products */}
+          <div className="bg-white/5 rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500">Products</span>
+              <span className="text-[10px] text-gray-600">Free: 1</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-white">
+                {forceEmpty ? '0' : productCount}
+              </span>
+              <span className="text-sm text-gray-400">/ 1</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Reset Info */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-500">
-          {forceEmpty ? 'Start tracking your usage' : `Resets in ${daysUntilReset()} days`}
-        </span>
-        <button className="text-xs text-[#FBAE1C] hover:text-white transition-colors">
-          Upgrade →
+      {/* Reset Info & Upgrade CTA */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>
+            {forceEmpty ? 'Start tracking your usage' : `Resets in ${daysUntilReset()} days`}
+          </span>
+        </div>
+
+        {/* Upgrade Button */}
+        <button className="w-full bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 hover:from-[#FBAE1C]/20 hover:to-[#FC9109]/20 border border-[#FBAE1C]/30 rounded-lg px-3 py-2 transition-all group">
+          <div className="flex items-center justify-between">
+            <div className="text-left">
+              <div className="text-xs font-medium text-[#FBAE1C] group-hover:text-white transition-colors">
+                Upgrade to Pro
+              </div>
+              <div className="text-[10px] text-gray-400">
+                Higher limits, track connections & AI replies
+              </div>
+            </div>
+            <svg className="w-4 h-4 text-[#FBAE1C] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </div>
         </button>
       </div>
       

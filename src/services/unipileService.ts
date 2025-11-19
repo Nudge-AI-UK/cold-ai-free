@@ -43,9 +43,9 @@ class UnipileService {
         api_url: 'https://api.unipile.com', // This will be handled by Edge Function
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         userId,
-        success_url: `${window.location.origin}/auth/unipile/success`,
-        failure_url: `${window.location.origin}/auth/unipile/failure`,
-        webhook_url: `https://n8n.phillyte.xyz/webhook/unipile-callback`
+        success_url: `${window.location.origin}?unipile=success`,
+        failure_url: `${window.location.origin}?unipile=failure`,
+        webhook_url: `https://hagtgdeyvogjkcjwacla.supabase.co/functions/v1/server-unipile-callback`
       };
 
       // Call Supabase Edge Function instead of Unipile directly
@@ -196,13 +196,59 @@ class UnipileService {
     try {
       console.log('🔌 Disconnecting LinkedIn for user:', userId);
 
-      // Update user profile to remove LinkedIn connection
+      // First, get the Unipile account ID so we can delete it
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('unipile_account_id')
+        .eq('user_id', userId)
+        .single();
+
+      const unipileAccountId = profile?.unipile_account_id;
+
+      // If there's a Unipile account, delete it from Unipile's platform
+      if (unipileAccountId) {
+        console.log('🗑️ Deleting Unipile account:', unipileAccountId);
+
+        try {
+          // Get current user session for auth
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+
+          if (token) {
+            // Call edge function to delete the account from Unipile
+            const response = await fetch(`${this.supabaseUrl}/functions/v1/unipile-delete-account`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                account_id: unipileAccountId,
+                user_id: userId
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.warn('⚠️ Failed to delete from Unipile (continuing with local disconnect):', errorText);
+            } else {
+              console.log('✅ Unipile account deleted successfully');
+            }
+          }
+        } catch (unipileError: any) {
+          // Log the error but continue with local disconnect
+          console.warn('⚠️ Error deleting from Unipile (continuing with local disconnect):', unipileError);
+        }
+      }
+
+      // Update user profile to remove LinkedIn connection (always do this, even if Unipile deletion fails)
       const { error } = await supabase
         .from('user_profiles')
         .update({
           linkedin_connected: false,
           unipile_account_id: null,
           linkedin_url: null,
+          linkedin_profile_data: null,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId);

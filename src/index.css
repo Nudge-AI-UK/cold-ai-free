@@ -250,12 +250,53 @@
 }
 
 @layer utilities {
+  /* Firefox compatibility fixes */
+  @supports not (backdrop-filter: blur(10px)) {
+    /* Fallback for Firefox - use solid backgrounds instead of blur */
+    .backdrop-blur-xl,
+    .backdrop-blur-sm,
+    .backdrop-blur-md,
+    .backdrop-blur-lg,
+    [class*="backdrop-blur"] {
+      backdrop-filter: none !important;
+      background-color: rgba(31, 41, 55, 0.95) !important; /* Solid dark background */
+    }
+
+    .widget-card {
+      backdrop-filter: none !important;
+      background: hsl(222 41% 11% / 0.98) !important;
+    }
+  }
+
+  /* Firefox-specific fixes using -moz prefix */
+  @-moz-document url-prefix() {
+    /* Ensure backgrounds render properly */
+    body {
+      background: #0a0f1b !important;
+      background: linear-gradient(135deg, #0a0f1b 0%, #1a1f2e 100%) !important;
+      background-attachment: fixed !important;
+    }
+
+    /* Fix backdrop-filter for Firefox */
+    .backdrop-blur-xl {
+      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(24px);
+      background-color: rgba(31, 41, 55, 0.85) !important;
+    }
+
+    .backdrop-blur-sm {
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      background-color: rgba(31, 41, 55, 0.85) !important;
+    }
+  }
+
   /* Animation keyframes */
   @keyframes subtle-glow {
-    0%, 100% { 
+    0%, 100% {
       opacity: 0.3;
     }
-    50% { 
+    50% {
       opacity: 0.6;
     }
   }
@@ -270,9 +311,35 @@
       transform: translateY(0);
     }
   }
-  
+
   .animate-fade-in-up {
     animation: fade-in-up 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
 
@@ -333,12 +400,50 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { 
+  0%, 100% {
     opacity: 1;
     box-shadow: 0 0 30px rgba(251, 174, 28, 0.6);
   }
-  50% { 
+  50% {
     opacity: 0.85;
     box-shadow: 0 0 20px rgba(251, 174, 28, 0.4);
   }
+}
+
+@keyframes onboarding-glow {
+  0%, 100% {
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow:
+      0 0 20px rgba(168, 85, 247, 0.4),
+      0 0 40px rgba(168, 85, 247, 0.2),
+      inset 0 0 20px rgba(168, 85, 247, 0.1);
+  }
+  50% {
+    border-color: rgba(168, 85, 247, 0.9);
+    box-shadow:
+      0 0 30px rgba(168, 85, 247, 0.6),
+      0 0 60px rgba(168, 85, 247, 0.3),
+      inset 0 0 30px rgba(168, 85, 247, 0.15);
+  }
+}
+
+@keyframes arrow-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.onboarding-highlight {
+  animation: onboarding-glow 2s ease-in-out infinite;
+  border-width: 2px;
+  position: relative;
+}
+
+.onboarding-arrow {
+  animation: arrow-pulse 1.5s ease-in-out infinite;
 }

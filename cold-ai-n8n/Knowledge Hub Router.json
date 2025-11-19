@@ -1,0 +1,765 @@
+{
+  "name": "Cold: Knowledge Hub",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-action",
+        "responseMode": "lastNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Router-Domain",
+                "value": "knowledge-base"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        144
+      ],
+      "id": "24f3654d-56ee-41f8-9fac-b4a87242f22d",
+      "name": "Knowledge Action",
+      "webhookId": "d8f2e4ac-544e-45ff-a7d8-7490bd96bc2d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Knowledge Base Request Validation\nconst headers = $input.first().json.headers;\nconst body = $input.first().json.body;\n\n// Validate API Key if configured\nconst API_KEY = $env.KB_API_KEY || $env.N8N_API_KEY;\nif (API_KEY && headers['x-api-key'] !== API_KEY) {\n  return {\n    json: {\n      success: false,\n      error: 'Unauthorized: Invalid API key',\n      statusCode: 401,\n      router: 'knowledge-base'\n    }\n  };\n}\n\n// Validate required fields\nconst requiredFields = ['action', 'user_id'];\nconst missingFields = requiredFields.filter(field => !body[field]);\n\nif (missingFields.length > 0) {\n  return {\n    json: {\n      success: false,\n      error: `Missing required fields: ${missingFields.join(', ')}`,\n      statusCode: 400,\n      router: 'knowledge-base'\n    }\n  };\n}\n\n// Validate action is knowledge-base related\nconst validActions = [\n  'add_entry', 'update_entry', 'delete_entry', 'get_entry', 'list_entries',\n  'submit_review', 'approve_entry', 'reject_entry', 'request_changes',\n  'generate_wiki', 'publish_wiki', 'update_toc',\n  'enhance_entry', 'extract_metadata',\n  'search', 'analytics'\n];\n\nif (!validActions.includes(body.action)) {\n  return {\n    json: {\n      success: false,\n      error: `Invalid action for knowledge router: ${body.action}`,\n      valid_actions: validActions,\n      statusCode: 400,\n      router: 'knowledge-base'\n    }\n  };\n}\n\n// Add metadata\nconst validatedRequest = {\n  ...body,\n  metadata: {\n    timestamp: new Date().toISOString(),\n    request_id: `kb_${Date.now()}_${Math.random().toString(36).substring(7)}`,\n    router: 'knowledge-base',\n    source: body.source || 'web_frontend',\n    api_version: '1.0'\n  }\n};\n\nreturn {\n  json: validatedRequest\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        144
+      ],
+      "id": "7c5919d7-6405-4bed-ab4b-27bd34292a59",
+      "name": "Authentication"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse KB Request - Code Node\n\n// Get the webhook data from the Knowledge Action node\nconst webhookData = $('Knowledge Action').first().json;\n\n// Extract the body which contains our actual payload\nconst body = webhookData.body || {};\n\n// Extract the data object which varies by action type\nconst data = body.data || {};\n\n// Parse and route knowledge base requests - 4 groups\n// Entry Management Group - Route 0\nconst entryManagementActions = [\n  'add_entry',\n  'update_entry', \n  'delete_entry',\n  'get_entry',\n  'list_entries'\n];\n\n// Review Process Group - Route 1  \nconst reviewProcessActions = [\n  'submit_review',\n  'approve_entry',\n  'reject_entry',\n  'request_changes'\n];\n\n// Wiki Operations Group - Route 2\nconst wikiOperationsActions = [\n  'generate_wiki',\n  'publish_wiki',\n  'update_toc'\n];\n\n// AI Enhancement Group - Route 3\nconst aiEnhancementActions = [\n  'enhance_entry',\n  'extract_metadata'\n];\n\n// Determine which group and set routing\nlet route_index = 99; // default for unknown\nlet group = 'Unknown';\n\nconst action = body.action || 'unknown';\n\nif (entryManagementActions.includes(action)) {\n  route_index = 0;\n  group = 'Entry Management';\n} else if (reviewProcessActions.includes(action)) {\n  route_index = 1;\n  group = 'Review Process';\n} else if (wikiOperationsActions.includes(action)) {\n  route_index = 2;\n  group = 'Wiki Operations';\n} else if (aiEnhancementActions.includes(action)) {\n  route_index = 3;\n  group = 'AI Enhancement';\n}\n\n// Return properly structured data\n// Note: Many fields will be null for delete_entry action\n// Different actions provide different data\nreturn {\n  json: {\n    // Core identifiers from the actual request\n    \"user_id\": body.user_id || null,\n    \"action\": action,\n    \n    // Entry-specific data (varies by action)\n    \"entry_id\": data.entry_id || data.entryId || null,\n    \"timestamp\": data.timestamp || null,\n    \n    // These fields are provided for add/update actions but not delete\n    \"knowledge_type\": data.knowledge_type || null,\n    \"title\": data.title || null,\n    \"content\": data.content || null,\n    \"metadata\": data.metadata || {},\n    \"team_id\": data.team_id || body.team_id || null,\n    \n    // Keep the original data object intact\n    \"data\": data,\n    \n    // Request metadata\n    \"request_metadata\": {\n      \"webhook_url\": webhookData.webhookUrl || null,\n      \"execution_mode\": webhookData.executionMode || null,\n      \"headers\": webhookData.headers || {},\n      \"original_body\": body\n    },\n    \n    // Routing information\n    \"routing\": {\n      \"route_index\": route_index,\n      \"group\": group,\n      \"action\": action,\n      \"has_entry_id\": !!(data.entry_id || data.entryId)\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        48
+      ],
+      "id": "79db9c7e-1c8b-42db-9fc4-0b321d4a4233",
+      "name": "Parse KB Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO webhook_events (\n  event_type,\n  source,\n  payload,\n  processed\n) VALUES (\n    $1, \n    $2, \n    jsonb_build_object(\n      'action', $3, \n      'user_id', $4,\n      'entryId', $5,\n      'entry_id', $6,\n      'timestamp', $7\n    ),\n    $8\n)\nRETURNING id, created_at;",
+        "options": {
+          "queryReplacement": "={{ 'kb_' + $('Knowledge Action').item.json.body.action }},\n{{ 'knowledge_base' }},\n{{ $('Knowledge Action').item.json.body.action }},\n{{ $('Knowledge Action').item.json.body.user_id }},\n{{ $('Knowledge Action').item.json.body.data.entry_id }},\n{{ $('Knowledge Action').item.json.body.data.entry_id }},\n{{ $('Knowledge Action').item.json.body.data.timestamp }},\n{{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1152,
+        48
+      ],
+      "id": "c67eef24-d4ce-4b96-99de-310c6c580259",
+      "name": "Log Request",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  u.user_id,\n  u.email,\n  u.onboarding_step,\n  u.onboarding_completed,\n  up.job_title,\n  bp.company_name,\n  up.linkedin_url,\n  tm.team_id,\n  tm.role as team_role,\n  tm.can_manage_knowledge_base,\n  tm.can_invite_members,\n  tm.can_manage_company_profile,\n  tm.can_manage_icps,\n  t.team_name,\n  t.monthly_message_limit,\n  t.monthly_messages_used,\n  COALESCE(\n    (SELECT COUNT(*) FROM knowledge_base \n     WHERE created_by = $1::text\n     AND created_at > NOW() - INTERVAL '30 days'),\n    0\n  ) as recent_kb_entries,\n  COALESCE(\n    (SELECT COUNT(*) FROM knowledge_base \n     WHERE created_by = $1::text),\n    0\n  ) as total_active_entries,\n  COALESCE(\n    (SELECT COUNT(*) FROM knowledge_base \n     WHERE created_by = $1::text\n     AND knowledge_type = $2),\n    0\n  ) as active_entries_of_type\nFROM users u\nLEFT JOIN user_profiles up ON u.user_id = up.user_id\nLEFT JOIN business_profiles bp ON u.user_id = bp.user_id\nLEFT JOIN team_memberships tm ON u.user_id = tm.user_id AND tm.status = 'active'\nLEFT JOIN teams t ON tm.team_id = t.team_id\nWHERE u.user_id = $1::text\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }}, {{ $json.data.knowledge_type || 'product' }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1600,
+        48
+      ],
+      "id": "6e30d843-b343-4401-9ff0-f46dcd9d481c",
+      "name": "Add User Context",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse KB Request').item.json.routing.route_index }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "id": "24848ae7-6282-42d7-9944-991ba3d0f832"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Entry Management"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2a3663b0-f520-4536-82db-ebc472e6655d",
+                    "leftValue": "={{ $node[\"Parse KB Request\"].json.routing.route_index }}",
+                    "rightValue": 1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Review Process"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a32f02d9-5977-4226-aa3e-7bb11838423d",
+                    "leftValue": "={{ $('Parse KB Request').item.json.routing.route_index }}",
+                    "rightValue": 2,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Wiki Operation"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown KB Action"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2032,
+        16
+      ],
+      "id": "d28520cb-97f4-4287-abf5-2683799d1d6a",
+      "name": "KB Action Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6nUnCKW3324kAwpm",
+          "mode": "list",
+          "cachedResultName": "Cold: Knowledge Hub: Entry Management"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        -240
+      ],
+      "id": "a2a34e8f-e6e7-411e-b596-55923161b231",
+      "name": "Entry Management"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "zN7YGVsiJB3GsTyQ",
+          "mode": "list",
+          "cachedResultName": "Cold: Knowledge Review"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        -48
+      ],
+      "id": "f8fa57bc-8674-4281-892e-ff3eb88597b4",
+      "name": "Review Process"
+    },
+    {
+      "parameters": {
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2320,
+        144
+      ],
+      "id": "3c1054c7-fd13-4f77-9f07-424bd3533d9f",
+      "name": "Wiki Operation",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH user_subscription AS (\n  SELECT \n    COALESCE(s.plan_type, 'free') as plan_type,\n    u.user_id,\n    CURRENT_TIMESTAMP as now\n  FROM users u\n  LEFT JOIN team_memberships tm ON u.user_id = tm.user_id\n  LEFT JOIN teams t ON tm.team_id = t.team_id\n  LEFT JOIN subscriptions s ON t.subscription_id = s.subscription_id\n  WHERE u.user_id = $1\n),\nactive_counts AS (\n  SELECT \n    COUNT(CASE WHEN knowledge_type = 'product' THEN 1 END) as active_products,\n    COUNT(CASE WHEN knowledge_type = 'company' THEN 1 END) as active_company,\n    COUNT(CASE WHEN knowledge_type = 'case_study' THEN 1 END) as active_case_studies\n  FROM knowledge_base\n  WHERE created_by = $1\n    AND (deleted_at IS NULL OR deleted_at > CURRENT_TIMESTAMP - INTERVAL '30 days')\n),\nmonthly_creations AS (\n  SELECT \n    COUNT(CASE WHEN knowledge_type = 'product' THEN 1 END) as monthly_products,\n    COUNT(CASE WHEN knowledge_type = 'company' THEN 1 END) as monthly_company,\n    COUNT(CASE WHEN knowledge_type = 'case_study' THEN 1 END) as monthly_case_studies,\n    COUNT(*) as total_monthly_creations\n  FROM knowledge_base\n  WHERE created_by = $1\n    AND created_at >= DATE_TRUNC('month', CURRENT_DATE)\n    AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'\n),\nmonthly_ai_usage AS (\n  SELECT \n    COUNT(*) as ai_generations_this_month\n  FROM knowledge_base\n  WHERE created_by = $1\n    AND created_at >= DATE_TRUNC('month', CURRENT_DATE)\n    AND metadata->>'aiFieldsRequested' IS NOT NULL\n),\nlimits_config AS (\n  SELECT \n    us.plan_type,\n    CASE us.plan_type\n      WHEN 'free' THEN json_build_object(\n        'products', 1, 'company_info', 1, 'case_studies', 1,\n        'monthly_products', 2, 'monthly_company', 1, 'monthly_case_studies', 1,\n        'monthly_edits', 3, 'icps', 1\n      )\n      WHEN 'basic' THEN json_build_object(\n        'products', 3, 'company_info', 3, 'case_studies', 3,\n        'monthly_products', 5, 'monthly_company', 3, 'monthly_case_studies', 3,\n        'monthly_edits', 9, 'icps', 3\n      )\n      WHEN 'standard' THEN json_build_object(\n        'products', 5, 'company_info', 5, 'case_studies', 5,\n        'monthly_products', 10, 'monthly_company', 5, 'monthly_case_studies', 5,\n        'monthly_edits', 15, 'icps', 5\n      )\n      WHEN 'pro' THEN json_build_object(\n        'products', 10, 'company_info', 10, 'case_studies', 10,\n        'monthly_products', 20, 'monthly_company', 10, 'monthly_case_studies', 10,\n        'monthly_edits', 30, 'icps', 10\n      )\n      WHEN 'team' THEN json_build_object(\n        'products', 50, 'company_info', 50, 'case_studies', 50,\n        'monthly_products', 100, 'monthly_company', 50, 'monthly_case_studies', 50,\n        'monthly_edits', 150, 'icps', 50\n      )\n      WHEN 'team_basic' THEN json_build_object(\n        'products', 20, 'company_info', 20, 'case_studies', 20,\n        'monthly_products', 40, 'monthly_company', 20, 'monthly_case_studies', 20,\n        'monthly_edits', 60, 'icps', 20\n      )\n      WHEN 'team_xl' THEN json_build_object(\n        'products', 50, 'company_info', 50, 'case_studies', 50,\n        'monthly_products', 100, 'monthly_company', 50, 'monthly_case_studies', 50,\n        'monthly_edits', 150, 'icps', 50\n      )\n      ELSE json_build_object(\n        'products', 1, 'company_info', 1, 'case_studies', 1,\n        'monthly_products', 2, 'monthly_company', 1, 'monthly_case_studies', 1,\n        'monthly_edits', 3, 'icps', 1\n      )\n    END as limits\n  FROM user_subscription us\n)\nSELECT \n  us.plan_type,\n  ac.active_products,\n  ac.active_company,\n  ac.active_case_studies,\n  mc.monthly_products,\n  mc.monthly_company,\n  mc.monthly_case_studies,\n  mc.total_monthly_creations,\n  mai.ai_generations_this_month,\n  lc.limits,\n  CASE \n    WHEN $2 = 'add_entry' AND $3 IS NOT NULL THEN\n      CASE $3\n        WHEN 'product' THEN \n          json_build_object(\n            'can_add', ac.active_products < (lc.limits->>'products')::int,\n            'can_create_monthly', mc.monthly_products < (lc.limits->>'monthly_products')::int,\n            'active_used', ac.active_products,\n            'active_limit', (lc.limits->>'products')::int,\n            'monthly_used', mc.monthly_products,\n            'monthly_limit', (lc.limits->>'monthly_products')::int\n          )\n        WHEN 'company' THEN \n          json_build_object(\n            'can_add', ac.active_company < (lc.limits->>'company_info')::int,\n            'can_create_monthly', mc.monthly_company < (lc.limits->>'monthly_company')::int,\n            'active_used', ac.active_company,\n            'active_limit', (lc.limits->>'company_info')::int,\n            'monthly_used', mc.monthly_company,\n            'monthly_limit', (lc.limits->>'monthly_company')::int\n          )\n        WHEN 'case_study' THEN \n          json_build_object(\n            'can_add', ac.active_case_studies < (lc.limits->>'case_studies')::int,\n            'can_create_monthly', mc.monthly_case_studies < (lc.limits->>'monthly_case_studies')::int,\n            'active_used', ac.active_case_studies,\n            'active_limit', (lc.limits->>'case_studies')::int,\n            'monthly_used', mc.monthly_case_studies,\n            'monthly_limit', (lc.limits->>'monthly_case_studies')::int\n          )\n        ELSE\n          json_build_object('can_proceed', false, 'error', 'Unknown knowledge type')\n      END\n    WHEN $2 = 'add_entry' AND $3 IS NULL THEN\n      json_build_object('can_proceed', false, 'error', 'Knowledge type required for add_entry')\n    WHEN $2 = 'delete_entry' THEN\n      json_build_object('can_delete', true, 'has_restore_window', true, 'restore_days', 30)\n    WHEN $2 = 'update_entry' THEN\n      json_build_object('can_update', true)\n    ELSE \n      json_build_object('can_proceed', true)\n  END as action_check\nFROM user_subscription us\nCROSS JOIN active_counts ac\nCROSS JOIN monthly_creations mc\nCROSS JOIN monthly_ai_usage mai\nCROSS JOIN limits_config lc;",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }},\n{{ $json.action }},\n{{ $json.data?.knowledge_type || $json.data?.knowledgeType || null }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        144
+      ],
+      "id": "61ee83bc-6512-4497-9e4e-b47b7c94f9b5",
+      "name": "Check Limits",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b3971e6-5424-4490-b8bf-6d9698fb4923",
+              "leftValue": "={{ $json.validation.can_proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        144
+      ],
+      "id": "6df498af-fca2-4152-9769-08f87b1da720",
+      "name": "Under Limit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff2442db-e146-4ece-96e7-da76e995ea08",
+              "name": "success",
+              "value": "=false",
+              "type": "boolean"
+            },
+            {
+              "id": "6ccd415d-5f64-4eb1-bcdd-43a038d46b95",
+              "name": "error",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "ae0ada04-65dd-4bdf-b5bb-4dd973289082",
+              "name": "error_type",
+              "value": "={{ $json.validation.error.type }}",
+              "type": "string"
+            },
+            {
+              "id": "fa959460-81f1-4cff-9eeb-55173d81fae4",
+              "name": "message",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "70c55d65-08a7-4bf1-9e4d-1d149361d1a6",
+              "name": "details",
+              "value": "={   \n  \"plan_type\": \"{{ $json.plan_type }}\",   \n  \"action_attempted\": \"{{ $json.action }}\",   \n  \"knowledge_type\": \"{{ $json.data.knowledge_type }}\",   \n  \"limits\": {     \n    \"active_used\": {{ $json.validation.error.limits.active_used }},     \n    \"active_limit\": {{ $json.validation.error.limits.active_limit }},     \n    \"monthly_used\": {{ $json.validation.error.limits.monthly_used }},     \n    \"monthly_limit\": {{ $json.validation.error.limits.monthly_limit }}   \n  },   \n  \"suggestion\": \"{{ $json.validation.error.suggestion }}\",   \n  \"reset_date\": \"{{ new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0] }}\" \n}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1152,
+        240
+      ],
+      "id": "0af2acf4-72d9-449b-8c29-99a482405857",
+      "name": "Limit Reached"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff2442db-e146-4ece-96e7-da76e995ea08",
+              "name": "message",
+              "value": "=Error: unknown action requested.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2320,
+        336
+      ],
+      "id": "934dd00c-0c6d-42d8-b883-42d703b87033",
+      "name": "Unknown Action",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Knowledge Base Limits Validator\nconst result = $input.first().json;\nconst action = result.action;\nconst actionCheck = result.action_check || {};\nconst planType = result.plan_type || 'free';\n\n// Initialize response\nlet canProceed = false;\nlet errorMessage = '';\nlet errorType = null;\nlet requiresLimitCheck = false;\n\n// Define which actions need limit checks\nconst limitedActions = ['add_entry'];\nconst alwaysAllowedActions = [\n  'delete_entry', \n  'get_entry', \n  'list_entries', \n  'search', \n  'analytics'\n];\nconst reviewActions = [\n  'submit_review', \n  'approve_entry', \n  'reject_entry', \n  'request_changes'\n];\nconst wikiActions = [\n  'generate_wiki', \n  'publish_wiki', \n  'update_toc'\n];\nconst enhancementActions = [\n  'enhance_entry', \n  'extract_metadata', \n  'update_entry'\n];\n\n// Process based on action type\nif (limitedActions.includes(action)) {\n  // These need full limit checking\n  requiresLimitCheck = true;\n  \n  if (actionCheck.can_add === false) {\n    errorType = 'ACTIVE_LIMIT_EXCEEDED';\n    errorMessage = `You've reached your ${planType} plan limit of ${actionCheck.active_limit} active ${result.data?.knowledge_type || 'entries'}. Please delete an existing entry or upgrade your plan.`;\n  } else if (actionCheck.can_create_monthly === false) {\n    errorType = 'MONTHLY_LIMIT_EXCEEDED';\n    errorMessage = `You've reached your monthly creation limit (${actionCheck.monthly_used}/${actionCheck.monthly_limit}) for ${result.data?.knowledge_type || 'entries'}. Limits reset on the 1st of each month.`;\n  } else {\n    canProceed = true;\n  }\n  \n} else if (alwaysAllowedActions.includes(action)) {\n  // These actions are always allowed\n  canProceed = true;\n  \n} else if (reviewActions.includes(action)) {\n  // Review actions - check if entry exists and user has permission\n  canProceed = true; // Will be validated at database level\n  \n} else if (wikiActions.includes(action)) {\n  // Wiki actions - may have plan-based restrictions\n  if (planType === 'free' && action === 'publish_wiki') {\n    errorType = 'FEATURE_LOCKED';\n    errorMessage = 'Publishing wiki requires a paid plan';\n  } else {\n    canProceed = true;\n  }\n  \n} else if (enhancementActions.includes(action)) {\n  // Enhancement actions - check AI usage limits if applicable\n  if (result.ai_generations_this_month > 100 && planType === 'free') {\n    errorType = 'AI_LIMIT_EXCEEDED';\n    errorMessage = 'Monthly AI generation limit exceeded for free plan';\n  } else {\n    canProceed = true;\n  }\n  \n} else {\n  // Unknown action - let it through for now (will fail at router)\n  canProceed = true;\n}\n\n// Build comprehensive response\nconst response = {\n  ...result,\n  validation: {\n    can_proceed: canProceed,\n    requires_limit_check: requiresLimitCheck,\n    action_category: getActionCategory(action),\n    timestamp: new Date().toISOString()\n  }\n};\n\n// Add error details if cannot proceed\nif (!canProceed) {\n  response.validation.error = {\n    type: errorType,\n    message: errorMessage,\n    limits: {\n      plan_type: planType,\n      active_used: actionCheck.active_used || 0,\n      active_limit: actionCheck.active_limit || 0,\n      monthly_used: actionCheck.monthly_used || 0,\n      monthly_limit: actionCheck.monthly_limit || 0\n    },\n    suggestion: getSuggestion(errorType, planType)\n  };\n}\n\n// Helper function to categorize actions\nfunction getActionCategory(action) {\n  if (limitedActions.includes(action)) return 'limited';\n  if (alwaysAllowedActions.includes(action)) return 'unrestricted';\n  if (reviewActions.includes(action)) return 'review';\n  if (wikiActions.includes(action)) return 'wiki';\n  if (enhancementActions.includes(action)) return 'enhancement';\n  return 'unknown';\n}\n\n// Helper function to provide upgrade suggestions\nfunction getSuggestion(errorType, planType) {\n  const suggestions = {\n    'ACTIVE_LIMIT_EXCEEDED': 'Delete unused entries or upgrade your plan',\n    'MONTHLY_LIMIT_EXCEEDED': 'Wait for monthly reset or upgrade your plan',\n    'FEATURE_LOCKED': 'Upgrade to a paid plan to unlock this feature',\n    'AI_LIMIT_EXCEEDED': 'Upgrade for unlimited AI generations'\n  };\n  return suggestions[errorType] || 'Contact support for assistance';\n}\n\n// Return the enhanced response\nreturn {\n  json: response\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        144
+      ],
+      "id": "fb55ec3c-8bf0-4a91-ba41-5720f67db585",
+      "name": "Limit Validator"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c6e9e50-a65e-42ae-a657-aa263e861619",
+              "name": "action",
+              "value": "={{ $('Parse KB Request').item.json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "36a1400b-515a-4ea4-8b10-49067d9ff4bb",
+              "name": "title",
+              "value": "={{ $('Parse KB Request').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "8d688e5d-6fb0-4e9e-a11a-68300afcdf4e",
+              "name": "content",
+              "value": "={{ $('Parse KB Request').item.json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "7f634744-656d-4172-958f-b10d090c3892",
+              "name": "entry_id",
+              "value": "={{ $('Parse KB Request').item.json.entry_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6b9d9b39-e0f0-4093-bb53-ba35b0a74ad9",
+              "name": "timestamp",
+              "value": "={{ $('Parse KB Request').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "6a44f057-46ae-466c-8f91-6b2b9b882205",
+              "name": "team_id",
+              "value": "={{ $('Parse KB Request').item.json.team_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cc73b85b-eb09-44a3-ae68-c64d05c75eeb",
+              "name": "metadata",
+              "value": "={{ $('Parse KB Request').item.json.metadata }}",
+              "type": "string"
+            },
+            {
+              "id": "e37f3087-c6ed-4711-9ce6-54625dbc624f",
+              "name": "plan_type",
+              "value": "={{ $('Check Limits').item.json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "f84e820b-3f7e-4d12-8e55-079eeb5633b1",
+              "name": "knowledge_type",
+              "value": "={{ $('Parse KB Request').item.json.knowledge_type }}",
+              "type": "string"
+            },
+            {
+              "id": "ae8ac7f1-2640-4cb4-bb3e-2a13609a41e2",
+              "name": "data",
+              "value": "={{ $('Parse KB Request').item.json.data }}",
+              "type": "object"
+            },
+            {
+              "id": "4e8c108a-8ad3-4726-8a17-8a1bd87e736e",
+              "name": "log_id",
+              "value": "={{ $('Log Request').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1808,
+        48
+      ],
+      "id": "88babd47-f79b-4d9a-84db-53f0b37f4408",
+      "name": "Global Variables"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "99eb41e2-8b17-409e-a606-227118cff587",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "test_connection",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        64,
+        144
+      ],
+      "id": "a3ce1755-c7cf-4166-9f98-44eb187f6602",
+      "name": "Test Connection"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b6df0744-1f40-48d5-8180-8f5e305cd201",
+              "name": "response_code",
+              "value": "200",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        352,
+        -80
+      ],
+      "id": "43841db1-80d7-49e4-8b40-103ed9d86881",
+      "name": "Test Connection Success"
+    }
+  ],
+  "pinData": {
+    "Knowledge Action": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.phillyte.xyz",
+            "user-agent": "Deno/2.1.4 (variant; SupabaseEdgeRuntime/1.69.4)",
+            "content-length": "137",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "accept-language": "*",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "2a05:d01c:76e:790a:4e24:4932:971b:bae",
+            "cf-ipcountry": "GB",
+            "cf-ray": "9852cdecd85a94b1-LHR",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "a2435c7e-096f-40b9-b867-80bc4f93919b",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+            "x-api-key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1YzdmMDA0OC1jMGZiLTRlMTItYjE1Ny03YjFhOTg4NmY0OTAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzUzMTk1NjIzfQ.vDWoWl7AFSdIFfGgQjta0Rsl-3nhPLvcQr4GCNwVwRg",
+            "x-forwarded-for": "2a05:d01c:76e:790a:4e24:4932:971b:bae",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "action": "test_connection",
+            "data": {
+              "test": true,
+              "timestamp": "2025-09-26T12:36:00.098Z",
+              "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02"
+            }
+          },
+          "webhookUrl": "https://n8n.phillyte.xyz/webhook/knowledge-action",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Knowledge Action": {
+      "main": [
+        [
+          {
+            "node": "Test Connection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authentication": {
+      "main": [
+        [
+          {
+            "node": "Check Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request": {
+      "main": [
+        [
+          {
+            "node": "Parse KB Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse KB Request": {
+      "main": [
+        [
+          {
+            "node": "Add User Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add User Context": {
+      "main": [
+        [
+          {
+            "node": "Global Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB Action Switch": {
+      "main": [
+        [
+          {
+            "node": "Entry Management",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Review Process",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wiki Operation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Limits": {
+      "main": [
+        [
+          {
+            "node": "Limit Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Under Limit": {
+      "main": [
+        [
+          {
+            "node": "Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Limit Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit Validator": {
+      "main": [
+        [
+          {
+            "node": "Under Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Variables": {
+      "main": [
+        [
+          {
+            "node": "KB Action Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Connection": {
+      "main": [
+        [
+          {
+            "node": "Test Connection Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2e39b52f-9df9-4f5e-80b7-2ec443249ce8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "1HH6QzFjl1H5Idz1",
+  "tags": []
+}

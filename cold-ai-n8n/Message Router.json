@@ -1,0 +1,667 @@
+{
+  "name": "Cold: Message Router",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": " // Message Generation Request Validation\n  const headers = $input.first().json.headers;\n  const body = $input.first().json.body;\n\n  // Validate API Key if configured (optional for message generation)\n  const API_KEY = $env.KB_API_KEY || $env.N8N_API_KEY;\n  if (API_KEY && headers['x-api-key'] !== API_KEY) {\n    return {\n      json: {\n        success: false,\n        error: 'Unauthorized: Invalid API key',\n        statusCode: 401,\n        router: 'message-generation'\n      }\n    };\n  }\n\n  // Validate required fields for message generation\n  const requiredFields = ['action', 'user_id'];\n  const missingFields = requiredFields.filter(field => !body[field]);\n\n  if (missingFields.length > 0) {\n    return {\n      json: {\n        success: false,\n        error: `Missing required fields: ${missingFields.join(', ')}`,\n        statusCode: 400,\n        router: 'message-generation'\n      }\n    };\n  }\n\n  // Validate action is message generation related\n  const validActions = [\n    'generate_message', 'test_connection'\n  ];\n\n  if (!validActions.includes(body.action)) {\n    return {\n      json: {\n        success: false,\n        error: `Invalid action for message router: ${body.action}`,\n        valid_actions: validActions,\n        statusCode: 400,\n        router: 'message-generation'\n      }\n    };\n  }\n\n  // Validate prospect data for message generation\n  if (body.action === 'generate_message') {\n    if (!body.prospect_data || !body.prospect_data.linkedin_url) {\n      return {\n        json: {\n          success: false,\n          error: 'Missing prospect_data.linkedin_url for message generation',\n          statusCode: 400,\n          router: 'message-generation'\n        }\n      };\n    }\n  }\n\n  // Add metadata\n  const validatedRequest = {\n    ...body,\n    metadata: {\n      timestamp: new Date().toISOString(),\n      request_id: body.request_id || `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`,\n      router: 'message-generation',\n      source: body.source || 'web_frontend',\n      api_version: '1.0'\n    }\n  };\n\n  return {\n    json: validatedRequest\n  };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2368,
+        -16
+      ],
+      "id": "497f4b9e-2157-4aa3-8062-16e2cc93505f",
+      "name": "Authentication"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO webhook_events (\n  event_type,\n  source,\n  payload,\n  processed\n) VALUES (\n    $1, \n    $2, \n    jsonb_build_object(\n      'prospect', $3, \n      'user_id', $4,\n      'timestamp', $5\n    ),\n    $6\n)\nRETURNING id, created_at;",
+        "options": {
+          "queryReplacement": "={{ $('Limit Validator').item.json.validation.usage_info.plan_type + '_' + $('Worker 1').item.json.body.action }}, {{ 'message' }}, {{ $('Worker 1').item.json.body.prospect_data.linkedin_url }}, {{ $('Worker 1').item.json.body.user_id }}, {{ $('Limit Validator').item.json.validation.timestamp }}, {{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -800,
+        -208
+      ],
+      "id": "e2cd88c0-7f8d-4144-9a6d-bc21228323b9",
+      "name": "Log Request",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b3971e6-5424-4490-b8bf-6d9698fb4923",
+              "leftValue": "={{ $json.validation.can_proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1696,
+        -16
+      ],
+      "id": "9db0d32d-ec32-4576-9a90-4e6f03e1df86",
+      "name": "Under Limit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff2442db-e146-4ece-96e7-da76e995ea08",
+              "name": "success",
+              "value": "=false",
+              "type": "boolean"
+            },
+            {
+              "id": "6ccd415d-5f64-4eb1-bcdd-43a038d46b95",
+              "name": "error",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "ae0ada04-65dd-4bdf-b5bb-4dd973289082",
+              "name": "error_type",
+              "value": "={{ $json.validation.error.type }}",
+              "type": "string"
+            },
+            {
+              "id": "fa959460-81f1-4cff-9eeb-55173d81fae4",
+              "name": "message",
+              "value": "={{ $json.validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "70c55d65-08a7-4bf1-9e4d-1d149361d1a6",
+              "name": "details",
+              "value": "=  {\n    \"plan_type\": \"{{ $json.validation.usage_info.plan_type }}\",\n    \"limits\": {\n      \"messages_used\": {{ $json.validation.usage_info.messages_used }},\n      \"messages_limit\": {{ $json.validation.usage_info.messages_limit }},\n      \"messages_remaining\": {{ $json.validation.usage_info.messages_remaining }}\n    },\n    \"error\": {\n      \"type\": \"{{ $json.validation.error.type }}\",\n      \"message\": \"{{ $json.validation.error.message }}\"\n    },\n    \"suggestion\": \"{{ $json.validation.error.suggestion }}\",\n    \"reset_date\": \"{{ new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0] }}\"\n  }",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1472,
+        80
+      ],
+      "id": "e5052892-a66f-44b2-8dcd-c96722b85058",
+      "name": "Limit Reached"
+    },
+    {
+      "parameters": {
+        "jsCode": " // Message Generation Limits Validator\n  const result = $input.first().json;\n  const planType = result.plan_type || 'free';\n\n  // Initialize response\n  let canProceed = false;\n  let errorMessage = '';\n  let errorType = null;\n  let requiresLimitCheck = true;\n\n  // Get current usage\n  let messagesUsed = 0;\n  if (result.messages_generated !== undefined) {\n    messagesUsed = result.messages_generated;\n  } else if (result.usage_data && result.usage_data.length > 0) {\n    messagesUsed = result.usage_data[0].messages_generated || result.usage_data[0].messages_sent || 0;\n  }\n\n  // Define limits\n  const limits = {\n    free: { monthly_messages: 25 },\n    pro: { monthly_messages: 1000 },\n    enterprise: { monthly_messages: -1 }\n  };\n\n  const currentLimit = limits[planType]?.monthly_messages || limits.free.monthly_messages;\n\n  // Check limits - any request that reaches this point needs limit checking\n  if (currentLimit === -1) {\n    canProceed = true; // Unlimited\n  } else if (messagesUsed >= currentLimit) {\n    errorType = 'MONTHLY_LIMIT_EXCEEDED';\n    errorMessage = `You've reached your monthly message limit (${messagesUsed}/${currentLimit}). Upgrade your plan or wait for next month's reset.`;\n    canProceed = false;\n  } else {\n    canProceed = true;\n  }\n\n  // Build response\n  const response = {\n    ...result,\n    validation: {\n      can_proceed: canProceed,\n      requires_limit_check: requiresLimitCheck,\n      usage_info: {\n        messages_used: messagesUsed,\n        messages_limit: currentLimit,\n        messages_remaining: currentLimit === -1 ? 'unlimited' : Math.max(0, currentLimit - messagesUsed),\n        plan_type: planType\n      },\n      timestamp: new Date().toISOString()\n    }\n  };\n\n  // Add error details if cannot proceed\n  if (!canProceed) {\n    response.validation.error = {\n      type: errorType,\n      message: errorMessage,\n      suggestion: 'Upgrade your plan for more messages or wait for monthly reset'\n    };\n  }\n\n  return { json: response };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        -16
+      ],
+      "id": "4fedcb0e-b0e8-491d-99f0-813348348b0a",
+      "name": "Limit Validator"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "message-gen_1",
+        "responseMode": "lastNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Router-Domain",
+                "value": "knowledge-base"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2592,
+        -16
+      ],
+      "id": "08021bb7-c4ac-41e0-8711-a5f6b8448bb6",
+      "name": "Worker 1",
+      "webhookId": "d8f2e4ac-544e-45ff-a7d8-7490bd96bc2d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n// The postgres node returns the array directly, not wrapped in db_result\nconst profileData = Array.isArray(result) ? result : [result];\n\nlet canProceed = false;\nlet errorMessage = '';\nlet profile = null;\n\n// Check if we have profile data\nif (!profileData || profileData.length === 0) {\n  errorMessage = 'Please complete your profile setup first';\n  canProceed = false;\n} else {\n  profile = profileData[0];\n\n  if (!profile || !profile.linkedin_connected || !profile.unipile_account_id) {\n    errorMessage = 'Please connect your LinkedIn account to generate personalised messages';\n    canProceed = false;\n  } else {\n    canProceed = true;\n  }\n}\n\n// Build response\nconst response = {\n  ...result,\n  linkedin_validation: {\n    can_proceed: canProceed,\n    linkedin_connected: profile?.linkedin_connected || false,\n    has_unipile_account: !!(profile?.unipile_account_id),\n    user_linkedin_url: profile?.linkedin_url || null\n  }\n};\n\nif (!canProceed) {\n  response.linkedin_validation.error = {\n    type: 'LINKEDIN_CONNECTION_REQUIRED',\n    message: errorMessage,\n    suggestion: 'Connect your LinkedIn account in Settings to enable message generation'\n  };\n}\n\nreturn { json: response };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        -112
+      ],
+      "id": "af6c4d91-e4c2-4c5b-8679-f5569d8a89b5",
+      "name": "Connected Validator"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4a261c2d-807c-40f1-a5db-cf0674a890b9",
+              "leftValue": "={{ $json.linkedin_validation.can_proceed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1024,
+        -112
+      ],
+      "id": "05841564-b4a0-4155-ad5f-ef08c9c8983c",
+      "name": "LinkedIn Connected"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff2442db-e146-4ece-96e7-da76e995ea08",
+              "name": "success",
+              "value": "=false",
+              "type": "boolean"
+            },
+            {
+              "id": "6ccd415d-5f64-4eb1-bcdd-43a038d46b95",
+              "name": "error",
+              "value": "={{ $json.linkedin_validation.error }}",
+              "type": "string"
+            },
+            {
+              "id": "ae0ada04-65dd-4bdf-b5bb-4dd973289082",
+              "name": "error_type",
+              "value": "={{ $json.linkedin_validation.error.type }}",
+              "type": "string"
+            },
+            {
+              "id": "fa959460-81f1-4cff-9eeb-55173d81fae4",
+              "name": "message",
+              "value": "={{ $json.linkedin_validation.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "70c55d65-08a7-4bf1-9e4d-1d149361d1a6",
+              "name": "details",
+              "value": "=  {\n    \"linkedin_status\": {\n      \"connected\": {{ $json.linkedin_validation.linkedin_connected }},\n      \"has_unipile_account\": {{ $json.linkedin_validation.has_unipile_account }},\n      \"user_linkedin_url\": \"{{ $json.linkedin_validation.user_linkedin_url }}\"\n    },\n    \"error\": {\n      \"type\": \"{{ $json.linkedin_validation.error.type }}\",\n      \"message\": \"{{ $json.linkedin_validation.error.message }}\"\n    },\n    \"suggestion\": \"{{ $json.linkedin_validation.error.suggestion }}\",\n    \"action_required\": \"Connect your LinkedIn account to enable message generation\"\n  }",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -800,
+        -16
+      ],
+      "id": "f5f53c74-b55f-4198-b694-a4e2505cd962",
+      "name": "Unconnected"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(SUM(messages_generated), 0) as messages_generated\nFROM usage_tracking\nWHERE user_id = $1\n  AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE);",
+        "options": {
+          "queryReplacement": "={{ $json.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2144,
+        -16
+      ],
+      "id": "b77da0fc-8cdd-4cc8-bebb-d2ae7de705bd",
+      "name": "Check Limits",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 4000,
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "lzD4GGJThnJo7EWU",
+          "mode": "list",
+          "cachedResultName": "Cold: Sub: Message Worker 1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "unipile_account_id",
+            "linkedin_url",
+            "profile_freshness",
+            "prospect_data_linkedin_url_split",
+            "prospect_data_linkedin_url",
+            "message_type",
+            "icp_id",
+            "product_id",
+            "user_id",
+            "timestamp",
+            "metadata_request_id",
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -208
+      ],
+      "name": "Call Cold: Sub: Message Worker 1",
+      "id": "67f80061-76e4-4e7e-9293-94f732ae88e7"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4347000-ece5-4725-9fa5-07515308b9b5",
+              "name": "account_id",
+              "value": "={{ $('User LinkedIn').item.json.unipile_account_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ce20fbc7-1808-40cc-936e-8919e7b0a2f6",
+              "name": "user_linkedin_identifier",
+              "value": "={{ $('User LinkedIn').item.json.linkedin_url }}",
+              "type": "string"
+            },
+            {
+              "id": "28a99511-8f13-49f6-bc62-ede47c267131",
+              "name": "user_linkedin",
+              "value": "={{ $('User LinkedIn').item.json.linkedin_url }}",
+              "type": "string"
+            },
+            {
+              "id": "c4697f7a-1814-41f6-949d-0d96270ac89c",
+              "name": "profile_freshness",
+              "value": "={{ $('Connected Validator').item.json.profile_freshness }}",
+              "type": "string"
+            },
+            {
+              "id": "675c9920-d466-4995-ad7d-9d109e20b0f7",
+              "name": "prospect_identifier",
+              "value": "={{ $('Authentication').item.json.prospect_data.linkedin_url.split('/').filter(part => part).pop() }}",
+              "type": "string"
+            },
+            {
+              "id": "973243ee-f399-46b0-9672-a1dde117873e",
+              "name": "prospect_url",
+              "value": "={{ $('Authentication').item.json.prospect_data.linkedin_url }}",
+              "type": "string"
+            },
+            {
+              "id": "5853b07c-9500-46f0-b2c4-ef9ea02c29a1",
+              "name": "message_type",
+              "value": "={{ $('Authentication').item.json.message_type }}",
+              "type": "string"
+            },
+            {
+              "id": "8f7fd98b-29aa-4151-a06e-15b08b3d619e",
+              "name": "icp_id",
+              "value": "={{ $('Authentication').item.json.icp_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ea801354-a21c-47dd-afdf-fe79445e30ef",
+              "name": "product_id",
+              "value": "={{ $('Authentication').item.json.product_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ba49e83c-f74b-4eb2-abcf-977681f8d49a",
+              "name": "user_id",
+              "value": "={{ $('Authentication').item.json.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "05a0ea06-9146-487f-b50c-7f768edc567b",
+              "name": "timestamp",
+              "value": "={{ $('Authentication').item.json.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "7ca09b19-9c94-4d6c-b6fc-ede1b7ae37b8",
+              "name": "request_id",
+              "value": "={{ $('Authentication').item.json.metadata.request_id }}",
+              "type": "string"
+            },
+            {
+              "id": "d0052eff-fc9d-4eb1-bfb9-52e4cfcf8050",
+              "name": "log_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "46dab8c8-8fb5-4b69-9dcc-96f69d5c23b0",
+              "name": "message_log_id",
+              "value": "={{ $('Worker 1').item.json.body.message_log_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -576,
+        -208
+      ],
+      "id": "b3d528ad-e104-429d-8cc7-0751bde2acd3",
+      "name": "LinkedIn Fields"
+    },
+    {
+      "parameters": {
+        "content": "# Add multiple workers here\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -416,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "182687cc-32e5-467b-a33e-48d393799ca1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# Need to split off non-premium LinkedIn users who can't InMail\n",
+        "height": 304,
+        "width": 640
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1504,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "31cabf2b-72f1-4dce-9697-6334e129a5b9",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  linkedin_connected,\n  unipile_account_id,\n  linkedin_url,\n  linkedin_profile_scraped_at,\n  CASE\n    WHEN linkedin_profile_scraped_at IS NULL THEN 'never'\n    WHEN linkedin_profile_scraped_at < NOW() - INTERVAL '30 days' THEN 'outdated'\n    ELSE 'current'\n  END as profile_freshness\nFROM user_profiles\nWHERE user_id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Worker 1').first().json.body.user_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1472,
+        -112
+      ],
+      "id": "8ef81aed-1164-4ee1-9ac0-ee8cd03a5e64",
+      "name": "User LinkedIn",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Worker 1": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.phillyte.xyz",
+            "user-agent": "Deno/2.1.4 (variant; SupabaseEdgeRuntime/1.69.4)",
+            "content-length": "309",
+            "accept": "text/plain",
+            "accept-encoding": "gzip, br",
+            "accept-language": "*",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "2a05:d01c:76e:7900:3a21:9a37:ed0e:70cf",
+            "cf-ipcountry": "GB",
+            "cf-ray": "9874021d3acfdb2e-LHR",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "a2435c7e-096f-40b9-b867-80bc4f93919b",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "x-forwarded-for": "2a05:d01c:76e:7900:3a21:9a37:ed0e:70cf",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "action": "generate_message",
+            "user_id": "3d2360d8-f592-4071-9f37-5d8e5b2b3c02",
+            "prospect_data": {
+              "linkedin_url": "https://www.linkedin.com/in/tom-palmer-gmbpss/"
+            },
+            "message_type": "first_message",
+            "product_id": 10,
+            "icp_id": 4,
+            "timestamp": "2025-09-30T13:18:47.844Z",
+            "request_id": "258bae40-67e4-4545-8400-c57e28655776"
+          },
+          "webhookUrl": "https://n8n.phillyte.xyz/webhook/message-gen_1",
+          "executionMode": "production"
+        }
+      }
+    ],
+    "Log Request": [
+      {
+        "json": {
+          "id": 58,
+          "created_at": "2025-09-30T17:33:28.318Z"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Authentication": {
+      "main": [
+        [
+          {
+            "node": "Check Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Under Limit": {
+      "main": [
+        [
+          {
+            "node": "User LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Limit Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit Validator": {
+      "main": [
+        [
+          {
+            "node": "Under Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Worker 1": {
+      "main": [
+        [
+          {
+            "node": "Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected Validator": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Connected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Connected": {
+      "main": [
+        [
+          {
+            "node": "Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unconnected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Limits": {
+      "main": [
+        [
+          {
+            "node": "Limit Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Fields": {
+      "main": [
+        [
+          {
+            "node": "Call Cold: Sub: Message Worker 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Connected Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "036615d8-cf49-42a9-b42a-3308d6d1833c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "trimcMQ0GzaHdxg9",
+  "tags": []
+}

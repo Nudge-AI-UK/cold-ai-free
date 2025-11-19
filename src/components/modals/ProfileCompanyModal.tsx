@@ -62,6 +62,7 @@ export function ProfileCompanyModal() {
   const [isSaving, setIsSaving] = useState(false)
   const [hasExistingData, setHasExistingData] = useState(false)
   const [originalFormData, setOriginalFormData] = useState<CompanyInfo | null>(null)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
   // Local change detection
   const hasLocalChanges = () => {
@@ -69,14 +70,32 @@ export function ProfileCompanyModal() {
     return JSON.stringify(formData) !== JSON.stringify(originalFormData)
   }
 
-  // Load existing data
+  // Load existing data and onboarding status
   useEffect(() => {
     if (user?.id || user?.user_id) {
       loadCompanyData()
+      loadOnboardingStatus()
     }
   }, [user])
 
   // Note: Removed modal state effect to prevent feedback loops
+
+  const loadOnboardingStatus = async () => {
+    const userId = user?.id || user?.user_id
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('onboarding_completed')
+        .eq('user_id', userId)
+        .single()
+
+      if (data && !error) {
+        setOnboardingCompleted(data.onboarding_completed || false)
+      }
+    } catch (error) {
+      console.error('Error loading onboarding status:', error)
+    }
+  }
 
   const loadCompanyData = async () => {
     setIsLoading(true)
@@ -194,7 +213,7 @@ export function ProfileCompanyModal() {
 
   if (isLoading) {
     return (
-      <BaseModal title="Company Information" description="Loading your company details...">
+      <BaseModal title="Company Information" description="Loading your company details..." dismissible={onboardingCompleted}>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-3 border-[#FBAE1C] border-t-transparent rounded-full animate-spin" />
         </div>
@@ -206,6 +225,7 @@ export function ProfileCompanyModal() {
     <BaseModal
       title="Company Information"
       description="Tell us about your business"
+      dismissible={onboardingCompleted}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
@@ -342,6 +362,7 @@ export function ProfileCompanyModal() {
         dynamicMode={true}
         hasExistingData={hasExistingData}
         hasChanges={hasLocalChanges()}
+        isFormValid={validateForm()}
       />
     </BaseModal>
   )

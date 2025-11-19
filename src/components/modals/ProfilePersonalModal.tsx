@@ -6,6 +6,49 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 
+// Common timezones list
+const TIMEZONES = [
+  'UTC',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Amsterdam',
+  'Europe/Brussels',
+  'Europe/Madrid',
+  'Europe/Rome',
+  'Europe/Stockholm',
+  'Europe/Dublin',
+  'Europe/Zurich',
+  'Europe/Vienna',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Toronto',
+  'America/Vancouver',
+  'America/Mexico_City',
+  'America/Sao_Paulo',
+  'America/Buenos_Aires',
+  'Asia/Dubai',
+  'Asia/Singapore',
+  'Asia/Hong_Kong',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Asia/Seoul',
+  'Asia/Bangkok',
+  'Asia/Manila',
+  'Asia/Jakarta',
+  'Asia/Kolkata',
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Australia/Brisbane',
+  'Australia/Perth',
+  'Pacific/Auckland',
+  'Africa/Johannesburg',
+  'Africa/Cairo',
+  'Africa/Lagos',
+]
+
 interface PersonalInfo {
   firstName: string
   lastName: string
@@ -31,15 +74,34 @@ export function ProfilePersonalModal() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasExistingData, setHasExistingData] = useState(false)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
-  // Load existing data
+  // Load existing data and onboarding status
   useEffect(() => {
     if (user?.id) {
       loadProfileData()
+      loadOnboardingStatus()
     }
   }, [user])
 
   // Note: Removed modal state effect to prevent feedback loops
+
+  const loadOnboardingStatus = async () => {
+    const userId = user?.id || user?.user_id
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('onboarding_completed')
+        .eq('user_id', userId)
+        .single()
+
+      if (data && !error) {
+        setOnboardingCompleted(data.onboarding_completed || false)
+      }
+    } catch (error) {
+      console.error('Error loading onboarding status:', error)
+    }
+  }
 
   const loadProfileData = async () => {
     setIsLoading(true)
@@ -162,7 +224,7 @@ export function ProfilePersonalModal() {
   }
 
   const validateForm = () => {
-    return formData.firstName && formData.lastName && formData.position
+    return formData.firstName && formData.lastName && formData.position && formData.territory
   }
 
   const handleNext = () => {
@@ -176,7 +238,7 @@ export function ProfilePersonalModal() {
 
   if (isLoading) {
     return (
-      <BaseModal title="Personal Information" description="Loading your profile...">
+      <BaseModal title="Personal Information" description="Loading your profile..." dismissible={onboardingCompleted}>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-3 border-[#FBAE1C] border-t-transparent rounded-full animate-spin" />
         </div>
@@ -188,6 +250,7 @@ export function ProfilePersonalModal() {
     <BaseModal
       title="Personal Information"
       description="Tell us about yourself to personalise your messages"
+      dismissible={onboardingCompleted}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
@@ -264,18 +327,23 @@ export function ProfilePersonalModal() {
 
               <div>
                 <label className="text-sm font-medium text-[#FBAE1C] block mb-2">
-                  Territory/Region
+                  Territory/Region <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.territory}
                   onChange={(e) => handleInputChange('territory', e.target.value)}
-                  placeholder="Your location"
-                  className="w-full rounded-xl px-4 py-3 text-white placeholder-gray-400 font-medium
+                  className="w-full rounded-xl px-4 py-3 text-white font-medium
                            bg-black/30 border border-white/10
                            focus:outline-none focus:border-[#FBAE1C]/50 focus:ring-3 focus:ring-[#FBAE1C]/10
                            transition-all duration-200"
-                />
+                >
+                  <option value="" className="bg-gray-900 text-gray-400">Select your timezone</option>
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz} value={tz} className="bg-gray-900 text-white">
+                      {tz.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </SectionCard>
@@ -332,6 +400,7 @@ export function ProfilePersonalModal() {
         dynamicMode={true}
         hasExistingData={hasExistingData}
         hasChanges={hasUnsavedChanges()}
+        isFormValid={validateForm()}
       />
     </BaseModal>
   )

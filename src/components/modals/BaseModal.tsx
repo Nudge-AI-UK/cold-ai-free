@@ -9,9 +9,10 @@ interface BaseModalProps {
   title: string
   description: string
   className?: string
+  dismissible?: boolean // Allow closing via X, ESC, backdrop click
 }
 
-export function BaseModal({ children, title, description, className = '' }: BaseModalProps) {
+export function BaseModal({ children, title, description, className = '', dismissible = true }: BaseModalProps) {
   const {
     state,
     closeModal,
@@ -71,20 +72,22 @@ export function BaseModal({ children, title, description, className = '' }: Base
 
       switch (e.key) {
         case 'ArrowLeft':
-          if (canNavigate.prev) {
+          if (dismissible && canNavigate.prev) {
             e.preventDefault()
             navigatePrevious()
           }
           break
         case 'ArrowRight':
-          if (canNavigate.next) {
+          if (dismissible && canNavigate.next) {
             e.preventDefault()
             navigateNext()
           }
           break
         case 'Escape':
-          e.preventDefault()
-          handleClose()
+          if (dismissible) {
+            e.preventDefault()
+            handleClose()
+          }
           break
       }
     }
@@ -166,15 +169,15 @@ export function BaseModal({ children, title, description, className = '' }: Base
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(10,14,27,0.4)] backdrop-blur-sm"
         onClick={(e) => {
-          // Only close if clicking the backdrop, not the modal content
-          if (e.target === e.currentTarget) {
+          // Only close if clicking the backdrop, not the modal content, and if dismissible
+          if (dismissible && e.target === e.currentTarget) {
             handleClose()
           }
         }}
       >
 
       {/* Navigation Arrows */}
-      {isInFlow() && (
+      {isInFlow() && dismissible && (
         <>
           <button
             onClick={navigatePrevious}
@@ -256,12 +259,14 @@ export function BaseModal({ children, title, description, className = '' }: Base
                          backdrop-blur-[10px] shadow-2xl shadow-black/50">
             {/* Modal Header */}
             <div className="flex-shrink-0 p-6 pb-4 border-b border-white/10 bg-gradient-to-b from-[rgba(10,14,27,0.98)] to-[rgba(26,31,54,0.95)] relative">
-              <button
-                onClick={handleClose}
-                className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {dismissible && (
+                <button
+                  onClick={handleClose}
+                  className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
 
               <h2 className="text-xl font-bold mb-1 pr-12">{title}</h2>
               <p className="text-sm text-gray-400">{description}</p>
@@ -301,6 +306,7 @@ interface ModalFooterProps {
   hasChanges?: boolean // Whether there are unsaved changes
   onSave?: () => void // Save handler for existing data
   saveLabel?: string // Custom save label
+  isFormValid?: boolean // Whether the form is valid (for required field validation)
 }
 
 export function ModalFooter({
@@ -322,7 +328,8 @@ export function ModalFooter({
   hasExistingData = false,
   hasChanges = false,
   onSave,
-  saveLabel = 'Save'
+  saveLabel = 'Save',
+  isFormValid = true // Default to true to not break existing modals
 }: ModalFooterProps) {
   const { canNavigate, navigateNext, navigatePrevious, hasUnsavedChanges } = useModalFlow()
 
@@ -406,9 +413,9 @@ export function ModalFooter({
           {showNext && (
             <button
               onClick={effectiveOnNext || handleNext}
-              disabled={shouldShowSave ? saveDisabled || isLoading : (!canNavigate.next || isLoading)}
+              disabled={shouldShowSave ? saveDisabled || isLoading : (!canNavigate.next || isLoading || !isFormValid)}
               className={`px-6 py-2 rounded-lg font-medium text-sm transition-all duration-200
-                         ${shouldShowSave && saveDisabled
+                         ${(shouldShowSave && saveDisabled) || !isFormValid
                            ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                            : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg hover:shadow-[#FBAE1C]/30 hover:-translate-y-0.5'
                          }
@@ -428,9 +435,9 @@ export function ModalFooter({
           {showComplete && (
             <button
               onClick={effectiveOnComplete || onComplete}
-              disabled={shouldShowSave ? saveDisabled || isLoading : isLoading}
+              disabled={shouldShowSave ? saveDisabled || isLoading : (isLoading || !isFormValid)}
               className={`px-6 py-2 rounded-lg font-medium text-sm transition-all duration-200
-                         ${shouldShowSave && saveDisabled
+                         ${(shouldShowSave && saveDisabled) || !isFormValid
                            ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                            : 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg hover:shadow-[#FBAE1C]/30 hover:-translate-y-0.5'
                          }

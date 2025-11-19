@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { DismissibleTooltip } from '@/components/ui/dismissible-tooltip';
 import {
   Plus,
   X,
@@ -164,26 +166,30 @@ export const ICPTabs: React.FC<ICPTabsProps> = ({
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               {Array.isArray(value) ? value.map((item: string, index: number) => (
-                <Badge
+                <DismissibleTooltip
                   key={index}
-                  variant="secondary"
-                  className={cn(
-                    "bg-gray-800 text-gray-300 border-gray-700",
-                    hasChanged && "border-yellow-500/50"
-                  )}
+                  content={isEditable ? "Click the X to remove this item" : "View only - cannot edit individual items"}
                 >
-                  {item}
-                  {isEditable && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="ml-1 p-0 h-auto"
-                      onClick={() => handleArrayFieldRemove(field, index)}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  )}
-                </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "bg-gray-800 text-gray-300 border-gray-700 cursor-default hover:bg-gray-800 hover:text-gray-300 hover:border-gray-700",
+                      hasChanged && "border-yellow-500/50 hover:border-yellow-500/50"
+                    )}
+                  >
+                    <span className="select-none">{item}</span>
+                    {isEditable && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-1 p-0 h-auto hover:bg-red-500/20 hover:text-red-400 transition-colors rounded"
+                        onClick={() => handleArrayFieldRemove(field, index)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </Badge>
+                </DismissibleTooltip>
               )) : (
                 <span className="text-gray-500 text-sm italic">No items</span>
               )}
@@ -283,8 +289,9 @@ export const ICPTabs: React.FC<ICPTabsProps> = ({
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="h-full">
-      <TabsList className="grid grid-cols-7 gap-2 bg-gray-800 p-1 mx-6 mt-4">
+    <TooltipProvider delayDuration={0}>
+      <Tabs value={activeTab} onValueChange={onTabChange} className="h-full">
+        <TabsList className="grid grid-cols-7 gap-2 bg-gray-800 p-1 mx-6 mt-4">
         {tabs.map((tab) => (
           <TabsTrigger
             key={tab.id}
@@ -462,6 +469,7 @@ export const ICPTabs: React.FC<ICPTabsProps> = ({
           </TabsContent>
         )}
       </div>
-    </Tabs>
+      </Tabs>
+    </TooltipProvider>
   );
 };

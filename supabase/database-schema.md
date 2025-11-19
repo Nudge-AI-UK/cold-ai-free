@@ -1,62 +1,3 @@
-# Cold AI Free - Database Schema Reference
-
-This file contains the database schema for reference when writing queries.
-
-## Key Table Relationships
-
-### User Management
-- **`users`** - Main user table with `user_id` as primary key
-- **`user_profiles`** - Personal profile info (linkedin_url, job_title, phone_number, etc.)
-- **`subscriptions`** - User subscription status and plan types
-
-### Business/Company Profiles
-- **`business_profiles`** - For individual/solo users (references `user_id`)
-- **`company_profiles`** - For team users (references `team_id`)
-
-### Communication & Preferences
-- **`communication_preferences`** - User communication style and preferences
-
-### Knowledge & Content
-- **`knowledge_base`** - Product/service information and content
-- **`icps`** - Ideal Customer Profiles
-
-### Teams & Collaboration
-- **`teams`** - Team information
-- **`team_memberships`** - User-team relationships
-
-## Important Schema Notes
-
-### Solo vs Team Users
-- **Solo users** use `business_profiles` table with `user_id` foreign key
-- **Team users** use `company_profiles` table with `team_id` foreign key
-
-### Common Column Patterns
-- Most tables use `user_id` as foreign key reference to `users.user_id`
-- Team-related tables use `team_id`
-- Knowledge base and ICPs use `created_by` field referencing `users.user_id`
-
-### Key Tables for Settings Widget
-
-#### `user_profiles`
-- Primary key: `id`
-- Foreign key: `user_id` → `users.user_id`
-- Contains: linkedin_url, job_title, phone_number, personal_bio, territory
-
-#### `business_profiles` (for solo users)
-- Primary key: `id`
-- Foreign key: `user_id` → `users.user_id`
-- Contains: company_name, industry, company_size, website, product_description, etc.
-
-#### `communication_preferences`
-- Primary key: `id`
-- Foreign key: `user_id` → `users.user_id`
-- Contains: communication_style, message_length, message_types, signature_style, etc.
-
-## Complete Schema (Context Only)
-
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
@@ -96,6 +37,27 @@ CREATE TABLE public.agent_messages (
   CONSTRAINT agent_messages_pkey PRIMARY KEY (id),
   CONSTRAINT agent_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.agent_conversations(id)
 );
+CREATE TABLE public.auth_account_lockouts (
+  id bigint NOT NULL DEFAULT nextval('auth_account_lockouts_id_seq'::regclass),
+  email text NOT NULL UNIQUE,
+  locked_at timestamp with time zone NOT NULL DEFAULT now(),
+  locked_until timestamp with time zone NOT NULL,
+  failed_attempts integer NOT NULL DEFAULT 0,
+  last_attempt_ip text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT auth_account_lockouts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.auth_login_attempts (
+  id bigint NOT NULL DEFAULT nextval('auth_login_attempts_id_seq'::regclass),
+  email text NOT NULL,
+  ip_address text,
+  attempt_time timestamp with time zone NOT NULL DEFAULT now(),
+  success boolean NOT NULL DEFAULT false,
+  user_agent text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT auth_login_attempts_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.business_profiles (
   user_id character varying UNIQUE,
   company_name character varying NOT NULL,
@@ -128,7 +90,7 @@ CREATE TABLE public.communication_preferences (
   user_id character varying UNIQUE,
   communication_style character varying DEFAULT 'professional'::character varying CHECK (communication_style::text = ANY (ARRAY['professional'::character varying, 'casual'::character varying, 'consultative'::character varying]::text[])),
   message_length character varying DEFAULT 'medium'::character varying CHECK (message_length::text = ANY (ARRAY['short'::character varying::text, 'medium'::character varying::text, 'long'::character varying::text, 'brief'::character varying::text, 'moderate'::character varying::text, 'detailed'::character varying::text])),
-  cta_preference character varying DEFAULT 'meeting'::character varying CHECK (cta_preference::text = ANY (ARRAY['meeting'::character varying, 'call'::character varying, 'email'::character varying, 'soft'::character varying]::text[])),
+  cta_preference character varying DEFAULT 'meeting'::character varying CHECK (cta_preference::text = ANY (ARRAY['meeting'::character varying::text, 'call'::character varying::text, 'email'::character varying::text, 'website'::character varying::text, 'soft'::character varying::text, 'custom'::character varying::text])),
   signature_style text DEFAULT 'Best regards'::text,
   avoid_phrases ARRAY,
   calendar_link character varying,
@@ -164,6 +126,57 @@ CREATE TABLE public.company_profiles (
   urls_collected_at timestamp without time zone,
   CONSTRAINT company_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT company_profiles_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
+);
+CREATE TABLE public.connection_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id character varying NOT NULL,
+  recipient_linkedin_id text NOT NULL,
+  message_text text,
+  message_length integer,
+  is_personalised boolean DEFAULT false,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'accepted'::text, 'ignored'::text, 'withdrawn'::text])),
+  sent_at timestamp with time zone DEFAULT now(),
+  status_changed_at timestamp with time zone,
+  withdrawal_scheduled_for timestamp with time zone DEFAULT (now() + '14 days'::interval),
+  auto_withdrawn boolean DEFAULT false,
+  sequence_id bigint,
+  prospect_id bigint,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT connection_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT connection_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT connection_requests_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
+  CONSTRAINT connection_requests_prospect_id_fkey FOREIGN KEY (prospect_id) REFERENCES public.sequence_prospects(id)
+);
+CREATE TABLE public.deleted_accounts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  email_hash text NOT NULL UNIQUE,
+  original_user_id uuid NOT NULL,
+  deleted_at timestamp with time zone NOT NULL DEFAULT now(),
+  soft_delete_until timestamp with time zone NOT NULL DEFAULT (now() + '30 days'::interval),
+  messages_sent_total integer DEFAULT 0,
+  icps_created_total integer DEFAULT 0,
+  knowledge_entries_total integer DEFAULT 0,
+  prospects_created_total integer DEFAULT 0,
+  deletion_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  hard_deleted boolean DEFAULT false,
+  CONSTRAINT deleted_accounts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.error_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  workflow_id text,
+  workflow_name text,
+  run_id text,
+  node_id text,
+  node_name text,
+  error_type text CHECK (error_type = ANY (ARRAY['postgres'::text, 'agent'::text, 'other'::text])),
+  severity text DEFAULT 'medium'::text CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])),
+  error_code text,
+  error_message text,
+  payload jsonb,
+  CONSTRAINT error_events_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.icps (
   id integer NOT NULL DEFAULT nextval('icps_id_seq'::regclass),
@@ -329,29 +342,92 @@ CREATE TABLE public.landing_interest (
   processed boolean DEFAULT false,
   CONSTRAINT landing_interest_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.linkedin_accounts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id character varying NOT NULL UNIQUE,
+  account_type text NOT NULL DEFAULT 'free'::text CHECK (account_type = ANY (ARRAY['free'::text, 'premium'::text, 'sales_navigator'::text, 'recruiter_lite'::text, 'recruiter_pro'::text])),
+  ssi_score integer DEFAULT 0 CHECK (ssi_score >= 0 AND ssi_score <= 100),
+  inmail_credits_remaining integer DEFAULT 0,
+  inmail_credits_max integer DEFAULT 0,
+  inmail_renewal_date timestamp with time zone,
+  connection_acceptance_rate numeric DEFAULT 0.50,
+  message_response_rate numeric DEFAULT 0.10,
+  account_status text DEFAULT 'active'::text CHECK (account_status = ANY (ARRAY['active'::text, 'warning'::text, 'restricted'::text, 'suspended'::text])),
+  last_restriction_date timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT linkedin_accounts_pkey PRIMARY KEY (id),
+  CONSTRAINT linkedin_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.message_generation_logs (
   id integer NOT NULL DEFAULT nextval('message_generation_logs_id_seq'::regclass),
   message_id character varying DEFAULT (gen_random_uuid())::text UNIQUE,
   user_id character varying,
   team_id character varying,
-  linkedin_url character varying,
-  prospect_name character varying,
-  prospect_company character varying,
   generated_message text,
   edited_message text,
-  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['generated'::character varying, 'approved'::character varying, 'sent'::character varying, 'archived'::character varying, 'failed'::character varying]::text[])),
-  communication_style character varying,
-  message_length character varying,
-  cta_preference character varying,
+  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text, 'analysing_conversation'::character varying::text])),
   ai_model_used character varying,
   generation_cost numeric,
   sent_at timestamp with time zone,
   response_received_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  research_cache_id integer,
+  ai_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+  parent_message_id character varying,
+  conversation_thread_id character varying DEFAULT (gen_random_uuid())::text,
+  response_id integer,
+  message_metadata jsonb,
+  message_type text CHECK (message_type = ANY (ARRAY['direct_message'::text, 'connection_request'::text, 'connection_request_200'::text, 'connection_request_300'::text, 'first_message'::text, 'inmail'::text, 'open_profile'::text, 'group_message'::text, 'event_message'::text])),
+  recipient_linkedin_id text,
+  recipient_name text,
+  subject_line text,
+  message_length integer,
+  is_personalised boolean DEFAULT false,
+  unipile_message_id text,
+  unipile_thread_id text,
+  inmail_credit_consumed boolean DEFAULT false,
+  inmail_credit_refunded boolean DEFAULT false,
+  sequence_id bigint,
+  sequence_message_id bigint,
+  focus_analysis jsonb,
+  focus_generated_at timestamp with time zone,
+  sequence_prospect_id bigint,
   CONSTRAINT message_generation_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT message_generation_logs_research_cache_id_fkey FOREIGN KEY (research_cache_id) REFERENCES public.research_cache(id),
+  CONSTRAINT message_generation_logs_parent_message_id_fkey FOREIGN KEY (parent_message_id) REFERENCES public.message_generation_logs(message_id),
   CONSTRAINT message_generation_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT message_generation_logs_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
+  CONSTRAINT message_generation_logs_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id),
+  CONSTRAINT message_generation_logs_sequence_prospect_id_fkey FOREIGN KEY (sequence_prospect_id) REFERENCES public.sequence_prospects(id),
+  CONSTRAINT message_generation_logs_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
+  CONSTRAINT message_generation_logs_sequence_message_id_fkey FOREIGN KEY (sequence_message_id) REFERENCES public.sequence_messages(id)
+);
+CREATE TABLE public.message_quotas (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id character varying NOT NULL UNIQUE,
+  daily_direct_messages integer DEFAULT 0,
+  daily_connection_requests integer DEFAULT 0,
+  daily_inmails integer DEFAULT 0,
+  daily_open_profile integer DEFAULT 0,
+  daily_group_messages integer DEFAULT 0,
+  daily_total_actions integer DEFAULT 0,
+  daily_reset_at timestamp with time zone DEFAULT (date_trunc('day'::text, now()) + '1 day'::interval),
+  weekly_connection_requests integer DEFAULT 0,
+  weekly_first_action_at timestamp with time zone,
+  weekly_reset_at timestamp with time zone,
+  monthly_personalised_connections integer DEFAULT 0,
+  monthly_open_profile_messages integer DEFAULT 0,
+  monthly_reset_at timestamp with time zone DEFAULT (date_trunc('month'::text, now()) + '1 mon'::interval),
+  pending_connections integer DEFAULT 0,
+  pending_inmails integer DEFAULT 0,
+  last_action_at timestamp with time zone,
+  hourly_action_count integer DEFAULT 0,
+  hourly_reset_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT message_quotas_pkey PRIMARY KEY (id),
+  CONSTRAINT message_quotas_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.message_templates (
   id integer NOT NULL DEFAULT nextval('message_templates_id_seq'::regclass),
@@ -369,6 +445,38 @@ CREATE TABLE public.message_templates (
   CONSTRAINT message_templates_pkey PRIMARY KEY (id),
   CONSTRAINT message_templates_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id),
   CONSTRAINT message_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.outreach_sequences (
+  id bigint NOT NULL DEFAULT nextval('outreach_sequences_id_seq'::regclass),
+  user_id character varying NOT NULL,
+  team_id character varying,
+  sequence_name text NOT NULL,
+  sequence_type text NOT NULL CHECK (sequence_type = ANY (ARRAY['connection_request'::text, 'inmail'::text, 'message'::text])),
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'completed'::text, 'archived'::text])),
+  icp_id bigint,
+  target_search_query text,
+  target_filters jsonb DEFAULT '{}'::jsonb,
+  message_template text NOT NULL,
+  follow_up_messages jsonb DEFAULT '[]'::jsonb,
+  daily_limit integer NOT NULL DEFAULT 50 CHECK (daily_limit <= 100),
+  delay_between_min integer NOT NULL DEFAULT 5,
+  delay_between_max integer NOT NULL DEFAULT 15,
+  working_hours_only boolean DEFAULT true,
+  working_days ARRAY DEFAULT ARRAY[1, 2, 3, 4, 5],
+  timezone text DEFAULT 'UTC'::text,
+  total_targets integer DEFAULT 0,
+  sent_count integer DEFAULT 0,
+  accepted_count integer DEFAULT 0,
+  replied_count integer DEFAULT 0,
+  failed_count integer DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  CONSTRAINT outreach_sequences_pkey PRIMARY KEY (id),
+  CONSTRAINT outreach_sequences_icp_id_fkey FOREIGN KEY (icp_id) REFERENCES public.icps(id),
+  CONSTRAINT outreach_sequences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT outreach_sequences_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
 );
 CREATE TABLE public.product_links (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -412,16 +520,79 @@ CREATE TABLE public.product_research_queue (
   CONSTRAINT product_research_queue_pkey PRIMARY KEY (id),
   CONSTRAINT product_research_queue_product_link_id_fkey FOREIGN KEY (product_link_id) REFERENCES public.product_links(id)
 );
+CREATE TABLE public.quota_violations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id character varying NOT NULL,
+  violation_type text NOT NULL,
+  limit_value integer,
+  actual_value integer,
+  message text,
+  occurred_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT quota_violations_pkey PRIMARY KEY (id),
+  CONSTRAINT quota_violations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.research_cache (
   id integer NOT NULL DEFAULT nextval('research_cache_id_seq'::regclass),
-  profile_url character varying UNIQUE,
-  profile_type character varying CHECK (profile_type::text = ANY (ARRAY['personal'::character varying, 'company'::character varying]::text[])),
+  profile_url character varying,
+  profile_type character varying CHECK (profile_type::text = ANY (ARRAY['personal_user'::character varying::text, 'personal_prospect'::character varying::text, 'company_user'::character varying::text, 'company_prospect'::character varying::text])),
   research_data jsonb,
   research_depth character varying CHECK (research_depth::text = ANY (ARRAY['basic'::character varying, 'standard'::character varying, 'deep'::character varying]::text[])),
   last_researched_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   research_version integer DEFAULT 1,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  profile_picture_url text,
+  deleted_at timestamp with time zone,
   CONSTRAINT research_cache_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.sequence_messages (
+  id bigint NOT NULL DEFAULT nextval('sequence_messages_id_seq'::regclass),
+  sequence_id bigint NOT NULL,
+  prospect_id bigint NOT NULL,
+  user_id character varying NOT NULL,
+  message_text text NOT NULL,
+  message_type text NOT NULL CHECK (message_type = ANY (ARRAY['connection_request'::text, 'inmail'::text, 'message'::text, 'follow_up'::text])),
+  step_number integer NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'sending'::text, 'sent'::text, 'failed'::text])),
+  unipile_chat_id text,
+  unipile_message_id text,
+  scheduled_for timestamp with time zone,
+  sent_at timestamp with time zone,
+  error_message text,
+  retry_count integer DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT sequence_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT sequence_messages_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
+  CONSTRAINT sequence_messages_prospect_id_fkey FOREIGN KEY (prospect_id) REFERENCES public.sequence_prospects(id),
+  CONSTRAINT sequence_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.sequence_prospects (
+  id bigint NOT NULL DEFAULT nextval('sequence_prospects_id_seq'::regclass),
+  sequence_id bigint NOT NULL,
+  user_id character varying NOT NULL,
+  linkedin_url text NOT NULL,
+  linkedin_public_id text NOT NULL,
+  linkedin_messaging_id text,
+  prospect_name text,
+  prospect_headline text,
+  prospect_company text,
+  prospect_data jsonb DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'pending_scheduled'::text, 'searching'::text, 'scheduled'::text, 'sending'::text, 'sent'::text, 'accepted'::text, 'replied'::text, 'failed'::text, 'skipped'::text])),
+  scheduled_for timestamp with time zone,
+  sent_at timestamp with time zone,
+  last_message_at timestamp with time zone,
+  current_step integer DEFAULT 0,
+  connection_accepted boolean DEFAULT false,
+  response_received boolean DEFAULT false,
+  unipile_chat_id text,
+  error_message text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  message_log_id bigint,
+  CONSTRAINT sequence_prospects_pkey PRIMARY KEY (id),
+  CONSTRAINT sequence_prospects_sequence_id_fkey FOREIGN KEY (sequence_id) REFERENCES public.outreach_sequences(id),
+  CONSTRAINT sequence_prospects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT sequence_prospects_message_log_id_fkey FOREIGN KEY (message_log_id) REFERENCES public.message_generation_logs(id)
 );
 CREATE TABLE public.subscriptions (
   subscription_id character varying NOT NULL,
@@ -492,6 +663,7 @@ CREATE TABLE public.usage_tracking (
   messages_archived integer DEFAULT 0,
   research_performed integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  connection_requests_sent integer DEFAULT 0,
   CONSTRAINT usage_tracking_pkey PRIMARY KEY (id),
   CONSTRAINT usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT usage_tracking_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
@@ -513,8 +685,31 @@ CREATE TABLE public.user_profiles (
   linkedin_profile_updated_at timestamp with time zone,
   linkedin_profile_scraped_at timestamp with time zone,
   linkedin_profile_hash character varying,
+  linkedin_premium boolean,
+  url_list text,
+  linkedin_public_identifier text,
+  linkedin_connection_history jsonb DEFAULT '[]'::jsonb,
+  linkedin_connection_error text,
+  account_status text DEFAULT 'active'::text CHECK (account_status = ANY (ARRAY['active'::text, 'pending_deletion'::text, 'deleted'::text])),
+  deletion_requested_at timestamp with time zone,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.user_prospect_relationships (
+  id integer NOT NULL DEFAULT nextval('user_prospect_relationships_id_seq'::regclass),
+  user_id uuid NOT NULL,
+  research_cache_id integer NOT NULL,
+  network_distance text,
+  connection_status text,
+  messages_generated integer DEFAULT 0,
+  last_message_at timestamp with time zone,
+  last_checked_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  metadata jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT user_prospect_relationships_pkey PRIMARY KEY (id),
+  CONSTRAINT user_prospect_relationships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT user_prospect_relationships_research_cache_id_fkey FOREIGN KEY (research_cache_id) REFERENCES public.research_cache(id)
 );
 CREATE TABLE public.user_sessions (
   id integer NOT NULL DEFAULT nextval('user_sessions_id_seq'::regclass),
@@ -554,6 +749,10 @@ CREATE TABLE public.users (
   ready_for_outreach boolean DEFAULT false,
   profile_completion jsonb DEFAULT '{"company": false, "product": false, "personal": false, "percentage": 0, "communication": false}'::jsonb,
   email_verified boolean DEFAULT false,
+  terms_accepted_at timestamp with time zone,
+  terms_version text DEFAULT '2024-10-16'::text,
+  privacy_accepted_at timestamp with time zone,
+  privacy_version text DEFAULT '2024-10-16'::text,
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
 CREATE TABLE public.webhook_events (

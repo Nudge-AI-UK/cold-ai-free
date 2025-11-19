@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { ExternalLink } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useProspectModal } from '@/components/modals/ProspectModalManager'
 
 // Helper function to parse and clean message
 const parseMessage = (message: string): string => {
@@ -54,17 +54,16 @@ interface Prospect {
   edited_message?: string
   message_metadata?: any
   ai_context?: any
+  focus_report_markdown?: string
+  message_count?: number
+  all_statuses?: string[]
 }
 
 export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
   const { user } = useAuth()
+  const { openProspectModal } = useProspectModal()
   const [prospects, setProspects] = useState<Prospect[]>([])
-  const [stats, setStats] = useState({ generated: 0, sent: 0, responseRate: 0 })
-  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null)
-  const [prospectMessages, setProspectMessages] = useState<Prospect[]>([])
-  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSending, setIsSending] = useState(false)
+  const [stats, setStats] = useState({ generated: 0, scheduled: 0, sent: 0 })
 
   useEffect(() => {
     if (user && !forceEmpty) {
@@ -108,7 +107,8 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
 
     const userId = user?.id || user?.user_id
 
-    // Fetch message generation logs with research_cache data
+    // Fetch ALL message generation logs with research_cache data (no limit)
+    // We need all messages to properly filter by status history
     const { data, error } = await supabase
       .from('message_generation_logs')
       .select(`
@@ -116,16 +116,18 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
         message_status,
         research_cache_id,
         created_at,
-        research_cache (
+        research_cache!inner (
           id,
           profile_url,
           profile_picture_url,
-          research_data
+          research_data,
+          deleted_at
         )
       `)
       .eq('user_id', userId)
+      .is('research_cache.deleted_at', null)
+      .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated', 'pending_scheduled', 'scheduled', 'sent', 'reply_received', 'reply_sent', 'archived', 'failed'])
       .order('created_at', { ascending: false })
-      .limit(10)
 
     if (error) {
       console.error('❌ Error fetching prospects:', error)
@@ -145,90 +147,94 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
       prospectMap.get(p.research_cache_id)!.push(p)
     })
 
-    // Get the most recent message for each prospect
-    const prospects = Array.from(prospectMap.values()).map(messages => messages[0])
-    setProspects(prospects)
-
-    // Calculate stats from ALL messages (not deduplicated)
-    const generated = allProspects.filter(p => ['generated', 'archived'].includes(p.message_status)).length
-    const sent = allProspects.filter(p =>
-      ['sent', 'approved'].includes(p.message_status)
-    ).length
-    // TODO: Calculate response rate when reply tracking is implemented
-
-    console.log('📈 Stats:', { generated, sent, totalMessages: allProspects.length, uniqueProspects: prospects.length })
-    setStats({ generated, sent, responseRate: 0 })
-  }
-
-  const handleSendMessage = async (messageLogId: number, messageText: string, recipientUrl: string) => {
-    if (!user) return
-
-    setIsSending(true)
-    try {
-      const userId = user?.id || user?.user_id
-
-      // Call Supabase Edge Function to send message via Unipile
-      const { data, error } = await supabase.functions.invoke('linkedin-send-message', {
-        body: {
-          user_id: userId,
-          message_log_id: messageLogId,
-          recipient_linkedin_url: recipientUrl,
-          message_text: messageText
+    // Get the most recent message for each prospect and add message count
+    // Filter to show only prospects needing immediate action
+    const prospects = Array.from(prospectMap.values())
+      .map(messages => {
+        const mostRecent = messages[0]
+        return {
+          ...mostRecent,
+          message_count: messages.length,
+          all_statuses: messages.map(m => m.message_status)
         }
       })
+      .filter(prospect => {
+        const statuses = prospect.all_statuses
 
-      if (error) throw error
+        // Hide if scheduled or pending_scheduled (already in pipeline)
+        if (statuses.includes('scheduled') || statuses.includes('pending_scheduled')) {
+          return false
+        }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send message')
-      }
+        // Hide if sent (conversation already started)
+        if (statuses.includes('sent')) {
+          return false
+        }
 
-      toast.success('Message sent successfully via LinkedIn!')
+        // Show generating states
+        const generatingStatuses = ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message']
+        if (generatingStatuses.includes(prospect.message_status)) {
+          return true
+        }
 
-      // Refresh prospects to show updated status
-      await fetchProspects()
+        // Show generated messages (ready to schedule)
+        if (prospect.message_status === 'generated') {
+          return true
+        }
 
-      // Close modal
-      setIsModalOpen(false)
+        // Show reply_received (needs response)
+        if (prospect.message_status === 'reply_received') {
+          return true
+        }
 
-    } catch (error: any) {
-      console.error('❌ Error sending message:', error)
-      toast.error(error.message || 'Failed to send message. Please try again.')
-    } finally {
-      setIsSending(false)
-    }
+        // Show failed messages (need attention)
+        if (prospect.message_status === 'failed') {
+          return true
+        }
+
+        // Show archived ONLY if never been contacted or scheduled
+        if (prospect.message_status === 'archived') {
+          const hasBeenContactedOrScheduled = statuses.some(s =>
+            ['sent', 'scheduled', 'pending_scheduled'].includes(s)
+          )
+          return !hasBeenContactedOrScheduled
+        }
+
+        return false
+      })
+      .slice(0, 10) // Limit to 10 prospects for display
+
+    setProspects(prospects)
+
+    // Fetch ALL messages for stats (not limited to 10)
+    const { data: allMessages } = await supabase
+      .from('message_generation_logs')
+      .select('message_status')
+      .eq('user_id', userId)
+
+    const allMessagesList = (allMessages || []) as { message_status: string }[]
+
+    // Calculate stats from ALL user messages
+    const generated = allMessagesList.length // Every message ever made
+    const scheduled = allMessagesList.filter(m =>
+      ['pending_scheduled', 'scheduled'].includes(m.message_status)
+    ).length
+    const sent = allMessagesList.filter(m =>
+      ['sent', 'reply_received', 'reply_sent'].includes(m.message_status)
+    ).length
+
+    console.log('📈 Stats:', { generated, scheduled, sent, totalMessages: allMessagesList.length, uniqueProspects: prospects.length })
+    setStats({ generated, scheduled, sent })
   }
 
-  const handleProspectClick = async (prospect: Prospect) => {
-    if (!prospect.research_cache_id) return
+  const handleProspectClick = (prospect: Prospect) => {
+    if (!prospect.id) return
 
-    // Fetch all messages for this prospect
-    const { data, error } = await supabase
-      .from('message_generation_logs')
-      .select(`
-        id,
-        message_status,
-        research_cache_id,
-        created_at,
-        generated_message,
-        edited_message,
-        message_metadata,
-        ai_context,
-        sent_at
-      `)
-      .eq('research_cache_id', prospect.research_cache_id)
-      .order('created_at', { ascending: false })
+    // Get all prospect IDs to enable navigation
+    const prospectIds = prospects.map(p => p.id)
 
-    if (error) {
-      console.error('❌ Error fetching prospect messages:', error)
-      toast.error('Failed to load prospect details')
-      return
-    }
-
-    setSelectedProspect(prospect)
-    setProspectMessages((data || []) as Prospect[])
-    setSelectedMessageId(data?.[0]?.id || null)
-    setIsModalOpen(true)
+    // Open the modal with the prospect ID and all IDs for navigation
+    openProspectModal(prospect.id, prospectIds)
   }
 
   const getTimeSince = (dateString: string) => {
@@ -246,24 +252,58 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
   }
 
   const getStatusColor = (status: string) => {
-    // Generating states
+    // Generating states - purple
     if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(status)) {
-      return { dot: 'bg-[#FBAE1C]', text: 'text-[#FBAE1C]', label: 'Generating' }
+      return { dot: 'bg-purple-500', text: 'text-purple-400', label: 'Generating' }
     }
 
     switch (status) {
       case 'generated':
         return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Generated' }
-      case 'approved':
-        return { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Sent' }
+      case 'pending_scheduled':
+        return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Pending' }
+      case 'scheduled':
+        return { dot: 'bg-orange-500', text: 'text-orange-400', label: 'Scheduled' }
       case 'sent':
-        return { dot: 'bg-purple-500', text: 'text-purple-400', label: 'Sent' }
+        return { dot: 'bg-green-500', text: 'text-green-400', label: 'Sent' }
+      case 'reply_received':
+        return { dot: 'bg-yellow-500', text: 'text-yellow-400', label: 'Reply Received' }
+      case 'reply_sent':
+        return { dot: 'bg-green-500', text: 'text-green-400', label: 'Reply Sent' }
       case 'archived':
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Archived' }
       case 'failed':
         return { dot: 'bg-red-500', text: 'text-red-400', label: 'Failed' }
       default:
         return { dot: 'bg-gray-500', text: 'text-gray-400', label: 'Unknown' }
+    }
+  }
+
+  const getCardBorderStyle = (status: string) => {
+    // Generating states - purple with glow
+    if (['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message'].includes(status)) {
+      return 'border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+    }
+
+    switch (status) {
+      case 'generated':
+        return 'border-2 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+      case 'pending_scheduled':
+        return 'border-2 border-gray-500'
+      case 'scheduled':
+        return 'border-2 border-orange-500'
+      case 'sent':
+        return 'border-2 border-green-500'
+      case 'reply_received':
+        return 'border-2 border-yellow-500'
+      case 'reply_sent':
+        return 'border-2 border-green-500'
+      case 'archived':
+        return 'border-2 border-gray-500 opacity-70'
+      case 'failed':
+        return 'border-2 border-red-500'
+      default:
+        return 'border-2 border-gray-500'
     }
   }
 
@@ -275,6 +315,7 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
     const colors = ['FBAE1C', 'FC9109', 'DD6800', 'FBAE1C']
     return colors[index % colors.length]
   }
+
 
   // Empty State
   if (forceEmpty || prospects.length === 0) {
@@ -326,24 +367,24 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">📊</div>
-            <p className="text-xs text-gray-300">Track Opens</p>
+            <div className="text-2xl mb-2">✨</div>
+            <p className="text-xs text-gray-300">Generated</p>
           </div>
           <div className="rounded-xl p-3 text-center border border-white/5"
                style={{
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">💬</div>
-            <p className="text-xs text-gray-300">Messages</p>
+            <div className="text-2xl mb-2">📅</div>
+            <p className="text-xs text-gray-300">Scheduled</p>
           </div>
           <div className="rounded-xl p-3 text-center border border-white/5"
                style={{
                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                  backdropFilter: 'blur(10px)'
                }}>
-            <div className="text-2xl mb-2">📈</div>
-            <p className="text-xs text-gray-300">Response Rate</p>
+            <div className="text-2xl mb-2">✅</div>
+            <p className="text-xs text-gray-300">Sent</p>
           </div>
         </div>
 
@@ -413,14 +454,13 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
           </div>
           <div className="w-px bg-white/10"></div>
           <div>
-            <div className="text-lg font-bold text-[#FBAE1C]">{stats.sent}</div>
-            <div className="text-xs text-gray-400">Sent</div>
+            <div className="text-lg font-bold text-[#FBAE1C]">{stats.scheduled}</div>
+            <div className="text-xs text-gray-400">Scheduled</div>
           </div>
           <div className="w-px bg-white/10"></div>
           <div>
-            {/* TODO: Calculate response rate when reply tracking is implemented */}
-            <div className="text-lg font-bold text-green-400">--</div>
-            <div className="text-xs text-gray-400">Response</div>
+            <div className="text-lg font-bold text-green-400">{stats.sent}</div>
+            <div className="text-xs text-gray-400">Sent</div>
           </div>
         </div>
       </div>
@@ -437,19 +477,21 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
             console.log('⚠️ No research_cache for prospect:', prospect.id)
             return (
               <div key={prospect.id}
-                   className="rounded-xl border border-white/5 p-3 animate-pulse"
+                   className={`rounded-xl p-3 animate-pulse ${getCardBorderStyle(prospect.message_status)}`}
                    style={{
                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
                    }}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
-                    <div>
-                      <div className="h-4 w-32 bg-gray-700 rounded mb-1"></div>
-                      <div className="h-3 w-40 bg-gray-800 rounded"></div>
-                    </div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-4 w-32 bg-gray-700 rounded mb-1"></div>
+                    <div className="h-3 w-40 bg-gray-800 rounded"></div>
                   </div>
+                </div>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
+                    <span className="text-gray-500">|</span>
                     <div className="relative flex items-center justify-center">
                       <div className="w-2 h-2 bg-[#FBAE1C] rounded-full animate-pulse"></div>
                       <div className="absolute w-2 h-2 bg-[#FBAE1C] rounded-full animate-ping"></div>
@@ -457,48 +499,65 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                     <span className="text-xs text-[#FBAE1C]">Loading...</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
-                </div>
               </div>
             )
           }
 
           // Full prospect card with research_cache data
           const cache = prospect.research_cache
-          const researchData = cache.research_data
+          // Parse research_data if it's a string
+          let researchData = cache.research_data
+          if (typeof researchData === 'string') {
+            try {
+              researchData = JSON.parse(researchData)
+            } catch (e) {
+              console.error('Failed to parse research_data:', e)
+              researchData = { name: 'Unknown', headline: 'Unknown' }
+            }
+          }
           const profilePicture = cache.profile_picture_url ||
+                                researchData.profile_picture_url ||
                                 `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
 
           return (
             <button
               key={prospect.id}
               onClick={() => handleProspectClick(prospect)}
-              className="w-full rounded-xl border border-white/5 p-3 transition-all text-left hover:bg-white/5 hover:border-white/10 cursor-pointer"
+              className={`relative w-full rounded-xl p-3 transition-all text-left hover:bg-white/5 cursor-pointer ${getCardBorderStyle(prospect.message_status)}`}
               style={{
                 background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)'
               }}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      src={profilePicture}
-                      alt={researchData.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                      onError={(e) => {
-                        // Fallback to UI avatars if LinkedIn image fails
-                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">{researchData.name}</h3>
-                    <p className="text-xs text-gray-400">{researchData.headline}</p>
-                  </div>
+              {/* Message Count Badge - Top Right */}
+              {prospect.message_count && prospect.message_count > 1 && (
+                <div className="absolute top-1 right-1 w-6 h-6 bg-gradient-to-br from-[#FBAE1C] to-[#FC9109] rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg z-10">
+                  {prospect.message_count}
                 </div>
+              )}
+
+              <div className="flex items-center gap-3 mb-2">
+                <div className="relative">
+                  <img
+                    src={profilePicture}
+                    alt={researchData.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      // Fallback to UI avatars if LinkedIn image fails
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(researchData.name)}&background=${getAvatarColor(index)}&color=fff&size=40&rounded=true`
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-white">{researchData.name}</h3>
+                  <p className="text-xs text-gray-400 line-clamp-1">{researchData.headline || researchData.occupation || 'No title'}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
                   {isGenerating ? (
                     <>
+                      <span className="text-gray-500">|</span>
                       <div className="relative flex items-center justify-center">
                         <div className={`w-2 h-2 ${statusInfo.dot} rounded-full animate-pulse`}></div>
                         <div className={`absolute w-2 h-2 ${statusInfo.dot} rounded-full animate-ping`}></div>
@@ -507,14 +566,12 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
                     </>
                   ) : (
                     <>
+                      <span className="text-gray-500">|</span>
                       <div className={`w-2 h-2 ${statusInfo.dot} rounded-full`}></div>
                       <span className={`text-xs ${statusInfo.text}`}>{statusInfo.label}</span>
                     </>
                   )}
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{getTimeSince(prospect.created_at)}</span>
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <div
                     onClick={() => cache.profile_url && window.open(cache.profile_url, '_blank')}
@@ -527,246 +584,6 @@ export function ProspectWidget({ forceEmpty, className }: ProspectWidgetProps) {
           )
         })}
       </div>
-
-      {/* Prospect Details Modal - Rendered via Portal */}
-      {isModalOpen && selectedProspect && selectedProspect.research_cache && createPortal(
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setIsModalOpen(false)}>
-          <div
-            className="bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="border-b border-white/10 p-6"
-                 style={{
-                   background: 'linear-gradient(135deg, rgba(251, 174, 28, 0.1) 0%, rgba(221, 104, 0, 0.05) 100%)'
-                 }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={selectedProspect.research_cache.profile_picture_url ||
-                         `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedProspect.research_cache.research_data.name)}&background=FBAE1C&color=fff&size=60&rounded=true`}
-                    alt={selectedProspect.research_cache.research_data.name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-[#FBAE1C]/30"
-                  />
-                  <div>
-                    <h2 className="text-xl font-bold text-white">
-                      {selectedProspect.research_cache.research_data.name}
-                    </h2>
-                    <p className="text-sm text-gray-400">
-                      {selectedProspect.research_cache.research_data.headline}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-white transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Message Count Indicator */}
-              {prospectMessages.length > 1 && (
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="bg-[#FBAE1C]/20 text-[#FBAE1C] px-3 py-1 rounded-full text-xs font-medium">
-                    {prospectMessages.length} Messages Generated
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
-              {/* Message Selector - Show only if multiple messages */}
-              {prospectMessages.length > 1 && (
-                <div className="mb-6 flex gap-2 flex-wrap">
-                  {prospectMessages.map((msg, index) => {
-                    const msgStatusInfo = getStatusColor(msg.message_status)
-                    const isSelected = msg.id === selectedMessageId
-
-                    return (
-                      <button
-                        key={msg.id}
-                        onClick={() => setSelectedMessageId(msg.id)}
-                        className={`px-4 py-2 rounded-lg border transition-all text-sm ${
-                          isSelected
-                            ? 'border-[#FBAE1C] bg-[#FBAE1C]/20 text-[#FBAE1C]'
-                            : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'
-                        }`}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 ${msgStatusInfo.dot} rounded-full`}></div>
-                          <span>Message {prospectMessages.length - index}</span>
-                          <span className="text-xs opacity-70">{getTimeSince(msg.created_at)}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Display Current Message */}
-              {prospectMessages.length > 0 && (() => {
-                const currentMessage = prospectMessages.find(m => m.id === selectedMessageId) || prospectMessages[0]
-                const messageText = parseMessage(currentMessage.edited_message || currentMessage.generated_message)
-                const messageMetadata = currentMessage.message_metadata
-                  ? (typeof currentMessage.message_metadata === 'string'
-                      ? JSON.parse(currentMessage.message_metadata)
-                      : currentMessage.message_metadata)
-                  : null
-
-                return (
-                  <div className="space-y-6">
-                    {/* Generated Message */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide">
-                          {currentMessage.edited_message ? 'Edited Message' : 'Generated Message'}
-                        </h3>
-                        {currentMessage.edited_message && (
-                          <span className="text-xs text-[#FBAE1C]">✏️ Edited</span>
-                        )}
-                      </div>
-                      <div className="bg-black/30 rounded-xl border border-white/10 p-4">
-                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-                          {messageText || 'No message generated yet'}
-                        </p>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        {messageText?.length || 0} characters
-                        {messageText && messageText.length > 300 && (
-                          <span className="text-red-400 ml-2">
-                            ({messageText.length - 300} over LinkedIn limit)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ICP Analysis */}
-                    {messageMetadata?.icp_analysis && (
-                      <div>
-                        <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide mb-3">
-                          ICP Match Analysis
-                        </h3>
-                        <div className="bg-black/30 rounded-xl border border-white/10 p-4 space-y-3">
-                          {/* Match Score */}
-                          {messageMetadata.icp_analysis.match_score && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-400">Match Score</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-[#FBAE1C] to-[#FC9109]"
-                                    style={{ width: `${messageMetadata.icp_analysis.match_score}%` }}
-                                  />
-                                </div>
-                                <span className="text-[#FBAE1C] font-bold text-sm">
-                                  {messageMetadata.icp_analysis.match_score}%
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Match Reasoning */}
-                          {messageMetadata.icp_analysis.match_reasoning && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-1">Reasoning</p>
-                              <p className="text-sm text-gray-300">
-                                {messageMetadata.icp_analysis.match_reasoning}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Key Alignment Points */}
-                          {messageMetadata.icp_analysis.key_alignment_points && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-2">Key Alignment Points</p>
-                              <ul className="space-y-1">
-                                {messageMetadata.icp_analysis.key_alignment_points.map((point: string, idx: number) => (
-                                  <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                    <span className="text-green-500 mt-0.5">✓</span>
-                                    <span>{point}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Potential Objections */}
-                          {messageMetadata.icp_analysis.potential_objections && (
-                            <div>
-                              <p className="text-xs text-gray-400 mb-2">Potential Objections</p>
-                              <ul className="space-y-1">
-                                {messageMetadata.icp_analysis.potential_objections.map((obj: string, idx: number) => (
-                                  <li key={idx} className="text-xs text-gray-300 flex items-start gap-2">
-                                    <span className="text-orange-500 mt-0.5">⚠</span>
-                                    <span>{obj}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 pt-4 border-t border-white/10">
-                      {(() => {
-                        // Check if any message has been sent to this prospect
-                        const hasBeenSent = prospectMessages.some((m: any) => m.sent_at !== null)
-                        const canSend = ['generated', 'archived'].includes(currentMessage.message_status)
-
-                        if (hasBeenSent) {
-                          return (
-                            <div className="flex-1 bg-purple-500/10 border border-purple-500/30 text-purple-400 font-medium py-3 px-6 rounded-xl text-center">
-                              ✓ Conversation already started
-                            </div>
-                          )
-                        }
-
-                        if (canSend) {
-                          return (
-                            <button
-                              onClick={() => handleSendMessage(
-                                currentMessage.id,
-                                messageText,
-                                selectedProspect.research_cache?.profile_url || ''
-                              )}
-                              disabled={isSending}
-                              className="flex-1 bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                              {isSending ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                  <span>Sending...</span>
-                                </div>
-                              ) : (
-                                'Send via LinkedIn'
-                              )}
-                            </button>
-                          )
-                        }
-
-                        return null
-                      })()}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(messageText || '')
-                          toast.success('Message copied to clipboard!')
-                        }}
-                        className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-gray-300 transition-all">
-                        Copy Message
-                      </button>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Decorative Elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>

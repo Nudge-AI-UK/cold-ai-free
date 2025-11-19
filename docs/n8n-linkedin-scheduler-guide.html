@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Scheduler - Database Integration Guide | Cold AI</title>
+    <link rel="icon" type="image/svg+xml" href="../public/Square_bishop.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0C1725;
+            --bg-secondary: #1a1f36;
+            --bg-tertiary: #252d43;
+            --text-primary: #ffffff;
+            --text-secondary: #a8b3cf;
+            --text-muted: #6b7897;
+            --accent-primary: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-light: rgba(59, 130, 246, 0.1);
+            --border-color: rgba(59, 130, 246, 0.2);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --code-bg: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Header */
+        header {
+            background: rgba(26, 31, 54, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-section img {
+            height: 40px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 40px;
+        }
+
+        .toc h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: var(--accent-primary);
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc li {
+            margin-bottom: 8px;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover {
+            color: var(--accent-primary);
+        }
+
+        /* Main Content */
+        .section {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h2 {
+            font-size: 1.875rem;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        h4 {
+            font-size: 1.25rem;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+        }
+
+        /* Code Blocks */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 16px 0;
+            position: relative;
+        }
+
+        code {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #e2e8f0;
+        }
+
+        .code-block {
+            position: relative;
+        }
+
+        .code-label {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--accent-primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            background: var(--code-bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 16px 0;
+            padding-left: 24px;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        .badge-info {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--accent-primary);
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--success);
+        }
+
+        /* Collapsible Sections */
+        .collapsible {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            padding: 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .collapsible-header:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .collapsible-content {
+            padding: 0 16px 16px;
+            display: none;
+        }
+
+        .collapsible.active .collapsible-content {
+            display: block;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.3s;
+        }
+
+        .collapsible.active .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Workflow Diagram */
+        .workflow-box {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+            position: relative;
+        }
+
+        .workflow-arrow {
+            text-align: center;
+            color: var(--accent-primary);
+            font-size: 1.5rem;
+            margin: 8px 0;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            margin-top: 60px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+
+            .section {
+                padding: 20px;
+            }
+
+            pre {
+                padding: 12px;
+            }
+
+            table {
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Syntax Highlighting */
+        .sql-keyword { color: #c792ea; }
+        .sql-function { color: #82aaff; }
+        .sql-string { color: #c3e88d; }
+        .sql-comment { color: #546e7a; }
+        .sql-number { color: #f78c6c; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo-section">
+                <img src="../public/Cold_AI_Logo_Rectangle.png" alt="Cold AI Logo">
+            </div>
+            <div>
+                <div class="header-title">LinkedIn Scheduler Guide</div>
+                <div class="header-subtitle">Database Integration & Anti-Detection</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Overview Section -->
+        <div class="section">
+            <h1>LinkedIn Message Scheduler</h1>
+            <h2 id="overview">Overview</h2>
+            <p>This guide explains the database schema and PostgreSQL queries needed to build a LinkedIn message scheduler that:</p>
+            <ul>
+                <li><span class="badge badge-success">✓</span> Respects daily, weekly, and monthly LinkedIn limits</li>
+                <li><span class="badge badge-success">✓</span> Implements randomization to avoid detection</li>
+                <li><span class="badge badge-success">✓</span> Tracks quota usage across all message types</li>
+                <li><span class="badge badge-success">✓</span> Integrates with Unipile API for actual message sending</li>
+            </ul>
+        </div>
+
+        <!-- Table of Contents -->
+        <div class="toc">
+            <h2>📋 Table of Contents</h2>
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#database-architecture">Database Architecture</a></li>
+                <li><a href="#key-functions">Key Database Functions</a></li>
+                <li><a href="#scheduler-queries">Critical SQL Queries for Scheduler</a></li>
+                <li><a href="#anti-detection">Anti-Detection Best Practices</a></li>
+                <li><a href="#workflow">Scheduler Implementation</a></li>
+                <li><a href="#cron-jobs">Cron Job Schedule</a></li>
+                <li><a href="#testing">Testing Queries</a></li>
+                <li><a href="#error-handling">Error Handling</a></li>
+            </ul>
+        </div>
+
+        <!-- Database Architecture -->
+        <div class="section">
+            <h2 id="database-architecture">🗄️ Database Architecture</h2>
+
+            <h3>Core Tables</h3>
+
+            <h4>1. linkedin_accounts</h4>
+            <p>Stores user's LinkedIn account configuration and limits.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query Example</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  user_id,
+  account_type,                    <span class="sql-comment">-- 'free', 'premium', 'sales_navigator', etc.</span>
+  inmail_credits_remaining,
+  inmail_credits_max,
+  inmail_renewal_date,
+  account_status                   <span class="sql-comment">-- 'active', 'warning', 'restricted', 'suspended'</span>
+<span class="sql-keyword">FROM</span> linkedin_accounts
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID_HERE'</span>;</code></pre>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>Account Type Limits:</strong><br>
+                • <strong>Free</strong>: 100 DMs/day, 20 personalized connections/month, 100 connections/week<br>
+                • <strong>Premium</strong>: 150 DMs/day, 100+ connections/week, InMail credits<br>
+                • <strong>Sales Navigator</strong>: Higher limits + advanced features
+            </div>
+
+            <h4>2. message_quotas</h4>
+            <p>Real-time tracking of all quota usage with automatic resets.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query Example</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  <span class="sql-comment">-- Daily quotas</span>
+  daily_direct_messages,
+  daily_connection_requests,
+  daily_inmails,
+  daily_open_profile,
+  daily_total_actions,
+  daily_reset_at,
+
+  <span class="sql-comment">-- Weekly quotas</span>
+  weekly_connection_requests,
+  weekly_reset_at,
+
+  <span class="sql-comment">-- Monthly quotas</span>
+  monthly_personalised_connections,
+  monthly_open_profile_messages,
+  monthly_reset_at,
+
+  <span class="sql-comment">-- Rate limiting</span>
+  last_action_at,
+  hourly_action_count,
+  hourly_reset_at,
+
+  <span class="sql-comment">-- Pending counts</span>
+  pending_connections
+<span class="sql-keyword">FROM</span> message_quotas
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID_HERE'</span>;</code></pre>
+                </div>
+            </div>
+
+            <h4>3. message_generation_logs</h4>
+            <p>Complete message lifecycle from AI generation to sending. Enhanced with LinkedIn-specific fields.</p>
+
+            <div class="alert alert-warning">
+                <strong>Key columns for scheduler:</strong><br>
+                • <code>message_status</code> - Current state: 'generated', 'approved', 'sent', 'failed'<br>
+                • <code>message_type</code> - LinkedIn type: 'connection_request', 'direct_message', 'inmail', 'open_profile'<br>
+                • <code>recipient_linkedin_id</code> - Target LinkedIn profile ID<br>
+                • <code>unipile_message_id</code> - Unipile's message identifier after sending<br>
+                • <code>is_personalised</code> - Affects quota limits for free accounts
+            </div>
+
+            <h4>4. connection_requests</h4>
+            <p>Tracks connection requests with auto-withdrawal after 14 days.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query Example</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  recipient_linkedin_id,
+  status,                          <span class="sql-comment">-- 'pending', 'accepted', 'ignored', 'withdrawn'</span>
+  sent_at,
+  withdrawal_scheduled_for,        <span class="sql-comment">-- Auto-withdraws after 14 days</span>
+  auto_withdrawn
+<span class="sql-keyword">FROM</span> connection_requests
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID_HERE'</span>
+  <span class="sql-keyword">AND</span> status = <span class="sql-string">'pending'</span>;</code></pre>
+                </div>
+            </div>
+
+            <h4>5. outreach_sequences</h4>
+            <p>Campaign configuration for automated sequences.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query Example</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  id,
+  sequence_name,
+  sequence_type,                   <span class="sql-comment">-- 'connection_request', 'inmail', 'message'</span>
+  status,                          <span class="sql-comment">-- 'draft', 'active', 'paused', 'completed'</span>
+  daily_limit,                     <span class="sql-comment">-- User-defined limit (max 100)</span>
+  delay_between_min,               <span class="sql-comment">-- Minimum minutes between sends</span>
+  delay_between_max,               <span class="sql-comment">-- Maximum minutes between sends</span>
+  working_hours_only,              <span class="sql-comment">-- Boolean</span>
+  working_days,                    <span class="sql-comment">-- Array: [1,2,3,4,5] = Mon-Fri</span>
+  timezone,                        <span class="sql-comment">-- User's timezone</span>
+  sent_count,
+  total_targets
+<span class="sql-keyword">FROM</span> outreach_sequences
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID_HERE'</span>
+  <span class="sql-keyword">AND</span> status = <span class="sql-string">'active'</span>;</code></pre>
+                </div>
+            </div>
+
+            <h4>6. sequence_prospects</h4>
+            <p>Individual targets within sequences, with scheduling information.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query Example</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  id,
+  sequence_id,
+  linkedin_public_id,
+  linkedin_messaging_id,
+  prospect_name,
+  status,                          <span class="sql-comment">-- 'pending', 'scheduled', 'sending', 'sent', 'failed'</span>
+  scheduled_for,                   <span class="sql-comment">-- When to send (calculated by scheduler)</span>
+  current_step                     <span class="sql-comment">-- 0 = initial, 1+ = follow-ups</span>
+<span class="sql-keyword">FROM</span> sequence_prospects
+<span class="sql-keyword">WHERE</span> sequence_id = <span class="sql-number">123</span>
+  <span class="sql-keyword">AND</span> status = <span class="sql-string">'scheduled'</span>
+  <span class="sql-keyword">AND</span> scheduled_for &lt;= <span class="sql-function">NOW</span>()
+<span class="sql-keyword">ORDER BY</span> scheduled_for <span class="sql-keyword">ASC</span>;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Functions -->
+        <div class="section">
+            <h2 id="key-functions">⚡ Key Database Functions</h2>
+
+            <h3>1. check_message_quota()</h3>
+            <p><strong>Purpose:</strong> Check if user can send a message right now.</p>
+
+            <pre><code><span class="sql-keyword">SELECT</span> * <span class="sql-keyword">FROM</span> <span class="sql-function">check_message_quota</span>(
+  p_user_id := <span class="sql-string">'user_abc123'</span>,
+  p_message_type := <span class="sql-string">'connection_request'</span>,
+  p_is_personalised := <span class="sql-keyword">true</span>
+);</code></pre>
+
+            <h4>Returns:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>can_send</code></td>
+                        <td>boolean</td>
+                        <td>Whether user can send now</td>
+                    </tr>
+                    <tr>
+                        <td><code>reason</code></td>
+                        <td>text</td>
+                        <td>Explanation if blocked</td>
+                    </tr>
+                    <tr>
+                        <td><code>wait_until</code></td>
+                        <td>timestamptz</td>
+                        <td>When quota resets (null if can send)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Example Results:</h4>
+
+            <div class="alert alert-success">
+                <strong>✅ Can Send:</strong><br>
+                <code>can_send: true</code><br>
+                <code>reason: ''</code><br>
+                <code>wait_until: null</code>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong>❌ Rate Limited:</strong><br>
+                <code>can_send: false</code><br>
+                <code>reason: 'Rate limit: Must wait 2 minutes between actions'</code><br>
+                <code>wait_until: '2025-10-21 10:35:00+00'</code>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong>❌ Daily Limit:</strong><br>
+                <code>can_send: false</code><br>
+                <code>reason: 'Daily direct message limit reached (100/day for free)'</code><br>
+                <code>wait_until: '2025-10-22 00:00:00+00'</code>
+            </div>
+
+            <h4>Checks Performed:</h4>
+            <ul>
+                <li><span class="badge badge-info">1</span> 2-minute rate limit between ANY actions</li>
+                <li><span class="badge badge-info">2</span> 25 actions per hour limit</li>
+                <li><span class="badge badge-info">3</span> Daily message type limits (100-150 DMs, varies by account)</li>
+                <li><span class="badge badge-info">4</span> Weekly connection request limit (100/week)</li>
+                <li><span class="badge badge-info">5</span> Monthly personalized connection limit (20/month for free)</li>
+                <li><span class="badge badge-info">6</span> InMail credits remaining</li>
+                <li><span class="badge badge-info">7</span> Pending connections &lt; 500</li>
+            </ul>
+
+            <h3>2. increment_message_quota()</h3>
+            <p><strong>Purpose:</strong> Update all quota counters after successfully sending a message.</p>
+
+            <pre><code><span class="sql-keyword">SELECT</span> <span class="sql-function">increment_message_quota</span>(
+  p_user_id := <span class="sql-string">'user_abc123'</span>,
+  p_message_type := <span class="sql-string">'connection_request'</span>,
+  p_is_personalised := <span class="sql-keyword">true</span>
+);</code></pre>
+
+            <h4>What It Does:</h4>
+            <ul>
+                <li>Increments relevant daily/weekly/monthly counters</li>
+                <li>Updates <code>last_action_at</code> timestamp</li>
+                <li>Increments <code>hourly_action_count</code></li>
+                <li>Decrements InMail credits (if applicable)</li>
+                <li>Updates legacy <code>usage_tracking</code> table for backwards compatibility</li>
+            </ul>
+
+            <div class="alert alert-warning">
+                <strong>⚠️ IMPORTANT:</strong> Call this AFTER Unipile confirms message was sent successfully.
+            </div>
+        </div>
+
+        <!-- Scheduler Queries -->
+        <div class="section">
+            <h2 id="scheduler-queries">🔍 Critical SQL Queries for Scheduler</h2>
+
+            <h3>1. Get Active Sequences to Process</h3>
+            <div class="collapsible active">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Get all active sequences that have pending prospects</span>
+<span class="sql-keyword">SELECT</span>
+  s.id <span class="sql-keyword">AS</span> sequence_id,
+  s.user_id,
+  s.sequence_name,
+  s.sequence_type,
+  s.daily_limit,
+  s.delay_between_min,
+  s.delay_between_max,
+  s.working_hours_only,
+  s.working_days,
+  s.timezone,
+  s.sent_count,
+  <span class="sql-comment">-- Calculate how many sent today</span>
+  <span class="sql-function">COALESCE</span>(
+    (<span class="sql-keyword">SELECT</span> <span class="sql-function">COUNT</span>(*)
+     <span class="sql-keyword">FROM</span> sequence_prospects sp
+     <span class="sql-keyword">WHERE</span> sp.sequence_id = s.id
+       <span class="sql-keyword">AND</span> sp.sent_at &gt;= <span class="sql-function">DATE_TRUNC</span>(<span class="sql-string">'day'</span>, <span class="sql-function">NOW</span>())
+    ), <span class="sql-number">0</span>
+  ) <span class="sql-keyword">AS</span> sent_today,
+  <span class="sql-comment">-- Count remaining prospects</span>
+  <span class="sql-function">COALESCE</span>(
+    (<span class="sql-keyword">SELECT</span> <span class="sql-function">COUNT</span>(*)
+     <span class="sql-keyword">FROM</span> sequence_prospects sp
+     <span class="sql-keyword">WHERE</span> sp.sequence_id = s.id
+       <span class="sql-keyword">AND</span> sp.status <span class="sql-keyword">IN</span> (<span class="sql-string">'pending'</span>, <span class="sql-string">'scheduled'</span>)
+    ), <span class="sql-number">0</span>
+  ) <span class="sql-keyword">AS</span> prospects_remaining
+<span class="sql-keyword">FROM</span> outreach_sequences s
+<span class="sql-keyword">WHERE</span> s.status = <span class="sql-string">'active'</span>
+  <span class="sql-keyword">AND EXISTS</span> (
+    <span class="sql-keyword">SELECT</span> <span class="sql-number">1</span> <span class="sql-keyword">FROM</span> sequence_prospects sp
+    <span class="sql-keyword">WHERE</span> sp.sequence_id = s.id
+      <span class="sql-keyword">AND</span> sp.status <span class="sql-keyword">IN</span> (<span class="sql-string">'pending'</span>, <span class="sql-string">'scheduled'</span>)
+  )
+<span class="sql-keyword">ORDER BY</span> s.id;</code></pre>
+                </div>
+            </div>
+
+            <h3>2. Get Next Prospect to Send</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Get the next prospect ready to send for a specific sequence</span>
+<span class="sql-keyword">SELECT</span>
+  sp.id <span class="sql-keyword">AS</span> prospect_id,
+  sp.sequence_id,
+  sp.user_id,
+  sp.linkedin_public_id,
+  sp.linkedin_messaging_id,
+  sp.prospect_name,
+  sp.prospect_headline,
+  sp.prospect_company,
+  sp.status,
+  sp.scheduled_for,
+  sp.current_step,
+  <span class="sql-comment">-- Get the message template from sequence</span>
+  s.sequence_type,
+  s.message_template,
+  <span class="sql-comment">-- Get research data if available</span>
+  rc.research_data
+<span class="sql-keyword">FROM</span> sequence_prospects sp
+<span class="sql-keyword">JOIN</span> outreach_sequences s <span class="sql-keyword">ON</span> s.id = sp.sequence_id
+<span class="sql-keyword">LEFT JOIN</span> research_cache rc <span class="sql-keyword">ON</span> rc.profile_url = sp.linkedin_url
+<span class="sql-keyword">WHERE</span> sp.sequence_id = <span class="sql-number">123</span>
+  <span class="sql-keyword">AND</span> sp.status = <span class="sql-string">'scheduled'</span>
+  <span class="sql-keyword">AND</span> sp.scheduled_for &lt;= <span class="sql-function">NOW</span>()
+<span class="sql-keyword">ORDER BY</span> sp.scheduled_for <span class="sql-keyword">ASC</span>
+<span class="sql-keyword">LIMIT</span> <span class="sql-number">1</span>;</code></pre>
+                </div>
+            </div>
+
+            <h3>3. Record Successful Send</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- After Unipile confirms send was successful</span>
+<span class="sql-keyword">BEGIN</span>;
+
+<span class="sql-comment">-- Update the message_generation_logs record</span>
+<span class="sql-keyword">UPDATE</span> message_generation_logs
+<span class="sql-keyword">SET</span>
+  message_status = <span class="sql-string">'sent'</span>,
+  message_type = <span class="sql-string">'connection_request'</span>,
+  recipient_linkedin_id = <span class="sql-string">'linkedin_profile_id_123'</span>,
+  recipient_name = <span class="sql-string">'John Doe'</span>,
+  unipile_message_id = <span class="sql-string">'unipile_msg_xyz'</span>,
+  unipile_thread_id = <span class="sql-string">'unipile_thread_abc'</span>,
+  is_personalised = <span class="sql-keyword">true</span>,
+  message_length = <span class="sql-number">150</span>,
+  sent_at = <span class="sql-function">NOW</span>(),
+  updated_at = <span class="sql-function">NOW</span>()
+<span class="sql-keyword">WHERE</span> message_id = <span class="sql-string">'msg_uuid_here'</span>;
+
+<span class="sql-comment">-- Update the prospect status</span>
+<span class="sql-keyword">UPDATE</span> sequence_prospects
+<span class="sql-keyword">SET</span>
+  status = <span class="sql-string">'sent'</span>,
+  sent_at = <span class="sql-function">NOW</span>(),
+  last_message_at = <span class="sql-function">NOW</span>(),
+  updated_at = <span class="sql-function">NOW</span>()
+<span class="sql-keyword">WHERE</span> id = <span class="sql-number">456</span>;
+
+<span class="sql-comment">-- Increment the quota counters</span>
+<span class="sql-keyword">SELECT</span> <span class="sql-function">increment_message_quota</span>(
+  p_user_id := <span class="sql-string">'user_abc123'</span>,
+  p_message_type := <span class="sql-string">'connection_request'</span>,
+  p_is_personalised := <span class="sql-keyword">true</span>
+);
+
+<span class="sql-comment">-- If it's a connection request, create tracking record</span>
+<span class="sql-keyword">INSERT INTO</span> connection_requests (
+  user_id,
+  recipient_linkedin_id,
+  message_text,
+  is_personalised,
+  status,
+  sequence_id,
+  prospect_id
+) <span class="sql-keyword">VALUES</span> (
+  <span class="sql-string">'user_abc123'</span>,
+  <span class="sql-string">'linkedin_profile_id_123'</span>,
+  <span class="sql-string">'Your personalized message here...'</span>,
+  <span class="sql-keyword">true</span>,
+  <span class="sql-string">'pending'</span>,
+  <span class="sql-number">123</span>,
+  <span class="sql-number">456</span>
+);
+
+<span class="sql-comment">-- Update sequence sent count</span>
+<span class="sql-keyword">UPDATE</span> outreach_sequences
+<span class="sql-keyword">SET</span>
+  sent_count = sent_count + <span class="sql-number">1</span>,
+  updated_at = <span class="sql-function">NOW</span>()
+<span class="sql-keyword">WHERE</span> id = <span class="sql-number">123</span>;
+
+<span class="sql-keyword">COMMIT</span>;</code></pre>
+                </div>
+            </div>
+
+            <h3>4. Schedule Next Prospect with Randomization</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Calculate next send time with randomization</span>
+<span class="sql-keyword">WITH</span> next_prospect <span class="sql-keyword">AS</span> (
+  <span class="sql-keyword">SELECT</span> id
+  <span class="sql-keyword">FROM</span> sequence_prospects
+  <span class="sql-keyword">WHERE</span> sequence_id = <span class="sql-number">123</span>
+    <span class="sql-keyword">AND</span> status = <span class="sql-string">'pending'</span>
+  <span class="sql-keyword">ORDER BY</span> id
+  <span class="sql-keyword">LIMIT</span> <span class="sql-number">1</span>
+),
+random_delay <span class="sql-keyword">AS</span> (
+  <span class="sql-comment">-- Generate random minutes between delay_between_min and delay_between_max</span>
+  <span class="sql-keyword">SELECT</span>
+    <span class="sql-number">5</span> <span class="sql-keyword">AS</span> min_delay,      <span class="sql-comment">-- From sequence config</span>
+    <span class="sql-number">15</span> <span class="sql-keyword">AS</span> max_delay,     <span class="sql-comment">-- From sequence config</span>
+    (<span class="sql-number">5</span> + <span class="sql-function">RANDOM</span>() * (<span class="sql-number">15</span> - <span class="sql-number">5</span>))::<span class="sql-keyword">INTEGER</span> <span class="sql-keyword">AS</span> delay_minutes
+)
+<span class="sql-keyword">UPDATE</span> sequence_prospects
+<span class="sql-keyword">SET</span>
+  status = <span class="sql-string">'scheduled'</span>,
+  scheduled_for = <span class="sql-function">NOW</span>() + (<span class="sql-keyword">SELECT</span> delay_minutes <span class="sql-keyword">FROM</span> random_delay) * <span class="sql-keyword">INTERVAL</span> <span class="sql-string">'1 minute'</span>,
+  updated_at = <span class="sql-function">NOW</span>()
+<span class="sql-keyword">WHERE</span> id = (<span class="sql-keyword">SELECT</span> id <span class="sql-keyword">FROM</span> next_prospect)
+<span class="sql-keyword">RETURNING</span>
+  id,
+  scheduled_for,
+  <span class="sql-function">EXTRACT</span>(<span class="sql-keyword">EPOCH</span> <span class="sql-keyword">FROM</span> (scheduled_for - <span class="sql-function">NOW</span>()))/<span class="sql-number">60</span> <span class="sql-keyword">AS</span> minutes_until_send;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anti-Detection -->
+        <div class="section">
+            <h2 id="anti-detection">🛡️ Anti-Detection Best Practices</h2>
+
+            <h3>1. Randomized Delays</h3>
+            <p><strong>Never use fixed intervals.</strong> LinkedIn's algorithm detects patterns.</p>
+
+            <div class="alert alert-warning">
+                <strong>❌ BAD: Fixed 5-minute delays</strong><br>
+                <code>scheduled_for = NOW() + INTERVAL '5 minutes'</code>
+            </div>
+
+            <div class="alert alert-success">
+                <strong>✅ GOOD: Random delays between 5-15 minutes</strong><br>
+                <code>scheduled_for = NOW() + (5 + RANDOM() * 10)::INTEGER * INTERVAL '1 minute'</code>
+            </div>
+
+            <div class="alert alert-success">
+                <strong>✅ BETTER: Use Gaussian distribution for more natural timing</strong><br>
+                <code>scheduled_for = NOW() + (5 + (RANDOM() + RANDOM() + RANDOM() + RANDOM()) / 4 * 10)::INTEGER * INTERVAL '1 minute'</code>
+            </div>
+
+            <h4>Recommended Delay Ranges:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Message Type</th>
+                        <th>Min Delay</th>
+                        <th>Max Delay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Connection Requests</td>
+                        <td>5 minutes</td>
+                        <td>20 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Direct Messages</td>
+                        <td>3 minutes</td>
+                        <td>10 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>InMails</td>
+                        <td>10 minutes</td>
+                        <td>30 minutes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2. Velocity Control</h3>
+            <p><strong>Don't send at maximum capacity every day.</strong> Vary your daily send volume.</p>
+
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query: Calculate Relaxed Daily Limit</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Calculate a "relaxed" daily limit (80-95% of max)</span>
+<span class="sql-keyword">WITH</span> daily_variance <span class="sql-keyword">AS</span> (
+  <span class="sql-keyword">SELECT</span>
+    daily_limit,
+    (daily_limit * (<span class="sql-number">0.80</span> + <span class="sql-function">RANDOM</span>() * <span class="sql-number">0.15</span>))::<span class="sql-keyword">INTEGER</span> <span class="sql-keyword">AS</span> todays_limit
+  <span class="sql-keyword">FROM</span> outreach_sequences
+  <span class="sql-keyword">WHERE</span> id = <span class="sql-number">123</span>
+)
+<span class="sql-keyword">SELECT</span>
+  todays_limit,
+  sent_today,
+  <span class="sql-keyword">CASE</span>
+    <span class="sql-keyword">WHEN</span> sent_today &gt;= todays_limit <span class="sql-keyword">THEN</span> <span class="sql-keyword">false</span>
+    <span class="sql-keyword">ELSE</span> <span class="sql-keyword">true</span>
+  <span class="sql-keyword">END</span> <span class="sql-keyword">AS</span> can_send_more_today
+<span class="sql-keyword">FROM</span> daily_variance
+<span class="sql-keyword">CROSS JOIN</span> (
+  <span class="sql-keyword">SELECT</span> <span class="sql-function">COUNT</span>(*) <span class="sql-keyword">AS</span> sent_today
+  <span class="sql-keyword">FROM</span> sequence_prospects
+  <span class="sql-keyword">WHERE</span> sequence_id = <span class="sql-number">123</span>
+    <span class="sql-keyword">AND</span> sent_at &gt;= <span class="sql-function">DATE_TRUNC</span>(<span class="sql-string">'day'</span>, <span class="sql-function">NOW</span>())
+) <span class="sql-keyword">AS</span> today;</code></pre>
+                </div>
+            </div>
+
+            <h3>3. Burst Prevention</h3>
+            <div class="alert alert-warning">
+                <strong>⚠️ Never send multiple messages within 2 minutes.</strong> Always check <code>last_action_at</code>.
+            </div>
+
+            <pre><code><span class="sql-comment">-- This is already built into check_message_quota() but here's the logic:</span>
+<span class="sql-keyword">SELECT</span>
+  user_id,
+  last_action_at,
+  <span class="sql-function">NOW</span>() - last_action_at <span class="sql-keyword">AS</span> time_since_last,
+  <span class="sql-keyword">CASE</span>
+    <span class="sql-keyword">WHEN</span> last_action_at <span class="sql-keyword">IS NULL THEN</span> <span class="sql-keyword">true</span>
+    <span class="sql-keyword">WHEN</span> <span class="sql-function">NOW</span>() - last_action_at &lt; <span class="sql-keyword">INTERVAL</span> <span class="sql-string">'2 minutes'</span> <span class="sql-keyword">THEN</span> <span class="sql-keyword">false</span>
+    <span class="sql-keyword">ELSE</span> <span class="sql-keyword">true</span>
+  <span class="sql-keyword">END</span> <span class="sql-keyword">AS</span> can_send
+<span class="sql-keyword">FROM</span> message_quotas
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID'</span>;</code></pre>
+
+            <h3>4. Connection Request Hygiene</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query: Check Pending Connection Ratio</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Check pending connection ratio (keep under 500, ideally under 200)</span>
+<span class="sql-keyword">SELECT</span>
+  pending_connections,
+  <span class="sql-keyword">CASE</span>
+    <span class="sql-keyword">WHEN</span> pending_connections &gt; <span class="sql-number">400</span> <span class="sql-keyword">THEN</span> <span class="sql-string">'critical'</span>
+    <span class="sql-keyword">WHEN</span> pending_connections &gt; <span class="sql-number">200</span> <span class="sql-keyword">THEN</span> <span class="sql-string">'warning'</span>
+    <span class="sql-keyword">ELSE</span> <span class="sql-string">'healthy'</span>
+  <span class="sql-keyword">END</span> <span class="sql-keyword">AS</span> status,
+  <span class="sql-keyword">CASE</span>
+    <span class="sql-keyword">WHEN</span> pending_connections &gt; <span class="sql-number">400</span> <span class="sql-keyword">THEN</span> <span class="sql-keyword">false</span>
+    <span class="sql-keyword">WHEN</span> pending_connections &gt; <span class="sql-number">200</span> <span class="sql-keyword">THEN</span> (<span class="sql-function">RANDOM</span>() &lt; <span class="sql-number">0.3</span>) <span class="sql-comment">-- Only 30% chance to send</span>
+    <span class="sql-keyword">ELSE</span> <span class="sql-keyword">true</span>
+  <span class="sql-keyword">END</span> <span class="sql-keyword">AS</span> should_send_connections
+<span class="sql-keyword">FROM</span> message_quotas
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'USER_ID'</span>;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow -->
+        <div class="section">
+            <h2 id="workflow">🔄 Scheduler Implementation</h2>
+
+            <h3>Main Scheduler Workflow</h3>
+
+            <div class="workflow-box">1. CRON Trigger (every 5 minutes)</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">2. Postgres Node: Get Active Sequences</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">3. Split Into Items (Loop each sequence)</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">4. Function Node: Check Working Hours</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">5. IF Node: Should Process?</div>
+            <div class="workflow-arrow">↓ (YES)</div>
+
+            <div class="workflow-box">6. Postgres Node: Get Next Scheduled Prospect</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">7. Postgres Node: Check Message Quota<br><code>SELECT * FROM check_message_quota(...)</code></div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">8. IF Node: Can Send?</div>
+            <div class="workflow-arrow">↓ (YES)</div>
+
+            <div class="workflow-box">9. Postgres Node: Mark as 'sending'</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">10. HTTP Request: Send via Unipile<br><code>POST https://api.unipile.com/api/v1/messaging/linkedin/send</code></div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">11. IF Node: Send Successful?</div>
+            <div class="workflow-arrow">↓ (YES)</div>
+
+            <div class="workflow-box">12. Postgres Node: Record Success (Transaction)<br>
+                • UPDATE message_generation_logs<br>
+                • UPDATE sequence_prospects<br>
+                • SELECT increment_message_quota()<br>
+                • INSERT INTO connection_requests<br>
+                • UPDATE outreach_sequences
+            </div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">13. Function Node: Calculate Random Next Send Time</div>
+            <div class="workflow-arrow">↓</div>
+
+            <div class="workflow-box">14. Postgres Node: Schedule Next Prospect</div>
+        </div>
+
+        <!-- Cron Jobs -->
+        <div class="section">
+            <h2 id="cron-jobs">⏰ Cron Job Schedule</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Job Name</th>
+                        <th>Schedule</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Main Scheduler</strong></td>
+                        <td><code>*/5 * * * *</code></td>
+                        <td>Process active sequences, check quotas, send messages</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Daily Reset</strong></td>
+                        <td><code>0 0 * * *</code></td>
+                        <td><code>SELECT reset_daily_quotas();</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hourly Reset</strong></td>
+                        <td><code>0 * * * *</code></td>
+                        <td><code>SELECT reset_hourly_quotas();</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weekly Reset Check</strong></td>
+                        <td><code>0 1 * * *</code></td>
+                        <td><code>SELECT reset_weekly_quotas();</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Monthly Reset Check</strong></td>
+                        <td><code>0 2 * * *</code></td>
+                        <td><code>SELECT reset_monthly_quotas();</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Connection Withdrawal</strong></td>
+                        <td><code>0 3 * * *</code></td>
+                        <td><code>SELECT auto_withdraw_old_requests();</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>InMail Credit Sync</strong></td>
+                        <td><code>0 */6 * * *</code></td>
+                        <td>Fetch InMail balance from Unipile API</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Testing -->
+        <div class="section">
+            <h2 id="testing">🧪 Testing Queries</h2>
+
+            <h3>Get User's Current Status</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'Account Type'</span> <span class="sql-keyword">AS</span> metric,
+  la.account_type <span class="sql-keyword">AS</span> value
+<span class="sql-keyword">FROM</span> linkedin_accounts la
+<span class="sql-keyword">WHERE</span> la.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'DMs Sent Today'</span>,
+  mq.daily_direct_messages::<span class="sql-keyword">TEXT</span>
+<span class="sql-keyword">FROM</span> message_quotas mq
+<span class="sql-keyword">WHERE</span> mq.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'Connections Sent Today'</span>,
+  mq.daily_connection_requests::<span class="sql-keyword">TEXT</span>
+<span class="sql-keyword">FROM</span> message_quotas mq
+<span class="sql-keyword">WHERE</span> mq.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'Connections Sent This Week'</span>,
+  mq.weekly_connection_requests::<span class="sql-keyword">TEXT</span>
+<span class="sql-keyword">FROM</span> message_quotas mq
+<span class="sql-keyword">WHERE</span> mq.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'InMail Credits'</span>,
+  la.inmail_credits_remaining::<span class="sql-keyword">TEXT</span>
+<span class="sql-keyword">FROM</span> linkedin_accounts la
+<span class="sql-keyword">WHERE</span> la.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'Pending Connections'</span>,
+  mq.pending_connections::<span class="sql-keyword">TEXT</span>
+<span class="sql-keyword">FROM</span> message_quotas mq
+<span class="sql-keyword">WHERE</span> mq.user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+
+<span class="sql-keyword">UNION ALL</span>
+
+<span class="sql-keyword">SELECT</span>
+  <span class="sql-string">'Last Action'</span>,
+  <span class="sql-function">TO_CHAR</span>(mq.last_action_at, <span class="sql-string">'YYYY-MM-DD HH24:MI:SS'</span>)
+<span class="sql-keyword">FROM</span> message_quotas mq
+<span class="sql-keyword">WHERE</span> mq.user_id = <span class="sql-string">'YOUR_USER_ID'</span>;</code></pre>
+                </div>
+            </div>
+
+            <h3>Simulate Sending a Message</h3>
+            <div class="collapsible">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span><strong>View Query</strong></span>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <pre><code><span class="sql-comment">-- Test the full flow without actually sending</span>
+<span class="sql-keyword">BEGIN</span>;
+
+<span class="sql-comment">-- 1. Check quota</span>
+<span class="sql-keyword">SELECT</span> * <span class="sql-keyword">FROM</span> <span class="sql-function">check_message_quota</span>(
+  <span class="sql-string">'YOUR_USER_ID'</span>,
+  <span class="sql-string">'connection_request'</span>,
+  <span class="sql-keyword">true</span>
+);
+
+<span class="sql-comment">-- 2. If can_send = true, increment (for testing, we'll rollback)</span>
+<span class="sql-keyword">SELECT</span> <span class="sql-function">increment_message_quota</span>(
+  <span class="sql-string">'YOUR_USER_ID'</span>,
+  <span class="sql-string">'connection_request'</span>,
+  <span class="sql-keyword">true</span>
+);
+
+<span class="sql-comment">-- 3. Check new quota state</span>
+<span class="sql-keyword">SELECT</span>
+  daily_connection_requests,
+  weekly_connection_requests,
+  last_action_at
+<span class="sql-keyword">FROM</span> message_quotas
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'YOUR_USER_ID'</span>;
+
+<span class="sql-comment">-- ROLLBACK for testing (use COMMIT in production)</span>
+<span class="sql-keyword">ROLLBACK</span>;</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Handling -->
+        <div class="section">
+            <h2 id="error-handling">⚠️ Error Handling</h2>
+
+            <h3>Common Errors and Solutions</h3>
+
+            <h4>1. Quota Check Returns False</h4>
+            <pre><code><span class="sql-comment">-- Query the violation log to understand why</span>
+<span class="sql-keyword">SELECT</span>
+  violation_type,
+  message,
+  occurred_at
+<span class="sql-keyword">FROM</span> quota_violations
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+<span class="sql-keyword">ORDER BY</span> occurred_at <span class="sql-keyword">DESC</span>
+<span class="sql-keyword">LIMIT</span> <span class="sql-number">10</span>;</code></pre>
+
+            <h4>2. Pending Connections Too High</h4>
+            <pre><code><span class="sql-comment">-- Check connection acceptance rate</span>
+<span class="sql-keyword">SELECT</span>
+  user_id,
+  pending_connections,
+  connection_acceptance_rate,
+  <span class="sql-keyword">CASE</span>
+    <span class="sql-keyword">WHEN</span> connection_acceptance_rate &lt; <span class="sql-number">0.20</span> <span class="sql-keyword">THEN</span> <span class="sql-string">'Poor - Pause connections'</span>
+    <span class="sql-keyword">WHEN</span> connection_acceptance_rate &lt; <span class="sql-number">0.40</span> <span class="sql-keyword">THEN</span> <span class="sql-string">'Low - Reduce volume'</span>
+    <span class="sql-keyword">ELSE</span> <span class="sql-string">'Healthy'</span>
+  <span class="sql-keyword">END</span> <span class="sql-keyword">AS</span> recommendation
+<span class="sql-keyword">FROM</span> linkedin_accounts
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'YOUR_USER_ID'</span>;</code></pre>
+
+            <h4>3. Account Restricted</h4>
+            <pre><code><span class="sql-comment">-- Check account status</span>
+<span class="sql-keyword">SELECT</span>
+  account_status,
+  last_restriction_date
+<span class="sql-keyword">FROM</span> linkedin_accounts
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'YOUR_USER_ID'</span>;
+
+<span class="sql-comment">-- If 'restricted', pause all sequences</span>
+<span class="sql-keyword">UPDATE</span> outreach_sequences
+<span class="sql-keyword">SET</span> status = <span class="sql-string">'paused'</span>
+<span class="sql-keyword">WHERE</span> user_id = <span class="sql-string">'YOUR_USER_ID'</span>
+  <span class="sql-keyword">AND</span> status = <span class="sql-string">'active'</span>;</code></pre>
+
+            <div class="alert alert-info">
+                <strong>Key Points to Remember:</strong><br>
+                1. Always call <code>check_message_quota()</code> before sending<br>
+                2. Always call <code>increment_message_quota()</code> after successful send<br>
+                3. Use randomization for ALL delays<br>
+                4. Never exceed 2-minute minimum between actions<br>
+                5. Monitor pending connections and acceptance rates<br>
+                6. Respect working hours when configured<br>
+                7. Handle Unipile errors gracefully and mark prospects as 'failed'
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Cold AI - LinkedIn Scheduler Database Integration Guide</p>
+        <p>For support and documentation, visit the Cold AI platform</p>
+    </footer>
+
+    <script>
+        function toggleCollapsible(header) {
+            const collapsible = header.parentElement;
+            collapsible.classList.toggle('active');
+        }
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

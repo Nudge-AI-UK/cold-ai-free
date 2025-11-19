@@ -263,12 +263,13 @@ class ICPService {
 
       const activeCount = count || 0;
 
-      if (activeCount >= limit) {
-        return {
-          canRestore: false,
-          reason: `You've reached your ICP limit (${limit}) for your ${planType} plan. Please upgrade or delete another ICP first.`
-        };
-      }
+      // TESTING: Limit check disabled for testing
+      // if (activeCount >= limit) {
+      //   return {
+      //     canRestore: false,
+      //     reason: `You've reached your ICP limit (${limit}) for your ${planType} plan. Please upgrade or delete another ICP first.`
+      //   };
+      // }
 
       return { canRestore: true };
     } catch (error) {

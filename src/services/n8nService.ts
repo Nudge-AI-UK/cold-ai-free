@@ -87,6 +87,15 @@ class N8NService {
     error?: string
   ): Promise<void> {
     try {
+      // Get current user ID from auth session or payload
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || payload?.userId || payload?.user_id;
+
+      if (!userId) {
+        console.warn('⚠️ [N8N Service] No user ID available for webhook tracking, skipping');
+        return;
+      }
+
       const eventData = {
         event_type: eventType,
         source: source,
@@ -94,6 +103,7 @@ class N8NService {
         processed: !error,
         error_message: error || null,
         retry_count: 0,
+        user_id: userId,
         created_at: new Date().toISOString()
       };
 
@@ -124,7 +134,7 @@ class N8NService {
       const token = session?.access_token || this.supabaseAnonKey;
 
       const response = await fetch(
-        `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`,
+        `${this.supabaseUrl}/functions/v1/server-knowledge-action`,
         {
           method: 'OPTIONS',
           headers: {
@@ -178,7 +188,7 @@ class N8NService {
       };
 
       const response = await fetch(
-        `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`,
+        `${this.supabaseUrl}/functions/v1/server-knowledge-action`,
         {
           method: 'POST',
           headers: {
@@ -236,7 +246,7 @@ class N8NService {
       const token = session?.access_token || this.supabaseAnonKey;
 
       // Use the Supabase Edge Function as a secure proxy
-      const url = `${this.supabaseUrl}/functions/v1/n8n-icp-action`;
+      const url = `${this.supabaseUrl}/functions/v1/server-icp-action`;
       
       console.group(`🚀 [n8nService] Calling ICP Action: ${payload.action}`);
       console.log('📍 URL:', url);
@@ -651,8 +661,8 @@ class N8NService {
       const token = session?.access_token || this.supabaseAnonKey;
 
       // Use the Supabase Edge Function as a secure proxy
-      const url = `${this.supabaseUrl}/functions/v1/n8n-knowledge-action`;
-      
+      const url = `${this.supabaseUrl}/functions/v1/server-knowledge-action`;
+
       console.group(`🚀 [n8nService] Calling Knowledge Action: ${payload.action}`);
       console.log('📍 URL:', url);
       console.log('👤 User ID:', payload.userId);

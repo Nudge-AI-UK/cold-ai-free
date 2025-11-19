@@ -375,25 +375,6 @@ export function SettingsWidget({ forceEmpty, className }: SettingsWidgetProps) {
         </div>
       </div>
 
-      {/* Bottom Success Bar */}
-      <div className="bg-gradient-to-r from-[#FBAE1C]/10 to-[#FC9109]/10 backdrop-blur-sm rounded-2xl p-4 border border-[#FBAE1C]/20">
-        <div className="flex items-center justify-between">
-          <div className="flex-1 flex items-start gap-3">
-            <span className="text-2xl">✨</span>
-            <div>
-              <p className="text-xs font-medium text-[#FBAE1C] mb-1">Cold AI Ready</p>
-              <p className="text-xs text-gray-300">Your settings are optimised for maximum personalisation and response rates</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleEditSettings}
-            className="ml-4 bg-white/10 hover:bg-white/15 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-xs flex items-center space-x-2 group">
-            <span>Edit Settings</span>
-            <Edit2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-      
       {/* Decorative Elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FBAE1C]/10 to-transparent rounded-bl-full blur-2xl"></div>
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-[#FC9109]/10 to-transparent rounded-tr-full blur-2xl"></div>

@@ -55,8 +55,11 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
   const [isApproving, setIsApproving] = useState(false);
   
   // Determine modal mode based on ICP status or use provided mode
-  const { mode: autoMode, isEditable, shouldLoadMetadata } = useModalMode(icp);
+  const { mode: autoMode, isEditable: autoIsEditable, shouldLoadMetadata } = useModalMode(icp);
   const mode = propMode || autoMode;
+
+  // If propMode is explicitly 'edit', override isEditable to true
+  const isEditable = propMode === 'edit' ? true : autoIsEditable;
   
   // Load ICP data with conditional metadata loading
   const { formData, setFormData, metadata, isDataLoading } = useICPData(
@@ -114,6 +117,10 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
 
     setIsApproving(true);
     try {
+      // DEBUG: Log formData to see what's being saved
+      console.log('🔍 formData being saved:', formData);
+      console.log('🔍 product_link_id in formData:', formData.product_link_id);
+
       // 1. Save the edited/approved data to icps table with reviewing status
       const { error: updateError } = await supabase
         .from('icps')
@@ -154,6 +161,11 @@ export const ICPUnifiedModal: React.FC<ICPUnifiedModalProps> = ({
       toast.success('ICP approved and sent for review!');
       onUpdate?.();
       onClose();
+
+      // Auto-refresh page to show the review widget version
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000); // Wait 1 second for toast to show before refreshing
     } catch (error: any) {
       console.error('Error approving ICP:', error);
       

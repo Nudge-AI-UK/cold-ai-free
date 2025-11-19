@@ -89,7 +89,7 @@ export const ICPCreationModalV2: React.FC<ICPCreationModalV2Props> = ({
         const { data: knowledgeData, error } = await supabase
           .from('knowledge_base')
           .select('id, title, content, knowledge_type, review_status, workflow_status, created_at')
-          .eq('knowledge_type', 'product')
+          .in('knowledge_type', ['product', 'service'])
           .eq('review_status', 'approved')
           .eq('workflow_status', 'active')
           .eq('created_by', userId);

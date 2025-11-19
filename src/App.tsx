@@ -1,14 +1,35 @@
 // src/App.tsx
 import { Toaster } from 'sonner'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LoadingProvider } from '@/contexts/LoadingContext'
+import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { WidgetDashboard } from '@/components/dashboard/WidgetDashboard'
+import { OutreachPage } from '@/pages/OutreachPage'
+import { ProspectsPage } from '@/pages/ProspectsPage'
+// import { InboxPage } from '@/pages/InboxPage'
 import { LoginPage } from '@/components/auth/LoginPage'
+import { PasswordResetPage } from '@/components/auth/PasswordResetPage'
 import { useAuth } from '@/hooks/useAuth'
 import { ModalFlowProvider } from '@/components/modals/ModalFlowManager'
+import { ProspectModalProvider } from '@/components/modals/ProspectModalManager'
+import { MobileBlocker } from '@/components/MobileBlocker'
+import { MaintenanceBlocker } from '@/components/MaintenanceBlocker'
+import { FeedbackWidget } from '@/components/feedback/FeedbackWidget'
+import { FeedbackProvider } from '@/contexts/FeedbackContext'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, isPasswordRecovery } = useAuth()
+  const isResetPasswordPage = window.location.pathname === '/reset-password'
+
+  // Check if this is a password recovery redirect (token in URL hash)
+  const hashParams = new URLSearchParams(window.location.hash.substring(1))
+  const isRecoveryRedirect = hashParams.get('type') === 'recovery' || hashParams.get('error_code') === 'otp_expired'
+
+  // Show password reset page if recovery detected via auth event or URL hash
+  const shouldShowPasswordReset = isResetPasswordPage || isRecoveryRedirect || isPasswordRecovery
 
   if (loading) {
     return (
@@ -23,32 +44,62 @@ function AppContent() {
     )
   }
 
+  // Handle password reset page - show regardless of auth state if recovery redirect
+  if (shouldShowPasswordReset) {
+    return <PasswordResetPage />
+  }
+
+  // Show login page for unauthenticated users
   if (!user) {
     return <LoginPage />
   }
 
-  return <WidgetDashboard />
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<WidgetDashboard />} />
+        <Route path="/outreach" element={<OutreachPage />} />
+        <Route path="/prospects" element={<ProspectsPage />} />
+        {/* <Route path="/inbox" element={<InboxPage />} /> */}
+        <Route path="/reset-password" element={<PasswordResetPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <FeedbackWidget />
+    </>
+  )
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <LoadingProvider>
-        <ModalFlowProvider>
-          <AppContent />
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: 'hsl(222 41% 11%)',
-                border: '1px solid hsl(217 33% 18%)',
-                color: 'hsl(210 20% 95%)',
-              },
-            }}
-          />
-        </ModalFlowProvider>
-      </LoadingProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <LoadingProvider>
+          <OnboardingProvider>
+            <FeedbackProvider>
+              <ModalFlowProvider>
+                <ProspectModalProvider>
+                  <MobileBlocker />
+                  <MaintenanceBlocker />
+                  <AppContent />
+                <Toaster
+                  position="bottom-right"
+                  toastOptions={{
+                    style: {
+                      background: 'hsl(222 41% 11%)',
+                      border: '1px solid hsl(217 33% 18%)',
+                      color: 'hsl(210 20% 95%)',
+                    },
+                  }}
+                />
+                  <Analytics />
+                  <SpeedInsights />
+                </ProspectModalProvider>
+              </ModalFlowProvider>
+            </FeedbackProvider>
+          </OnboardingProvider>
+        </LoadingProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 

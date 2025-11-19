@@ -1,0 +1,630 @@
+{
+  "name": "Cold: Knowledge Base Wiki",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "system": "",
+          "maxTokens": 2000,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        144
+      ],
+      "id": "68662360-c166-4970-88ca-b09d8e8600c9",
+      "name": "Create Wiki",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "remove_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bb5eaa84-9d8b-49ae-ae8e-9f0d10b63771"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Remove Entry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a0d9c378-0eda-4d37-8b3a-8b4d70f6e430",
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "add_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Add Entry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "772406d0-10ad-4d78-8ad3-c21fb046e6fe",
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "first_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "First Entry"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0087c09c-f28b-4f4a-85a4-2bd0c8cb73b3",
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "update_entry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Update Entry"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        96,
+        -80
+      ],
+      "id": "d0586f3c-6fef-4578-898e-250dd50de655",
+      "name": "Operation",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {
+          "queryReplacement": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        -240
+      ],
+      "id": "d2051a70-dadc-428d-ae64-8191f6cf83a2",
+      "name": "Get User Knowledge Base",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -240
+      ],
+      "id": "2d60a5a1-41ef-4963-a15e-2a8576259359",
+      "name": "Find and Remove Section",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {
+          "queryReplacement": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1712,
+        -240
+      ],
+      "id": "574080db-9506-4415-b106-6586aace96c9",
+      "name": "Save User Knowledge Base",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {
+          "queryReplacement": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        -48
+      ],
+      "id": "dea8dae4-cd9f-4a86-95e9-747ae3d94d63",
+      "name": "Get Personal Profile",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {
+          "queryReplacement": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        144
+      ],
+      "id": "01cc0dda-a267-4baa-bbc9-cc88066cff06",
+      "name": "Get Company Profile",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        128
+      ],
+      "id": "42833d22-cf5d-40cc-bdfe-790ea7e01867",
+      "name": "Merge",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {
+          "queryReplacement": ""
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        832,
+        336
+      ],
+      "id": "47e5e40d-e9ae-44d0-a1b9-6fd83bbd2945",
+      "name": "Get Product Entry1",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "system": "",
+          "webSearch": true,
+          "maxUses": "={{ $('Max Web Searches').item.json.max_web_searches }}",
+          "maxTokens": 3000,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -48
+      ],
+      "id": "994a50ee-c70e-4362-93c8-d5d51edca0e3",
+      "name": "Summarise Personal Links",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-20250514"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "system": "",
+          "webSearch": true,
+          "maxUses": "={{ $json.max_web_searches }}",
+          "maxTokens": 3000,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        768,
+        144
+      ],
+      "id": "c2fbe083-8051-4c4d-acd1-b5983b493d52",
+      "name": "Summarise Company Links",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lDC742vQMAEyOlJH",
+          "name": "Anthropic account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        240
+      ],
+      "id": "33186610-111d-4a2b-8e96-494e3ba5f7fd",
+      "name": "Max Web Searches",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE webhook_events \nSET \n  processed = $1\nWHERE id = $2 ",
+        "options": {
+          "queryReplacement": "={{ 'completed' }}, {{ $('Wiki Start').item.json.all_data.log_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1920,
+        -240
+      ],
+      "id": "771678bf-33ce-4f7e-b2a8-929f9a11c192",
+      "name": "Log Response",
+      "credentials": {
+        "postgres": {
+          "id": "T8ezeWp6i6SGTMT9",
+          "name": "Cold Database"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        -48
+      ],
+      "id": "de63c181-8a0e-4303-9872-e646398eb7e7",
+      "name": "Wiki Start"
+    },
+    {
+      "parameters": {
+        "content": "## Incomplete\n\nThis will be the worfklow to create company and profile information. These 'entries' will then be used to generate and update a Wiki-type page. This feature is only available for paying users.",
+        "width": 800
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        80,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "0f9a7745-1e7f-40fc-b855-66ea4724ea02",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Operation": {
+      "main": [
+        [
+          {
+            "node": "Get User Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Max Web Searches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get User Knowledge Base": {
+      "main": [
+        [
+          {
+            "node": "Find and Remove Section",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find and Remove Section": {
+      "main": [
+        [
+          {
+            "node": "Save User Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Personal Profile": {
+      "main": [
+        [
+          {
+            "node": "Summarise Personal Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Create Wiki",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Company Profile": {
+      "main": [
+        [
+          {
+            "node": "Summarise Company Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Product Entry1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Summarise Personal Links": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise Company Links": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Max Web Searches": {
+      "main": [
+        [
+          {
+            "node": "Get Personal Profile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Company Profile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Product Entry1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Wiki": {
+      "main": [
+        [
+          {
+            "node": "Save User Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save User Knowledge Base": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wiki Start": {
+      "main": [
+        [
+          {
+            "node": "Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "versionId": "407df301-8e7f-4fc1-9247-f43c978e43e8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ac32282631d87907ecd7e488a2d942d074ac75be96eae3783bd96e6548940ff2"
+  },
+  "id": "kd6Z2Ak0IzKWE30Y",
+  "tags": [
+    {
+      "createdAt": "2025-07-03T14:41:16.741Z",
+      "updatedAt": "2025-07-03T14:41:16.741Z",
+      "id": "AfErn6zbWY41qrY9",
+      "name": "nudge cold"
+    },
+    {
+      "createdAt": "2025-07-22T15:09:00.765Z",
+      "updatedAt": "2025-07-22T15:09:00.765Z",
+      "id": "yrfp10HbhjmoX07s",
+      "name": "web-app"
+    }
+  ]
+}

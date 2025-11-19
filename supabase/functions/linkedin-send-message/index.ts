@@ -1,183 +1,173 @@
 // supabase/functions/linkedin-send-message/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface SendMessageRequest {
-  user_id: string
-  message_log_id: number
-  recipient_linkedin_url: string
-  message_text: string
-}
-
-serve(async (req) => {
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', {
+      headers: corsHeaders
+    });
   }
-
   try {
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     // Get user authentication
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('Missing authorization header')
+      throw new Error('Missing authorization header');
     }
-
     // Parse request payload
-    const payload: SendMessageRequest = await req.json()
-    console.log('📤 LinkedIn send message request:', payload)
-
+    const payload = await req.json();
+    console.log('📤 LinkedIn send message request:', payload);
     // Validate required fields
     if (!payload.user_id || !payload.message_log_id || !payload.recipient_linkedin_url || !payload.message_text) {
-      throw new Error('Missing required fields')
+      throw new Error('Missing required fields');
     }
-
-    // Get user's LinkedIn account from integrations table
-    console.log('🔍 Fetching LinkedIn account for user:', payload.user_id)
-    const { data: integration, error: integrationError } = await supabase
-      .from('integrations')
-      .select('account_id, access_token, provider_account_id')
-      .eq('user_id', payload.user_id)
-      .eq('provider', 'linkedin')
-      .eq('status', 'connected')
-      .single()
-
-    if (integrationError || !integration) {
-      console.error('❌ No LinkedIn account found:', integrationError)
-      throw new Error('LinkedIn account not connected. Please connect your LinkedIn account first.')
+    // Get user's LinkedIn account from user_profiles table
+    console.log('🔍 Fetching LinkedIn account for user:', payload.user_id);
+    const { data: profile, error: profileError } = await supabase.from('user_profiles').select('unipile_account_id, linkedin_connected').eq('user_id', payload.user_id).eq('linkedin_connected', true).single();
+    if (profileError || !profile || !profile.unipile_account_id) {
+      console.error('❌ No LinkedIn account found:', profileError);
+      throw new Error('LinkedIn account not connected. Please connect your LinkedIn account first.');
     }
-
-    console.log('✅ Found LinkedIn account:', integration.account_id)
-
+    console.log('✅ Found LinkedIn account:', profile.unipile_account_id);
     // Get Unipile API configuration
-    const unipileApiUrl = Deno.env.get('UNIPILE_API_URL') || 'https://api.unipile.com:13443'
-    const unipileApiKey = Deno.env.get('UNIPILE_API_KEY')
-
-    if (!unipileApiKey) {
-      throw new Error('UNIPILE_API_KEY not configured')
+    const unipileApiUrl = Deno.env.get('UNIPILE_API_URL');
+    const unipileApiKey = Deno.env.get('UNIPILE_API_KEY');
+    if (!unipileApiUrl) {
+      throw new Error('UNIPILE_API_URL not configured');
     }
-
+    if (!unipileApiKey) {
+      throw new Error('UNIPILE_API_KEY not configured');
+    }
     // Extract LinkedIn public identifier from URL
     // e.g., https://linkedin.com/in/john-doe-123/ -> john-doe-123
-    const urlMatch = payload.recipient_linkedin_url.match(/linkedin\.com\/in\/([\w%-]+)\/?/)
+    const urlMatch = payload.recipient_linkedin_url.match(/linkedin\.com\/in\/([\w%-]+)\/?/);
     if (!urlMatch) {
-      throw new Error('Invalid LinkedIn URL format')
+      throw new Error('Invalid LinkedIn URL format');
     }
-    const recipientIdentifier = decodeURIComponent(urlMatch[1])
+    const recipientPublicId = decodeURIComponent(urlMatch[1]);
+    // Step 1: Get recipient's messaging ID from Unipile
+    console.log('🔍 Looking up recipient profile for:', recipientPublicId);
+    const profileLookupUrl = `${unipileApiUrl}/api/v1/users/${recipientPublicId}?account_id=${profile.unipile_account_id}`;
+    console.log('📡 Unipile profile lookup URL:', profileLookupUrl);
 
-    // Prepare Unipile API request to start new chat
-    console.log('📨 Sending message via Unipile API...')
-    const unipilePayload = {
-      account_id: integration.account_id,
-      attendees: [{
-        identifier: recipientIdentifier,
-        provider: 'LINKEDIN'
-      }],
-      text: payload.message_text
+    const profileResponse = await fetch(profileLookupUrl, {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': unipileApiKey,
+        'accept': 'application/json'
+      }
+    });
+
+    const profileData = await profileResponse.json();
+    console.log('📦 Unipile profile response:', { ok: profileResponse.ok, status: profileResponse.status, data: profileData });
+
+    if (!profileResponse.ok) {
+      console.error('❌ Failed to find recipient:', profileData);
+      throw new Error(`Could not find recipient LinkedIn profile. Status: ${profileResponse.status}, Error: ${profileData.message || 'Unknown error'}`);
     }
 
-    console.log('🔧 Unipile request:', { ...unipilePayload, text: '[REDACTED]' })
+    // Extract messaging ID from profile response
+    // The provider_id is what we need to send messages
+    const recipientMessagingId = profileData.provider_id || profileData.id;
 
+    if (!recipientMessagingId) {
+      console.error('❌ No messaging ID in profile response:', profileData);
+      throw new Error('Could not extract messaging ID from profile. Please try again.');
+    }
+
+    console.log('✅ Found recipient messaging ID:', recipientMessagingId);
+    // Step 2: Send message using Classic API with multipart/form-data
+    console.log('📨 Sending message via Unipile Classic API...');
+    // Build form data
+    const formData = new FormData();
+    formData.append('attendees_ids', recipientMessagingId);
+    formData.append('text', payload.message_text);
+    formData.append('account_id', profile.unipile_account_id);
+    formData.append('inmail', 'false');
+    formData.append('api', 'classic');
+    console.log('🔧 Unipile Classic API request:', {
+      attendees_ids: recipientMessagingId,
+      account_id: profile.unipile_account_id,
+      text: '[REDACTED]',
+      inmail: false
+    });
     const unipileResponse = await fetch(`${unipileApiUrl}/api/v1/chats`, {
       method: 'POST',
       headers: {
-        'X-API-KEY': unipileApiKey,
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
+        'accept': 'application/json',
+        'X-API-KEY': unipileApiKey
       },
-      body: JSON.stringify(unipilePayload)
-    })
-
-    const unipileData = await unipileResponse.json()
-
+      body: formData
+    });
+    const unipileData = await unipileResponse.json();
     if (!unipileResponse.ok) {
-      console.error('❌ Unipile API error:', unipileData)
-      throw new Error(unipileData.message || 'Failed to send message via Unipile')
+      console.error('❌ Unipile API error:', unipileData);
+      throw new Error(unipileData.message || 'Failed to send message via Unipile');
     }
-
-    console.log('✅ Message sent successfully via Unipile:', unipileData)
-
+    console.log('✅ Message sent successfully via Unipile:', unipileData);
     // Update message_generation_logs to mark as sent
-    const { error: updateError } = await supabase
-      .from('message_generation_logs')
-      .update({
-        message_status: 'sent',
-        sent_at: new Date().toISOString(),
-        message_metadata: {
-          unipile_chat_id: unipileData.object?.id,
-          sent_via: 'linkedin',
-          sent_at: new Date().toISOString()
-        },
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', payload.message_log_id)
-
+    const { error: updateError } = await supabase.from('message_generation_logs').update({
+      message_status: 'sent',
+      sent_at: new Date().toISOString(),
+      message_metadata: {
+        unipile_chat_id: unipileData.object?.id,
+        sent_via: 'linkedin',
+        sent_at: new Date().toISOString()
+      },
+      updated_at: new Date().toISOString()
+    }).eq('id', payload.message_log_id);
     if (updateError) {
-      console.error('❌ Failed to update message log:', updateError)
-      // Don't fail the request since message was sent successfully
+      console.error('❌ Failed to update message log:', updateError);
+    // Don't fail the request since message was sent successfully
     }
-
     // Update usage tracking (messages_sent)
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0];
     const { error: usageError } = await supabase.rpc('increment_usage_tracking', {
       p_user_id: payload.user_id,
       p_usage_date: today,
       p_field: 'messages_sent',
       p_increment: 1
-    })
-
+    });
     if (usageError) {
-      console.error('❌ Failed to update usage tracking:', usageError)
-      // Don't fail the request since message was sent
+      console.error('❌ Failed to update usage tracking:', usageError);
+    // Don't fail the request since message was sent
     }
-
     // Return success response
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Message sent successfully via LinkedIn',
-        chat_id: unipileData.object?.id,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Message sent successfully via LinkedIn',
+      chat_id: unipileData.object?.id,
+      timestamp: new Date().toISOString()
+    }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
-    )
-
+    });
   } catch (error) {
-    console.error('❌ Send message error:', error)
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Unknown error occurred',
-        timestamp: new Date().toISOString()
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+    console.error('❌ Send message error:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
-    )
+    });
   }
-})
-
-/* To test locally:
+}) /* To test locally:
 
   curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/linkedin-send-message' \
     --header 'Authorization: Bearer [YOUR_USER_TOKEN]' \
@@ -197,4 +187,4 @@ serve(async (req) => {
     "timestamp": "2025-10-08T..."
   }
 
-*/
+*/ ;

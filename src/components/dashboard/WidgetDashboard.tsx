@@ -48,9 +48,8 @@ export function WidgetDashboard() {
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gridTemplateRows: 'auto auto auto auto',
+            gridTemplateRows: 'min-content min-content auto',
             gridTemplateAreas: `
-              "icp message message prospects"
               "icp message message prospects"
               "icp analytics linkedin prospects"
               "knowledge knowledge settings settings"
