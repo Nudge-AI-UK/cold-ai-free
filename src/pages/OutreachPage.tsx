@@ -1,5 +1,5 @@
 // src/pages/OutreachPage.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { Header } from '@/components/layout/Header'
@@ -59,6 +59,37 @@ export function OutreachPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [draggedFromSlot, setDraggedFromSlot] = useState<{ day: number; hour: number } | null>(null)
   const [swapPreview, setSwapPreview] = useState<{ fromId: string; toId: string } | null>(null)
+  const [isPageTitleHidden, setIsPageTitleHidden] = useState(false)
+  const prospectsScrollRef = useRef<HTMLDivElement>(null)
+  const calendarScrollRef = useRef<HTMLDivElement>(null)
+
+  // Track scroll position to hide/show page title
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLDivElement
+      const scrollTop = target.scrollTop
+      setIsPageTitleHidden(scrollTop > 20)
+    }
+
+    const prospectsScroll = prospectsScrollRef.current
+    const calendarScroll = calendarScrollRef.current
+
+    if (prospectsScroll) {
+      prospectsScroll.addEventListener('scroll', handleScroll)
+    }
+    if (calendarScroll) {
+      calendarScroll.addEventListener('scroll', handleScroll)
+    }
+
+    return () => {
+      if (prospectsScroll) {
+        prospectsScroll.removeEventListener('scroll', handleScroll)
+      }
+      if (calendarScroll) {
+        calendarScroll.removeEventListener('scroll', handleScroll)
+      }
+    }
+  }, [])
 
   // Update current time every minute for the progress line
   useEffect(() => {
@@ -892,7 +923,7 @@ export function OutreachPage() {
               <div className="text-sm font-semibold text-white">{dayName}</div>
               <div className="text-xs text-gray-400 mt-1">{dateStr}</div>
             </div>
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col overflow-y-auto min-h-0">
               {hours.map(hour => renderTimeSlot(todayDayIndex, hour, today))}
             </div>
           </div>
@@ -917,7 +948,7 @@ export function OutreachPage() {
                   <div className="text-sm font-semibold text-white">{day.substring(0, 3)}</div>
                   <div className="text-xs text-gray-400 mt-1">{dateStr}</div>
                 </div>
-                <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col overflow-y-auto min-h-0">
                   {hours.map(hour => renderTimeSlot(dayIndex, hour, date))}
                 </div>
               </div>
@@ -1046,12 +1077,14 @@ export function OutreachPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0e1b] via-[#1a1f36] to-[#0a0e1b] text-white">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0a0e1b] via-[#1a1f36] to-[#0a0e1b] text-white overflow-hidden">
       <Header />
 
-      <div className="p-6">
-        {/* Header */}
-        <div className="max-w-[1800px] mx-auto mb-6">
+      <div className="flex-1 flex flex-col overflow-hidden p-6">
+        {/* Page Header - Collapsible on scroll */}
+        <div className={`max-w-[1800px] mx-auto w-full transition-all duration-300 ease-in-out overflow-hidden ${
+          isPageTitleHidden ? 'max-h-0 opacity-0 mb-0' : 'max-h-24 opacity-100 mb-6'
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] bg-clip-text text-transparent">
@@ -1094,16 +1127,53 @@ export function OutreachPage() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <main className={`max-w-[1800px] mx-auto grid gap-6 transition-all duration-500 ease-in-out h-[calc(100vh-180px)] ${
+        {/* Controls bar - Always visible when title is hidden */}
+        {isPageTitleHidden && (
+          <div className="max-w-[1800px] mx-auto w-full mb-4 flex items-center justify-end gap-3">
+            {/* View Toggle */}
+            <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+              {(['today', 'week', 'month'] as ViewMode[]).map(view => (
+                <button
+                  key={view}
+                  onClick={() => handleViewChange(view)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    currentView === view
+                      ? 'bg-[#FBAE1C] text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {view.charAt(0).toUpperCase() + view.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveChanges}
+              disabled={!hasUnsavedChanges}
+              className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
+                hasUnsavedChanges
+                  ? 'bg-gradient-to-r from-[#FBAE1C] to-[#FC9109] text-white hover:shadow-lg'
+                  : 'bg-gray-700/30 text-gray-500 cursor-not-allowed opacity-50'
+              }`}
+            >
+              <span>💾</span>
+              Save Changes
+            </button>
+          </div>
+        )}
+
+        {/* Main Content - Fixed height grid */}
+        <main
+          className={`max-w-[1800px] mx-auto w-full flex-1 grid gap-6 transition-all duration-500 ease-in-out overflow-hidden ${
           currentView === 'today' ? 'grid-cols-[3fr_1fr]' :
           currentView === 'month' ? 'grid-cols-[1fr_3fr]' :
           'grid-cols-[1fr_1fr]'
         }`}>
           {/* Prospects Section */}
-          <section className="bg-white/5 border border-white/10 rounded-xl p-6 flex flex-col transition-all duration-500 ease-in-out">
+          <section className="bg-white/5 border border-white/10 rounded-xl p-6 flex flex-col transition-all duration-500 ease-in-out overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10 flex-shrink-0">
               <h2 className="text-xl font-semibold">Prospects</h2>
               <span className="bg-[#FBAE1C]/20 text-[#FBAE1C] px-3 py-1 rounded-full text-sm font-semibold">
                 {filteredProspects.length}
@@ -1111,7 +1181,7 @@ export function OutreachPage() {
             </div>
 
             {/* Filter Chips */}
-            <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-white/10">
+            <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-white/10 flex-shrink-0">
               {(['all', 'generated', 'pending_scheduled', 'scheduled', 'sent', 'reply-received', 'reply-sent', 'archived'] as StatusFilter[])
                 .filter(filter => filter !== 'pending_scheduled' || statusCounts.pending_scheduled > 0) // Only show pending if count > 0
                 .map(filter => {
@@ -1157,7 +1227,10 @@ export function OutreachPage() {
             </div>
 
             {/* Prospects Grid - Wrapper for scrolling */}
-            <div className="overflow-y-auto overflow-x-hidden pr-2 -mr-2">
+            <div
+              ref={prospectsScrollRef}
+              className="flex-1 overflow-y-auto overflow-x-hidden pr-2 -mr-2 min-h-0"
+            >
               <div className={`grid gap-3 p-1 transition-all duration-500 ease-in-out ${
                 currentView === 'today' ? 'grid-cols-[repeat(3,1fr)]' :
                 currentView === 'month' ? 'grid-cols-[1fr]' :
@@ -1203,7 +1276,10 @@ export function OutreachPage() {
               </div>
             )}
 
-            <div className="flex-1 h-full">
+            <div
+              ref={calendarScrollRef}
+              className="flex-1 overflow-y-auto min-h-0"
+            >
               {renderCalendar()}
             </div>
           </section>

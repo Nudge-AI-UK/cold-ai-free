@@ -398,6 +398,10 @@ export const LoginPage = () => {
           )
         }
 
+        // Check if this is a user who already has a confirmed email (e.g., signed up with Google before)
+        // In this case, Supabase returns the existing user with email_confirmed_at already set
+        const emailAlreadyConfirmed = data?.user?.email_confirmed_at !== null && data?.user?.email_confirmed_at !== undefined;
+
         // Only show OTP verification for email/password signups (not OAuth)
         // Provider will be 'email' for email/password, or 'google'/'github' etc for OAuth
         const isEmailPasswordSignup = data?.user && data.user.app_metadata?.provider === 'email';
@@ -405,10 +409,21 @@ export const LoginPage = () => {
         console.log('🔍 Checking if should show OTP:', {
           isEmailPasswordSignup,
           hasUser: !!data?.user,
-          provider: data?.user?.app_metadata?.provider
+          provider: data?.user?.app_metadata?.provider,
+          emailAlreadyConfirmed,
+          email_confirmed_at: data?.user?.email_confirmed_at
         })
 
-        if (isEmailPasswordSignup) {
+        if (emailAlreadyConfirmed) {
+          // User already exists with confirmed email (e.g., Google sign-up)
+          // Skip OTP and inform them to sign in instead
+          console.log('📧 Email already confirmed, skipping OTP')
+          toast.info(
+            'This email is already registered. Please sign in with your existing account (Google or email/password).',
+            { duration: 6000 }
+          )
+          setIsSignUp(false) // Switch to sign-in mode
+        } else if (isEmailPasswordSignup) {
           console.log('📧 Setting OTP verification with email:', email)
           setVerificationEmail(email);
           setShowOtpVerification(true);
