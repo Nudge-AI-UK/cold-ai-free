@@ -259,7 +259,7 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     // Check for the most recent message generation log that's in-progress or generated (not archived/sent/copied/scheduled)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, research_cache_id, recipient_linkedin_id')
+      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, research_cache_id')
       .eq('user_id', userId)
       .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated'])
       .order('created_at', { ascending: false })
@@ -280,12 +280,6 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       // Set research cache ID if available
       if (existingLog.research_cache_id) {
         setCurrentResearchId(existingLog.research_cache_id)
-      }
-
-      // Extract LinkedIn URL from recipient_linkedin_id field
-      if (existingLog.recipient_linkedin_id) {
-        setRecipientUrl(existingLog.recipient_linkedin_id)
-        console.log('✅ Restored LinkedIn URL:', existingLog.recipient_linkedin_id)
       }
 
       // Check if it's in progress

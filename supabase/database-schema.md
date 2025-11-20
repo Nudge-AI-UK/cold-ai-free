@@ -100,6 +100,7 @@ CREATE TABLE public.communication_preferences (
   message_types jsonb,
   primary_style character varying,
   custom_cta text,
+  with_note boolean NOT NULL DEFAULT false,
   CONSTRAINT communication_preferences_pkey PRIMARY KEY (id),
   CONSTRAINT communication_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
@@ -221,6 +222,7 @@ CREATE TABLE public.icps (
   growth_opportunities ARRAY,
   risk_factors ARRAY,
   last_used timestamp with time zone,
+  archived_at timestamp with time zone,
   CONSTRAINT icps_pkey PRIMARY KEY (id),
   CONSTRAINT icps_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id),
   CONSTRAINT icps_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
@@ -274,6 +276,7 @@ CREATE TABLE public.knowledge_base (
   reviewed_by uuid,
   reviewed_at timestamp with time zone,
   summary text,
+  archived_at timestamp with time zone,
   CONSTRAINT knowledge_base_pkey PRIMARY KEY (id),
   CONSTRAINT knowledge_base_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES auth.users(id),
   CONSTRAINT knowledge_base_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id),
@@ -366,7 +369,7 @@ CREATE TABLE public.message_generation_logs (
   team_id character varying,
   generated_message text,
   edited_message text,
-  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text, 'analysing_conversation'::character varying::text])),
+  message_status character varying DEFAULT 'generated'::character varying CHECK (message_status::text = ANY (ARRAY['analysing_icp'::character varying::text, 'analysing_prospect'::character varying::text, 'generating_message'::character varying::text, 'generated'::character varying::text, 'approved'::character varying::text, 'pending_scheduled'::character varying::text, 'scheduled'::character varying::text, 'sent'::character varying::text, 'copied'::character varying::text, 'failed'::character varying::text, 'archived'::character varying::text, 'researching_product'::character varying::text, 'analysing_conversation'::character varying::text, 'reply_received'::character varying::text, 'reply_generated'::character varying::text, 'reply_sent'::character varying::text])),
   ai_model_used character varying,
   generation_cost numeric,
   sent_at timestamp with time zone,
@@ -394,6 +397,7 @@ CREATE TABLE public.message_generation_logs (
   focus_analysis jsonb,
   focus_generated_at timestamp with time zone,
   sequence_prospect_id bigint,
+  hidden boolean DEFAULT false,
   CONSTRAINT message_generation_logs_pkey PRIMARY KEY (id),
   CONSTRAINT message_generation_logs_research_cache_id_fkey FOREIGN KEY (research_cache_id) REFERENCES public.research_cache(id),
   CONSTRAINT message_generation_logs_parent_message_id_fkey FOREIGN KEY (parent_message_id) REFERENCES public.message_generation_logs(message_id),
@@ -594,6 +598,21 @@ CREATE TABLE public.sequence_prospects (
   CONSTRAINT sequence_prospects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT sequence_prospects_message_log_id_fkey FOREIGN KEY (message_log_id) REFERENCES public.message_generation_logs(id)
 );
+CREATE TABLE public.status_feedback (
+  id bigint NOT NULL DEFAULT nextval('status_feedback_id_seq'::regclass),
+  user_id text,
+  email text NOT NULL,
+  subject text NOT NULL,
+  feedback text NOT NULL,
+  feedback_type text NOT NULL CHECK (feedback_type = ANY (ARRAY['bug'::text, 'feature'::text, 'improvement'::text, 'other'::text, 'love_it'::text, 'issue'::text, 'suggestion'::text, 'question'::text])),
+  context_data jsonb DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'new'::text CHECK (status = ANY (ARRAY['new'::text, 'reviewed'::text, 'in_progress'::text, 'resolved'::text, 'closed'::text])),
+  admin_notes text,
+  resolved_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT status_feedback_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.subscriptions (
   subscription_id character varying NOT NULL,
   squarespace_subscription_id character varying UNIQUE,
@@ -667,6 +686,21 @@ CREATE TABLE public.usage_tracking (
   CONSTRAINT usage_tracking_pkey PRIMARY KEY (id),
   CONSTRAINT usage_tracking_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT usage_tracking_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
+);
+CREATE TABLE public.user_feedback (
+  id bigint NOT NULL DEFAULT nextval('user_feedback_id_seq'::regclass),
+  user_id text,
+  email text NOT NULL,
+  subject text NOT NULL,
+  feedback text NOT NULL,
+  feedback_type text NOT NULL CHECK (feedback_type = ANY (ARRAY['bug'::text, 'feature'::text, 'improvement'::text, 'other'::text, 'love_it'::text, 'issue'::text, 'suggestion'::text, 'question'::text])),
+  context_data jsonb DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'new'::text CHECK (status = ANY (ARRAY['new'::text, 'reviewed'::text, 'in_progress'::text, 'resolved'::text, 'closed'::text])),
+  admin_notes text,
+  resolved_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_feedback_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.user_profiles (
   id integer NOT NULL DEFAULT nextval('user_profiles_id_seq'::regclass),
