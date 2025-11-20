@@ -1242,6 +1242,42 @@ export function ProspectModal({
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                        {/* Archive Button - Only show for generated messages */}
+                        {currentMessage.message_status === 'generated' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={async () => {
+                                    if (!currentMessage.id) return
+
+                                    const { error } = await supabase
+                                      .from('message_generation_logs')
+                                      .update({
+                                        message_status: 'archived',
+                                        updated_at: new Date().toISOString()
+                                      })
+                                      .eq('id', currentMessage.id)
+
+                                    if (error) {
+                                      console.error('❌ Failed to archive message:', error)
+                                      toast.error('Failed to archive message')
+                                    } else {
+                                      toast.success('Message archived')
+                                      // Refresh the prospect data to show updated status
+                                      await fetchProspectData()
+                                    }
+                                  }}
+                                  className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl hover:bg-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-400 transition-all">
+                                  Archive
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Archive this message</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </div>
                   )

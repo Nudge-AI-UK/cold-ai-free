@@ -158,6 +158,8 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   const [environment, setEnvironment] = useState<'production' | 'testing'>('production')
   const [isAdmin, setIsAdmin] = useState(false)
   const [generatedMessageType, setGeneratedMessageType] = useState<string | null>(null)
+  const [isAdjustingTone, setIsAdjustingTone] = useState(false)
+  const [appliedTone, setAppliedTone] = useState<'concise' | 'professional' | 'casual' | null>(null)
 
   // Compute widget state for transition animation
   const widgetState =
@@ -167,10 +169,14 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     'idle';
 
   useEffect(() => {
+    console.log('🎯 useEffect triggered - user:', user?.id || user?.user_id, 'forceEmpty:', forceEmpty)
     if (user && !forceEmpty) {
+      console.log('✅ Conditions met, calling functions...')
       checkUserRole()
       checkSetupStatus()
       checkForInProgressGeneration()
+    } else {
+      console.log('❌ Conditions NOT met - user:', !!user, 'forceEmpty:', forceEmpty)
     }
   }, [user, forceEmpty])
 
@@ -241,16 +247,21 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
 
   // Check for any in-progress message generation on mount
   const checkForInProgressGeneration = async () => {
-    if (!user) return
+    console.log('🔄 checkForInProgressGeneration called, user:', user?.id || user?.user_id)
+    if (!user) {
+      console.log('❌ No user found, skipping check')
+      return
+    }
 
     const userId = user?.id || user?.user_id
 
-    // Check for the most recent message generation log that's in-progress or generated (not archived/sent)
+    console.log('🔍 Checking for existing message logs for user:', userId)
+    // Check for the most recent message generation log that's in-progress or generated (not archived/sent/copied/scheduled)
     const { data: existingLog, error: logError } = await supabase
       .from('message_generation_logs')
-      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, prospect_data, research_cache_id')
+      .select('id, message_status, generated_message, edited_message, message_type, created_at, updated_at, research_cache_id, recipient_linkedin_id')
       .eq('user_id', userId)
-      .or('message_status.eq.analysing_prospect,message_status.eq.researching_product,message_status.eq.analysing_icp,message_status.eq.generating_message,message_status.eq.generated')
+      .in('message_status', ['analysing_prospect', 'researching_product', 'analysing_icp', 'generating_message', 'generated'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -260,8 +271,10 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
       return
     }
 
+    console.log('📝 Query result - existingLog:', existingLog)
+
     if (existingLog) {
-      console.log('📝 Found existing message log:', existingLog)
+      console.log('✅ Found existing message log:', existingLog)
       setCurrentLogId(existingLog.id)
 
       // Set research cache ID if available
@@ -269,13 +282,10 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
         setCurrentResearchId(existingLog.research_cache_id)
       }
 
-      // Extract LinkedIn URL from prospect_data
-      if (existingLog.prospect_data && typeof existingLog.prospect_data === 'object') {
-        const prospectData = existingLog.prospect_data as any
-        if (prospectData.linkedin_url) {
-          setRecipientUrl(prospectData.linkedin_url)
-          console.log('✅ Restored LinkedIn URL from prospect_data:', prospectData.linkedin_url)
-        }
+      // Extract LinkedIn URL from recipient_linkedin_id field
+      if (existingLog.recipient_linkedin_id) {
+        setRecipientUrl(existingLog.recipient_linkedin_id)
+        console.log('✅ Restored LinkedIn URL:', existingLog.recipient_linkedin_id)
       }
 
       // Check if it's in progress
@@ -601,6 +611,13 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
   }
 
   const handleGenerate = async () => {
+    // Prevent starting a new generation if one is already in progress
+    if (isGenerating) {
+      console.warn('⚠️ Generation already in progress, ignoring new request')
+      toast.error('A message is already being generated. Please wait for it to complete.')
+      return
+    }
+
     if (!linkedinUrl) {
       toast.error('Please enter a LinkedIn URL')
       setLinkedinError('LinkedIn URL is required')
@@ -898,6 +915,70 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
     openProspectModal(currentLogId, [currentLogId])
   }
 
+  const handleToneAdjustment = async (toneType: 'concise' | 'professional' | 'casual') => {
+    if (!currentLogId || !user) {
+      toast.error('Unable to adjust message tone')
+      return
+    }
+
+    setIsAdjustingTone(true)
+    setAppliedTone(toneType)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        throw new Error('No authentication token')
+      }
+
+      const currentMessage = editedMessage || generatedMessage
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server-edit-message`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: toneType,
+            user_id: user.id || user.user_id,
+            message: currentMessage,
+            message_log_id: currentLogId
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to adjust message tone')
+      }
+
+      const result = await response.json()
+
+      toast.success(`Message adjusted to be more ${toneType}`)
+
+      // The adjusted message will come through the realtime subscription
+      // or we can set it directly if returned in response
+      if (result.adjusted_message) {
+        setEditedMessage(result.adjusted_message)
+      }
+    } catch (error) {
+      console.error('Tone adjustment error:', error)
+      toast.error('Failed to adjust message tone')
+      setAppliedTone(null)
+    } finally {
+      setIsAdjustingTone(false)
+    }
+  }
+
+  const handleResetMessage = () => {
+    setEditedMessage('')
+    setAppliedTone(null)
+    toast.success('Message reset to original')
+  }
+
   const settingsCount = Object.values(setupStatus.settings).filter(Boolean).length
 
   // Setup Required State
@@ -1129,11 +1210,12 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
           <textarea
             value={editedMessage || generatedMessage}
             onChange={(e) => setEditedMessage(e.target.value)}
+            disabled={isAdjustingTone}
             className={`w-full min-h-[300px] bg-black/30 border rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-all duration-200 resize-none ${
               isOverLimit
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-white/10 focus:border-green-500/50'
-            }`}
+            } ${isAdjustingTone ? 'opacity-50 cursor-not-allowed' : ''}`}
             placeholder="Your generated message will appear here..."
           />
         </div>
@@ -1162,7 +1244,17 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                   )}
                 </div>
                 {editedMessage && editedMessage !== generatedMessage && (
-                  <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                    <button
+                      onClick={handleResetMessage}
+                      className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5"
+                      title="Reset to original message"
+                    >
+                      <span>↩️</span>
+                      <span>Reset</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -1186,6 +1278,82 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
             </>
           )
         })()}
+
+        {/* Tone Adjustment Section - Only visible to specific user */}
+        {(user?.id === '681e2401-1b8a-4e6f-812f-ca18bf29a821' || user?.user_id === '681e2401-1b8a-4e6f-812f-ca18bf29a821') && (
+        <div className="mb-4 pb-4 border-b border-white/10">
+          <label className="block text-xs font-medium text-white/70 uppercase tracking-wide mb-2">
+            Adjust Tone
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleToneAdjustment('concise')}
+              disabled={isAdjustingTone}
+              className={`flex-1 px-4 py-2 rounded-xl border transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                appliedTone === 'concise'
+                  ? 'border-green-500/50 bg-green-500/10 text-green-400'
+                  : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
+              }`}
+            >
+              {isAdjustingTone && appliedTone === 'concise' ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Adjusting...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <span>✂️ More Concise</span>
+                  {appliedTone === 'concise' && !isAdjustingTone && <span>✓</span>}
+                </div>
+              )}
+            </button>
+
+            <button
+              onClick={() => handleToneAdjustment('professional')}
+              disabled={isAdjustingTone}
+              className={`flex-1 px-4 py-2 rounded-xl border transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                appliedTone === 'professional'
+                  ? 'border-green-500/50 bg-green-500/10 text-green-400'
+                  : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
+              }`}
+            >
+              {isAdjustingTone && appliedTone === 'professional' ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Adjusting...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <span>👔 More Professional</span>
+                  {appliedTone === 'professional' && !isAdjustingTone && <span>✓</span>}
+                </div>
+              )}
+            </button>
+
+            <button
+              onClick={() => handleToneAdjustment('casual')}
+              disabled={isAdjustingTone}
+              className={`flex-1 px-4 py-2 rounded-xl border transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                appliedTone === 'casual'
+                  ? 'border-green-500/50 bg-green-500/10 text-green-400'
+                  : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
+              }`}
+            >
+              {isAdjustingTone && appliedTone === 'casual' ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Adjusting...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <span>😊 More Casual</span>
+                  {appliedTone === 'casual' && !isAdjustingTone && <span>✓</span>}
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3">
@@ -1634,7 +1802,17 @@ export function MessageWidget({ forceEmpty, className }: MessageWidgetProps) {
                       )}
                     </div>
                     {editedMessage && editedMessage !== generatedMessage && (
-                      <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#FBAE1C] text-xs">✏️ Edited</span>
+                        <button
+                          onClick={handleResetMessage}
+                          className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5"
+                          title="Reset to original message"
+                        >
+                          <span>↩️</span>
+                          <span>Reset</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 

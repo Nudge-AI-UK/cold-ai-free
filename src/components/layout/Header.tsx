@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { LogOut, User, MessageSquare, Users, Trash2 } from 'lucide-react'
+import { LogOut, User, MessageSquare, Users, Trash2, BookOpen } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   DropdownMenu,
@@ -197,6 +197,13 @@ export function Header() {
                 {user?.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-orange-500/20" />
+              <DropdownMenuItem
+                onClick={() => window.open('https://docs.coldai.uk', '_blank')}
+                className="hover:bg-orange-500/20 cursor-pointer text-gray-200 focus:bg-orange-500/20 focus:text-orange-300"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Documentation
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => signOut()}
                 className="hover:bg-orange-500/20 cursor-pointer text-gray-200 focus:bg-orange-500/20 focus:text-orange-300"
