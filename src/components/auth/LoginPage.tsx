@@ -163,6 +163,9 @@ export const LoginPage = () => {
             sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
             execution: 'execute', // Don't run until we call execute()
             appearance: 'execute', // Keep widget invisible
+            'refresh-expired': 'auto', // Auto-refresh for Safari compatibility
+            retry: 'auto', // Auto-retry on failure
+            'retry-interval': 8000, // Retry interval in ms
             callback: (token: string) => {
               setCaptchaToken(token);
               setIsVerifying(false);
@@ -209,6 +212,19 @@ export const LoginPage = () => {
     };
   }, [isSignUp, showEmailForm, turnstileReady]);
 
+  // Clean up Turnstile widget when OTP modal is shown
+  useEffect(() => {
+    if (showOtpVerification && turnstileWidgetId.current && window.turnstile) {
+      try {
+        window.turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+        console.log('✅ Removed Turnstile widget when showing OTP modal');
+      } catch (e) {
+        console.warn('Failed to remove turnstile widget when showing OTP:', e);
+      }
+    }
+  }, [showOtpVerification]);
+
   // Render Turnstile widget for password reset modal in execution mode
   useEffect(() => {
     if (!turnstileReady || !showPasswordReset || !resetTurnstileRef.current) {
@@ -237,6 +253,9 @@ export const LoginPage = () => {
             sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
             execution: 'execute', // Don't run until we call execute()
             appearance: 'execute', // Keep widget invisible
+            'refresh-expired': 'auto', // Auto-refresh for Safari compatibility
+            retry: 'auto', // Auto-retry on failure
+            'retry-interval': 8000, // Retry interval in ms
             callback: (token: string) => {
               setResetCaptchaToken(token);
               setIsResetVerifying(false);
