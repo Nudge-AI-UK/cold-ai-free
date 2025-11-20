@@ -15,6 +15,7 @@ interface CommunicationInfo {
   customCta: string
   phrasesToAvoid: string
   calendarLink: string
+  connectionRequestWithNote: boolean
 }
 
 const communicationStyles = [
@@ -56,7 +57,8 @@ export function ProfileCommunicationModal() {
     defaultCta: 'soft',
     customCta: '',
     phrasesToAvoid: '',
-    calendarLink: ''
+    calendarLink: '',
+    connectionRequestWithNote: false
   })
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -121,7 +123,8 @@ export function ProfileCommunicationModal() {
           defaultCta: data.cta_preference || 'soft',
           customCta: data.custom_cta || '',
           phrasesToAvoid: data.avoid_phrases ? data.avoid_phrases.join(', ') : '',
-          calendarLink: data.calendar_link || ''
+          calendarLink: data.calendar_link || '',
+          connectionRequestWithNote: data.with_note || false
         }
         setFormData(commData)
         setHasExistingData(hasData)
@@ -192,6 +195,7 @@ export function ProfileCommunicationModal() {
           custom_cta: formData.defaultCta === 'custom' ? formData.customCta : '',
           avoid_phrases: formData.phrasesToAvoid ? formData.phrasesToAvoid.split(',').map(p => p.trim()).filter(p => p) : [],
           calendar_link: formData.calendarLink,
+          with_note: formData.connectionRequestWithNote,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id'
@@ -374,6 +378,35 @@ export function ProfileCommunicationModal() {
                   />
                 </div>
               )}
+
+              <div>
+                <label className="text-sm font-medium text-[#FBAE1C] block mb-2">
+                  Connection Request Settings
+                </label>
+                <label className="flex items-start gap-3 text-sm cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={formData.connectionRequestWithNote}
+                    onChange={(e) => handleInputChange('connectionRequestWithNote', e.target.checked)}
+                    className="mt-0.5 rounded accent-[#FBAE1C] bg-black/30 border-white/20
+                             focus:ring-2 focus:ring-[#FBAE1C]/20"
+                  />
+                  <span className="text-white group-hover:text-[#FBAE1C] transition-colors">
+                    Send connection requests with note
+                  </span>
+                </label>
+                {/* Tip */}
+                <div className="mt-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5 flex-shrink-0">
+                      <span className="text-blue-400 text-xs font-bold">💡</span>
+                    </div>
+                    <p className="text-xs text-blue-300 leading-relaxed">
+                      <strong>Tip:</strong> Cold AI recommends sending connection requests without a note, then crafting a direct message once connected for better response rates.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <label className="text-sm font-medium text-[#FBAE1C] block mb-2">
